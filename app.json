@@ -95,6 +95,30 @@
       "bundler": "metro",
       "output": "single",
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "targetName": "ExpoWidgetsTarget",
+                  "bundleIdentifier": "com.gaster.dvoe.ExpoWidgetsTarget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.gaster.dvoe"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        },
+        "projectId": "43ca4251-00ac-42e8-b36b-8c8b99dd6d0f"
+      }
+    },
+    "owner": "gaster45"
   }
 }
