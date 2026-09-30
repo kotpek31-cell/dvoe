@@ -1,0 +1,14 @@
+# Необязательно. Обратный прокси к Supabase — для сетей, где *.supabase.co не открывается
+# (в России провайдеры с июня 2025 года ограничивают трафик Cloudflare, через который работает Supabase).
+#
+# 1. Арендуйте VPS, IP которого доступен у вас без VPN, и направьте на него домен (A-запись).
+# 2. Установите Caddy (https://caddyserver.com/docs/install) и положите этот файл в /etc/caddy/Caddyfile.
+# 3. Замените dvoe.example.ru на свой домен, your-project-ref — на id проекта Supabase.
+# 4. sudo systemctl reload caddy — Caddy сам получит HTTPS-сертификат, WebSocket (Realtime) проксируется автоматически.
+# 5. В .env приложения: EXPO_PUBLIC_SUPABASE_URL=https://dvoe.example.ru — и пересоберите приложение.
+
+dvoe.example.ru {
+	reverse_proxy https://your-project-ref.supabase.co {
+		header_up Host {upstream_hostport}
+	}
+}

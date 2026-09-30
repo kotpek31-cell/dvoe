@@ -1,0 +1,47 @@
+{
+  "name": "dvoe",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "start:dev": "expo start --dev-client",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~57.0.16",
+    "@expo/ui": "~57.0.0",
+    "@kingstinct/react-native-healthkit": "latest",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "@react-native-community/datetimepicker": "9.1.0",
+    "@supabase/supabase-js": "^2.100.0",
+    "expo": "~57.0.0",
+    "expo-background-task": "~57.0.0",
+    "expo-constants": "~57.0.0",
+    "expo-dev-client": "~57.0.0",
+    "expo-device": "~57.0.0",
+    "expo-haptics": "~57.0.0",
+    "expo-linking": "~57.0.0",
+    "expo-notifications": "~57.0.0",
+    "expo-router": "~57.0.0",
+    "expo-splash-screen": "~57.0.0",
+    "expo-status-bar": "~57.0.0",
+    "expo-system-ui": "~57.0.0",
+    "expo-task-manager": "~57.0.0",
+    "expo-widgets": "~57.0.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "~0.86.0",
+    "react-native-android-widget": "latest",
+    "react-native-nitro-modules": "latest",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-web": "^0.21.2"
+  },
+  "devDependencies": {
+    "@types/react": "~19.2.0",
+    "typescript": "~6.0.3"
+  }
+}
