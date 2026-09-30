@@ -1,3 +1,5 @@
+import { registerServiceWorker } from './webPush';
+
 // Веб-версия: мета-теги, чтобы сайт можно было установить на экран «Домой»
 // (iPhone: Safari → «Поделиться» → «На экран Домой») и он открывался без адресной строки.
 type Doc = {
@@ -20,14 +22,16 @@ export function setupWebApp(): void {
   const doc = (globalThis as unknown as { document?: Doc }).document;
   if (!doc) return;
   doc.title = 'Двое';
-  doc.body.style.backgroundColor = '#0E0E12';
-  doc.documentElement.style.backgroundColor = '#0E0E12';
+  doc.body.style.backgroundColor = '#0B0A14';
+  doc.documentElement.style.backgroundColor = '#0B0A14';
   // Относительные пути работают и при размещении сайта в подпапке (GitHub Pages)
   addTag(doc, 'link', { rel: 'manifest', href: 'manifest.json' });
   addTag(doc, 'link', { rel: 'apple-touch-icon', href: 'apple-touch-icon.png' });
-  addTag(doc, 'meta', { name: 'theme-color', content: '#0E0E12' });
+  addTag(doc, 'meta', { name: 'theme-color', content: '#0B0A14' });
   addTag(doc, 'meta', { name: 'apple-mobile-web-app-capable', content: 'yes' });
   addTag(doc, 'meta', { name: 'mobile-web-app-capable', content: 'yes' });
   addTag(doc, 'meta', { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' });
   addTag(doc, 'meta', { name: 'apple-mobile-web-app-title', content: 'Двое' });
+  // service worker нужен для push-уведомлений на iPhone
+  registerServiceWorker();
 }

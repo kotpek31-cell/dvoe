@@ -1,9 +1,9 @@
-// Данные для виджетов на главном экране: настроение и оценка дня партнёра.
+// Данные для виджета на главном экране: лицо настроения партнёра, статус сна и оценка дня.
 // Android-виджет обновляется сам (каждые 30 минут) и когда приложение что-то меняет.
-// iOS-виджет (expo-widgets) не умеет ходить в сеть — данные ему передаёт приложение.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { formatTime, todayKey } from './dates';
-import { getEmotion, INTENSITY_LABELS } from './emotions';
+import { entryMix, getEmotion, mixDominant, mixSummary } from './emotions';
+import type { FaceKey } from './face';
 import { formatScore } from './score';
 import { supabase } from './supabase';
 import { pushSnapshotToWidgets } from './widgetBridge';
@@ -11,65 +11,73 @@ import { pushSnapshotToWidgets } from './widgetBridge';
 export type PartnerSnapshot = {
   state: 'ok' | 'no_partner' | 'signed_out';
   name: string;
-  avatar: string;
-  emoji: string;
+  faceKey: FaceKey;
+  faceValue: number;
   moodLabel: string;
   moodDetail: string;
   rating: string;
   updatedAt: string;
+  // для iOS-виджета (expo-widgets) — там нет рисования SVG
+  avatar: string;
+  emoji: string;
 };
 
 type SnapshotRow = {
   name: string;
   avatar: string;
   sleeping_since: string | null;
-  mood: { emotion: string; sub_emotion: string | null; intensity: number; created_at: string } | null;
+  mood: { emotion: string; sub_emotion: string | null; intensity: number; created_at: string; emotions?: unknown } | null;
   rating: number | null;
   auto_score: number | null;
 };
 
-const CACHE_KEY = 'dvoe:widget-snapshot';
+const CACHE_KEY = 'dvoe:widget-snapshot-0.1';
 
 export function placeholderSnapshot(state: PartnerSnapshot['state']): PartnerSnapshot {
   return {
     state,
     name: state === 'signed_out' ? 'Двое' : 'Партнёр',
-    avatar: '💞',
-    emoji: '🫶',
-    moodLabel: state === 'signed_out' ? 'Войдите в приложение' : 'Ждём партнёра',
-    moodDetail: state === 'signed_out' ? 'чтобы видеть настроение пары' : 'поделитесь кодом пары',
+    faceKey: 'love',
+    faceValue: 40,
+    moodLabel: state === 'signed_out' ? 'Войди в приложение' : 'Ждём партнёра',
+    moodDetail: state === 'signed_out' ? 'чтобы видеть настроение пары' : 'поделись кодом пары',
     rating: '—',
     updatedAt: formatTime(new Date()),
+    avatar: '💞',
+    emoji: '🫶',
   };
 }
 
 function mapRow(row: SnapshotRow): PartnerSnapshot {
   const now = formatTime(new Date());
+  const rating = row.rating != null ? `${row.rating}/10` : row.auto_score != null ? `авто ${formatScore(row.auto_score)}` : '—';
   if (row.sleeping_since) {
     return {
       state: 'ok',
       name: row.name,
-      avatar: row.avatar,
-      emoji: '😴',
+      faceKey: 'sleep',
+      faceValue: 100,
       moodLabel: 'Спит',
       moodDetail: `с ${formatTime(row.sleeping_since)}`,
-      rating: row.rating != null ? `${row.rating}/10` : '—',
+      rating,
       updatedAt: now,
+      avatar: row.avatar,
+      emoji: '😴',
     };
   }
-  const mood = row.mood;
-  const emotion = mood ? getEmotion(mood.emotion) : null;
+  const mix = row.mood ? entryMix(row.mood) : {};
+  const top = mixDominant(mix);
   return {
     state: 'ok',
     name: row.name,
-    avatar: row.avatar,
-    emoji: emotion ? emotion.emoji : '🤍',
-    moodLabel: emotion ? emotion.label : 'Ещё не отмечено',
-    moodDetail: mood
-      ? [mood.sub_emotion, INTENSITY_LABELS[mood.intensity], formatTime(mood.created_at)].filter(Boolean).join(' · ')
-      : 'настроение за сегодня',
-    rating: row.rating != null ? `${row.rating}/10` : row.auto_score != null ? `авто ${formatScore(row.auto_score)}` : '—',
+    faceKey: top?.key ?? 'calm',
+    faceValue: top?.value ?? 0,
+    moodLabel: top ? mixSummary(mix) : 'Ещё не отмечено',
+    moodDetail: row.mood ? [formatTime(row.mood.created_at), row.mood.sub_emotion].filter(Boolean).join(' · ') : 'настроение за сегодня',
+    rating,
     updatedAt: now,
+    avatar: row.avatar,
+    emoji: top ? getEmotion(top.key).emoji : '🤍',
   };
 }
 

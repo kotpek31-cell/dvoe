@@ -1,45 +1,43 @@
-import { FlexWidget, TextWidget } from 'react-native-android-widget';
+import { FlexWidget, SvgWidget, TextWidget } from 'react-native-android-widget';
+import { faceSvg } from '../lib/face';
 import type { PartnerSnapshot } from '../lib/widgets';
 
-// Виджет Android рисуется нативными View, поэтому здесь свои примитивы, а не <View>/<Text>
+// Виджет Android рисуется нативными View, поэтому здесь свои примитивы, а не <View>/<Text>.
+// Лицо — тот же движок эмоций, что в приложении, только SVG-строкой.
 export function AndroidPartnerWidget({ snapshot }: { snapshot: PartnerSnapshot }) {
+  const svg = faceSvg(snapshot.faceKey ?? 'calm', snapshot.faceValue ?? 0, 96);
   return (
     <FlexWidget
       clickAction="OPEN_APP"
       style={{
         height: 'match_parent',
         width: 'match_parent',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-        backgroundColor: '#17171D',
-        borderRadius: 24,
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#1A1530',
+        borderRadius: 28,
+        borderWidth: 1,
+        borderColor: '#3A3160',
         padding: 14,
       }}
     >
-      <TextWidget
-        text={`${snapshot.avatar} ${snapshot.name}`}
-        maxLines={1}
-        truncate="END"
-        style={{ fontSize: 13, color: '#9C9CAB' }}
-      />
-      <FlexWidget style={{ flexDirection: 'row', alignItems: 'center', width: 'match_parent' }}>
-        <TextWidget text={snapshot.emoji} style={{ fontSize: 34 }} />
-        <FlexWidget style={{ flexDirection: 'column', marginLeft: 10, flex: 1 }}>
-          <TextWidget
-            text={snapshot.moodLabel}
-            maxLines={1}
-            truncate="END"
-            style={{ fontSize: 17, color: '#F3F3F6', fontWeight: 'bold' }}
-          />
-          <TextWidget
-            text={snapshot.moodDetail}
-            maxLines={1}
-            truncate="END"
-            style={{ fontSize: 12, color: '#9C9CAB' }}
-          />
-        </FlexWidget>
+      <SvgWidget svg={svg} style={{ height: 68, width: 68 }} />
+      <FlexWidget style={{ flexDirection: 'column', marginLeft: 12, flex: 1 }}>
+        <TextWidget
+          text={snapshot.name}
+          maxLines={1}
+          truncate="END"
+          style={{ fontSize: 13, color: '#FF9EBB', fontWeight: 'bold' }}
+        />
+        <TextWidget
+          text={snapshot.moodLabel}
+          maxLines={1}
+          truncate="END"
+          style={{ fontSize: 17, color: '#F6F3FF', fontWeight: 'bold' }}
+        />
+        <TextWidget text={snapshot.moodDetail} maxLines={1} truncate="END" style={{ fontSize: 12, color: '#B9B3CE' }} />
+        <TextWidget text={`Оценка дня: ${snapshot.rating}`} maxLines={1} style={{ fontSize: 12, color: '#FFC266', fontWeight: 'bold' }} />
       </FlexWidget>
-      <TextWidget text={`Оценка дня: ${snapshot.rating}`} style={{ fontSize: 13, color: '#FF9EBB', fontWeight: 'bold' }} />
     </FlexWidget>
   );
 }

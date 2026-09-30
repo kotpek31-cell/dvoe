@@ -1,5 +1,10 @@
 // Типы строк базы данных (совпадают с supabase/schema.sql)
 
+export type ChibiKind = 'boy' | 'girl' | 'nb';
+
+// Внешность чибика. В 0.1 — только вид; причёски, глаза, рост и т. д. добавятся позже.
+export type ChibiLook = { kind: ChibiKind };
+
 export type Profile = {
   id: string;
   display_name: string;
@@ -7,6 +12,7 @@ export type Profile = {
   pair_id: string | null;
   water_goal: number;
   sleeping_since: string | null;
+  chibi?: ChibiLook | null;
   created_at: string;
 };
 
@@ -21,9 +27,10 @@ export type MoodEntry = {
   id: string;
   user_id: string;
   day: string;
-  emotion: string;
+  emotion: string; // главная эмоция (для старых версий приложения и виджета)
   sub_emotion: string | null;
-  intensity: number;
+  intensity: number; // 1…5, главная эмоция
+  emotions?: Record<string, number> | null; // с 0.1: сила каждой эмоции 0…100
   note: string | null;
   created_at: string;
 };
@@ -41,8 +48,6 @@ export type SleepEntry = {
   created_at: string;
   updated_at: string;
 };
-
-export type WaterLog = { user_id: string; day: string; glasses: number };
 
 export type Gratitude = {
   id: string;
@@ -104,7 +109,6 @@ export type TableName =
   | 'profiles'
   | 'mood_entries'
   | 'sleep_entries'
-  | 'water_logs'
   | 'gratitudes'
   | 'wishes'
   | 'question_answers'
@@ -115,7 +119,6 @@ export const REALTIME_TABLES: TableName[] = [
   'profiles',
   'mood_entries',
   'sleep_entries',
-  'water_logs',
   'gratitudes',
   'wishes',
   'question_answers',

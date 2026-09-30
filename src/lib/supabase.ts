@@ -10,6 +10,9 @@ const SUPABASE_KEY =
 export const isSupabaseConfigured =
   /^https:\/\/.+/.test(SUPABASE_URL) && !SUPABASE_URL.includes('your-project-ref') && SUPABASE_KEY.length > 20;
 
+// Адрес проекта без «/» на конце — нужен для Edge Function веб-уведомлений
+export const supabaseUrl = isSupabaseConfigured ? SUPABASE_URL.replace(/\/+$/, '') : '';
+
 export const supabase = createClient(
   isSupabaseConfigured ? SUPABASE_URL : 'https://not-configured.supabase.co',
   isSupabaseConfigured ? SUPABASE_KEY : 'not-configured-publishable-key',

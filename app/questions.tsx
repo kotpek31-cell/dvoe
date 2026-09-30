@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Card, Empty, ErrorBox, Loading, Screen, Txt } from '../src/components/ui';
+import { Card, Empty, ErrorBox, Screen, Txt } from '../src/components/ui';
 import { usePair, useTableVersion } from '../src/context/PairProvider';
 import { fetchAnswerArchive } from '../src/lib/api';
 import { formatDayLong } from '../src/lib/dates';
@@ -24,28 +24,26 @@ export default function QuestionsArchive() {
     return [...byDay.entries()].sort((a, b) => (a[0] < b[0] ? 1 : -1));
   }, [data, me?.id]);
 
-  if (!me || (loading && !data)) return <Loading />;
-
   return (
-    <Screen refreshing={refreshing} onRefresh={refresh}>
+    <Screen background back title="Архив вопросов" refreshing={refreshing} onRefresh={refresh}>
       {error ? <ErrorBox message={error} onRetry={reload} /> : null}
-      {days.length === 0 ? <Empty text="Здесь появятся ваши ответы на вопросы дня" /> : null}
+      {!loading && days.length === 0 ? <Empty text="Здесь появятся ваши ответы на вопросы дня" /> : null}
       {days.map(([day, item]) => (
         <Card key={day}>
-          <Txt muted size={13}>
+          <Txt faint size={13}>
             {formatDayLong(day)}
           </Txt>
-          <Txt bold size={16}>
+          <Txt weight="displaySemi" size={16}>
             {item.question}
           </Txt>
           <View style={[styles.answer, { borderColor: C.me }]}>
-            <Txt muted size={12}>
+            <Txt faint size={12}>
               Ты
             </Txt>
             <Txt>{item.mine ?? '—'}</Txt>
           </View>
           <View style={[styles.answer, { borderColor: C.partner }]}>
-            <Txt muted size={12}>
+            <Txt faint size={12}>
               {partner?.display_name ?? 'Партнёр'}
             </Txt>
             <Txt>{item.theirs ?? 'не ответил(а)'}</Txt>

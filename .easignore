@@ -1,0 +1,28 @@
+# Что НЕ отправлять в EAS Build. Этот файл заменяет .gitignore для EAS, поэтому повторяет его —
+# кроме google-services.json: в GitHub он не попадает, а в сборку APK попасть должен.
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Нативные папки генерируются командой prebuild / EAS Build
+/ios
+/android
+
+# Ключи подписи
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+credentials.json
+
+# Ключ сервисного аккаунта Firebase — загружается в EAS, в репозиторий не кладём
+*firebase-adminsdk*.json
+
+.DS_Store
+npm-debug.*
+yarn-error.*
+
+*.zip

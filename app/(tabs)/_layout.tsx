@@ -1,66 +1,51 @@
-import { Redirect, router, Tabs } from 'expo-router';
-import { Pressable, Text } from 'react-native';
+import { Redirect, Tabs, usePathname } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { Aurora } from '../../src/components/Aurora';
+import { TabBar } from '../../src/components/TabBar';
 import { Loading } from '../../src/components/ui';
 import { useAuth } from '../../src/context/AuthProvider';
 import { usePair } from '../../src/context/PairProvider';
+import { hasChosenChibi } from '../../src/lib/chibi';
+import { getFlag } from '../../src/lib/prefs';
 import { useBackgroundSync } from '../../src/lib/sync';
 import { C } from '../../src/theme';
-
-function TabIcon({ emoji, focused }: { emoji: string; focused: boolean }) {
-  return <Text style={{ fontSize: 21, opacity: focused ? 1 : 0.45 }}>{emoji}</Text>;
-}
-
-function SettingsButton() {
-  return (
-    <Pressable onPress={() => router.push('/settings')} hitSlop={12} style={{ paddingHorizontal: 16 }}>
-      <Text style={{ fontSize: 20 }}>⚙️</Text>
-    </Pressable>
-  );
-}
 
 export default function TabsLayout() {
   const { session, initializing } = useAuth();
   const { me, loading } = usePair();
+  const pathname = usePathname();
+  const [onboarded, setOnboarded] = useState<boolean | null>(null);
   useBackgroundSync();
 
-  if (initializing || (session && loading)) return <Loading />;
+  useEffect(() => {
+    getFlag('onboarded').then(setOnboarded);
+  }, []);
+
+  if (initializing || (session && loading) || onboarded === null) return <Loading />;
   if (!session) return <Redirect href="/sign-in" />;
   if (!me?.pair_id) return <Redirect href="/pair" />;
+  if (!onboarded && !hasChosenChibi(me)) return <Redirect href="/onboarding" />;
 
   return (
-    <Tabs
-      screenOptions={{
-        headerStyle: { backgroundColor: C.bg },
-        headerTintColor: C.text,
-        headerTitleStyle: { fontWeight: '700' },
-        headerShadowVisible: false,
-        headerRight: () => <SettingsButton />,
-        tabBarStyle: { backgroundColor: C.card, borderTopColor: C.border },
-        tabBarActiveTintColor: C.text,
-        tabBarInactiveTintColor: C.faint,
-        sceneStyle: { backgroundColor: C.bg },
-      }}
-    >
-      <Tabs.Screen
-        name="today"
-        options={{ title: 'Сегодня', tabBarIcon: ({ focused }) => <TabIcon emoji="☀️" focused={focused} /> }}
-      />
-      <Tabs.Screen
-        name="sleep"
-        options={{ title: 'Сон', tabBarIcon: ({ focused }) => <TabIcon emoji="🌙" focused={focused} /> }}
-      />
-      <Tabs.Screen
-        name="mood"
-        options={{ title: 'Настроение', tabBarIcon: ({ focused }) => <TabIcon emoji="🎭" focused={focused} /> }}
-      />
-      <Tabs.Screen
-        name="wishes"
-        options={{ title: 'Желания', tabBarIcon: ({ focused }) => <TabIcon emoji="🎁" focused={focused} /> }}
-      />
-      <Tabs.Screen
-        name="stats"
-        options={{ title: 'Итоги', tabBarIcon: ({ focused }) => <TabIcon emoji="📊" focused={focused} /> }}
-      />
-    </Tabs>
+    <View style={styles.root}>
+      {/* Один фон на все вкладки; на главной его закрывает локация — там аврору не крутим */}
+      <Aurora paused={pathname === '/home' || pathname === '/'} />
+      <Tabs
+        tabBar={(props) => <TabBar {...props} />}
+        screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: 'transparent' } }}
+      >
+        <Tabs.Screen name="home" options={{ title: 'Главная' }} />
+        <Tabs.Screen name="mood" options={{ title: 'Настроение' }} />
+        <Tabs.Screen name="sleep" options={{ title: 'Сон' }} />
+        <Tabs.Screen name="us" options={{ title: 'Мы' }} />
+        <Tabs.Screen name="stats" options={{ title: 'Итоги' }} />
+        <Tabs.Screen name="profile" options={{ title: 'Профиль' }} />
+      </Tabs>
+    </View>
   );
 }
+
+const styles = StyleSheet.create({
+  root: { flex: 1, backgroundColor: C.bg },
+});

@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button, Input, Segmented, showError } from '../src/components/ui';
+import { StyleSheet, View } from 'react-native';
+import { Chibi } from '../src/components/Chibi';
+import { Button, Input, Screen, Segmented, showError, Txt } from '../src/components/ui';
 import { translateError } from '../src/lib/api';
 import { supabase } from '../src/lib/supabase';
 import { C, S } from '../src/theme';
@@ -10,7 +10,6 @@ import { C, S } from '../src/theme';
 type Mode = 'login' | 'register';
 
 export default function SignIn() {
-  const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<Mode>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -20,9 +19,9 @@ export default function SignIn() {
 
   const submit = async () => {
     const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail.includes('@')) return showError('Введите email');
+    if (!cleanEmail.includes('@')) return showError('Введи email');
     if (password.length < 6) return showError('Пароль — минимум 6 символов');
-    if (mode === 'register' && !name.trim()) return showError('Как вас называть? Введите имя');
+    if (mode === 'register' && !name.trim()) return showError('Как тебя называть? Введи имя');
     setBusy(true);
     setInfo(null);
     try {
@@ -41,8 +40,8 @@ export default function SignIn() {
           router.replace('/');
         } else {
           setInfo(
-            'Аккаунт создан. Подтвердите email по ссылке из письма и войдите. ' +
-              'Чтобы письма не требовались, отключите «Confirm email» в Supabase → Authentication (см. README).',
+            'Аккаунт создан. Подтверди email по ссылке из письма и войди. ' +
+              'Чтобы письма не требовались, отключи «Confirm email» в Supabase → Authentication (см. README).',
           );
           setMode('login');
         }
@@ -55,59 +54,61 @@ export default function SignIn() {
   };
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView
-        contentContainerStyle={[styles.content, { paddingTop: insets.top + 48, paddingBottom: insets.bottom + 24 }]}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={styles.logo}>💞</Text>
-        <Text style={styles.title}>Двое</Text>
-        <Text style={styles.subtitle}>Общий дневник: сон, настроение, желания и маленькая игра каждый день</Text>
+    <Screen background>
+      <View style={styles.duo}>
+        <Chibi kind="boy" emotion="joy" value={55} pose="idle" size={96} look={3} />
+        <Chibi kind="girl" emotion="love" value={45} pose="idle" size={96} look={-3} />
+      </View>
+      <Txt weight="display" size={36} center>
+        Двое
+      </Txt>
+      <Txt muted center style={styles.subtitle}>
+        Общий дневник для двоих: сон, настроение, желания и маленькие чибики, которые гуляют вместе
+      </Txt>
 
-        <Segmented
-          options={[
-            { value: 'login', label: 'Вход' },
-            { value: 'register', label: 'Регистрация' },
-          ]}
-          value={mode}
-          onChange={setMode}
+      <Segmented
+        options={[
+          { value: 'login', label: 'Вход' },
+          { value: 'register', label: 'Регистрация' },
+        ]}
+        value={mode}
+        onChange={setMode}
+      />
+
+      <View style={styles.form}>
+        {mode === 'register' ? (
+          <Input placeholder="Твоё имя" value={name} onChangeText={setName} autoCapitalize="words" maxLength={40} />
+        ) : null}
+        <Input
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          autoComplete="email"
+          textContentType="emailAddress"
         />
-
-        <View style={styles.form}>
-          {mode === 'register' ? (
-            <Input placeholder="Ваше имя" value={name} onChangeText={setName} autoCapitalize="words" maxLength={40} />
-          ) : null}
-          <Input
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoComplete="email"
-            textContentType="emailAddress"
-          />
-          <Input
-            placeholder="Пароль (от 6 символов)"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-            textContentType={mode === 'login' ? 'password' : 'newPassword'}
-          />
-          <Button title={mode === 'login' ? 'Войти' : 'Создать аккаунт'} onPress={submit} loading={busy} />
-          {info ? <Text style={styles.info}>{info}</Text> : null}
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+        <Input
+          placeholder="Пароль (от 6 символов)"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+          textContentType={mode === 'login' ? 'password' : 'newPassword'}
+        />
+        <Button title={mode === 'login' ? 'Войти' : 'Создать аккаунт'} onPress={submit} loading={busy} />
+        {info ? (
+          <Txt color={C.warn} size={14}>
+            {info}
+          </Txt>
+        ) : null}
+      </View>
+    </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: C.bg },
-  content: { paddingHorizontal: S.xl, gap: S.lg },
-  logo: { fontSize: 56, textAlign: 'center' },
-  title: { color: C.text, fontSize: 34, fontWeight: '800', textAlign: 'center' },
-  subtitle: { color: C.muted, fontSize: 15, textAlign: 'center', lineHeight: 21, marginBottom: S.md },
+  duo: { flexDirection: 'row', justifyContent: 'center', gap: S.sm, marginTop: S.xl },
+  subtitle: { marginBottom: S.md },
   form: { gap: S.md },
-  info: { color: C.warn, fontSize: 14, lineHeight: 20 },
 });

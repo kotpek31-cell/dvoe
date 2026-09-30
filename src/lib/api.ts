@@ -13,11 +13,12 @@ import type {
   SleepEntry,
   SleepSource,
   Streak,
-  WaterLog,
   Wish,
   WishHorizon,
+  ChibiLook,
 } from '../types';
 import { atTime } from './dates';
+import { legacyIntensity, mixDominant, type MoodMix } from './emotions';
 import type { RangeData } from './report';
 import { supabase } from './supabase';
 
@@ -31,6 +32,9 @@ export function translateError(message: string): string {
   if (/row-level security/i.test(message)) return 'Нет доступа: запись не относится к вашей паре.';
   if (/permission denied/i.test(message)) return 'Нет прав на действие. Убедитесь, что SQL-схема выполнена полностью.';
   if (/duplicate key/i.test(message)) return 'Такая запись уже есть.';
+  if (/schema cache|does not exist|could not find the (function|column)/i.test(message)) {
+    return 'База данных ещё не обновлена до 0.1: выполните supabase/schema.sql в Supabase → SQL Editor.';
+  }
   return message;
 }
 
@@ -69,7 +73,7 @@ export async function leavePair(): Promise<void> {
   check(error);
 }
 
-export type ProfilePatch = Partial<Pick<Profile, 'display_name' | 'avatar_emoji' | 'water_goal' | 'sleeping_since'>>;
+export type ProfilePatch = Partial<Pick<Profile, 'display_name' | 'avatar_emoji' | 'sleeping_since'>> & { chibi?: ChibiLook };
 
 export async function updateMyProfile(userId: string, patch: ProfilePatch): Promise<void> {
   const { error } = await supabase.from('profiles').update(patch).eq('id', userId);
@@ -86,10 +90,9 @@ export async function savePushToken(userId: string, token: string | null): Promi
 // ---------- Чтение данных за период ----------
 
 export async function fetchRange(from: string, to: string): Promise<RangeData> {
-  const [moods, sleeps, water, gratitudes, scores, answers, wishesDone] = await Promise.all([
+  const [moods, sleeps, gratitudes, scores, answers, wishesDone] = await Promise.all([
     supabase.from('mood_entries').select('*').gte('day', from).lte('day', to).order('created_at'),
     supabase.from('sleep_entries').select('*').gte('day', from).lte('day', to).order('day'),
-    supabase.from('water_logs').select('user_id, day, glasses').gte('day', from).lte('day', to),
     supabase.from('gratitudes').select('*').gte('day', from).lte('day', to).order('created_at'),
     supabase.from('day_scores').select('*').gte('day', from).lte('day', to),
     supabase.rpc('answered_days', { p_from: from, p_to: to }),
@@ -100,11 +103,10 @@ export async function fetchRange(from: string, to: string): Promise<RangeData> {
       .gte('done_at', atTime(from, 0).toISOString())
       .lt('done_at', new Date(atTime(to, 0).getTime() + 86_400_000).toISOString()),
   ]);
-  for (const res of [moods, sleeps, water, gratitudes, scores, answers, wishesDone]) check(res.error);
+  for (const res of [moods, sleeps, gratitudes, scores, answers, wishesDone]) check(res.error);
   return {
     moods: (moods.data ?? []) as MoodEntry[],
     sleeps: (sleeps.data ?? []) as SleepEntry[],
-    water: (water.data ?? []) as WaterLog[],
     gratitudes: (gratitudes.data ?? []) as Gratitude[],
     scores: (scores.data ?? []) as DayScore[],
     answers: (answers.data ?? []) as AnswerMark[],
@@ -162,18 +164,22 @@ export async function fetchMoods(from: string, to: string): Promise<MoodEntry[]>
   return (data ?? []) as MoodEntry[];
 }
 
-export async function addMood(input: {
-  day: string;
-  emotion: string;
-  subEmotion: string | null;
-  intensity: number;
-  note: string | null;
-}): Promise<void> {
+// Отметка настроения — смесь эмоций 0…100. В старые колонки emotion/intensity кладём главную эмоцию,
+// чтобы старые версии приложения и виджет тоже её видели.
+export async function addMood(input: { day: string; mix: MoodMix; subs: string[]; note: string | null }): Promise<void> {
+  const dominant = mixDominant(input.mix);
+  if (!dominant) throw new Error('Подвинь хотя бы один ползунок');
+  const emotions: Record<string, number> = {};
+  (Object.keys(input.mix) as (keyof MoodMix)[]).forEach((key) => {
+    const v = Math.round(input.mix[key] ?? 0);
+    if (v > 0) emotions[key] = Math.min(100, v);
+  });
   const { error } = await supabase.from('mood_entries').insert({
     day: input.day,
-    emotion: input.emotion,
-    sub_emotion: input.subEmotion,
-    intensity: input.intensity,
+    emotion: dominant.key,
+    intensity: legacyIntensity(dominant.value),
+    emotions,
+    sub_emotion: input.subs.length ? input.subs.join(', ').slice(0, 200) : null,
     note: input.note?.trim() || null,
   });
   check(error);
@@ -215,13 +221,6 @@ export async function fetchMySleep(userId: string, day: string): Promise<SleepEn
 
 export async function deleteSleep(id: string): Promise<void> {
   const { error } = await supabase.from('sleep_entries').delete().eq('id', id);
-  check(error);
-}
-
-export async function setWater(userId: string, day: string, glasses: number): Promise<void> {
-  const { error } = await supabase
-    .from('water_logs')
-    .upsert({ user_id: userId, day, glasses: Math.max(0, Math.min(40, glasses)) }, { onConflict: 'user_id,day' });
   check(error);
 }
 
@@ -283,5 +282,17 @@ export async function saveDayScore(input: {
 
 export async function sendNudge(userId: string): Promise<void> {
   const { error } = await supabase.from('nudges').insert({ from_user: userId });
+  check(error);
+}
+
+// ---------- Web Push (iPhone: сайт на экране «Домой») ----------
+
+export async function saveWebPush(sub: { endpoint: string; p256dh: string; auth: string }): Promise<void> {
+  const { error } = await supabase.rpc('save_web_push', { p_endpoint: sub.endpoint, p_p256dh: sub.p256dh, p_auth: sub.auth });
+  check(error);
+}
+
+export async function deleteWebPush(endpoint: string): Promise<void> {
+  const { error } = await supabase.rpc('delete_web_push', { p_endpoint: endpoint });
   check(error);
 }

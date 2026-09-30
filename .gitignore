@@ -22,3 +22,10 @@ credentials.json
 .DS_Store
 npm-debug.*
 yarn-error.*
+
+# Файл Firebase для push на Android: кладётся в Codespace рядом с package.json, в GitHub не уходит
+# (EAS Build его всё равно берёт — см. .easignore)
+google-services.json
+
+# Архивы с обновлениями — распаковываются и удаляются, в GitHub не нужны
+*.zip

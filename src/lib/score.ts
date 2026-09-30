@@ -3,17 +3,17 @@ import { moodEntryScore } from './emotions';
 // Автоматический балл дня 0…10 из трёх частей:
 //   сон (35%) — 7–9 часов = 10 баллов, за каждый час недосыпа −2.5, пересыпа −2;
 //   настроение (40%) — среднее по отметкам дня (приятные эмоции выше);
-//   выполненные пункты (25%) — сон, настроение, вода по цели, благодарность, вопрос дня.
-// Если сна или настроения нет, их вес перераспределяется.
+//   выполненные пункты (25%) — сон, настроение, благодарность, вопрос дня.
+// Если сна или настроения нет, их вес перераспределяется. Вода с версии 0.1 не учитывается.
 
-export type ChecklistKey = 'sleep' | 'mood' | 'water' | 'gratitude' | 'question';
+export type ChecklistKey = 'sleep' | 'mood' | 'gratitude' | 'question';
 export type ChecklistItem = { key: ChecklistKey; label: string; done: boolean };
+
+type MoodLike = { emotion: string; intensity: number; emotions?: unknown };
 
 export type DayInputs = {
   sleepMin: number | null;
-  moods: { emotion: string; intensity: number }[];
-  water: number;
-  waterGoal: number;
+  moods: MoodLike[];
   gratitudes: number;
   answered: boolean;
 };
@@ -37,9 +37,9 @@ export function sleepScore(min: number | null): number | null {
   return round1(clamp(10 - (h - 9) * 2, 0, 10));
 }
 
-export function moodScore(moods: { emotion: string; intensity: number }[]): number | null {
+export function moodScore(moods: MoodLike[]): number | null {
   if (moods.length === 0) return null;
-  const sum = moods.reduce((acc, m) => acc + moodEntryScore(m.emotion, m.intensity), 0);
+  const sum = moods.reduce((acc, m) => acc + moodEntryScore(m), 0);
   return round1(sum / moods.length);
 }
 
@@ -47,7 +47,6 @@ export function computeAutoScore(input: DayInputs): AutoScore {
   const checklist: ChecklistItem[] = [
     { key: 'sleep', label: 'Сон отмечен', done: input.sleepMin != null },
     { key: 'mood', label: 'Настроение отмечено', done: input.moods.length > 0 },
-    { key: 'water', label: `Вода: ${input.water} из ${input.waterGoal}`, done: input.water >= input.waterGoal },
     { key: 'gratitude', label: 'Благодарность записана', done: input.gratitudes > 0 },
     { key: 'question', label: 'Ответ на вопрос дня', done: input.answered },
   ];
@@ -65,6 +64,6 @@ export function computeAutoScore(input: DayInputs): AutoScore {
 }
 
 export function formatScore(v: number | null | undefined): string {
-  if (v == null) return '—';
+  if (v == null || !Number.isFinite(v)) return '—';
   return (Math.round(v * 10) / 10).toString().replace('.', ',');
 }

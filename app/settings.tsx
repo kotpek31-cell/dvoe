@@ -1,9 +1,10 @@
+// Настройки: имя, пара, уведомления, сон, виджет, аккаунт
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { AppState, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { AppState, Platform, Share, StyleSheet, View } from 'react-native';
 import * as ScreenSleep from '../modules/screen-sleep';
-import { Button, Card, Input, Loading, Row, Screen, showError, Txt } from '../src/components/ui';
+import { Button, Card, Input, Row, Screen, showError, Txt } from '../src/components/ui';
 import { useAuth } from '../src/context/AuthProvider';
 import { usePair } from '../src/context/PairProvider';
 import { leavePair, updateMyProfile } from '../src/lib/api';
@@ -11,22 +12,30 @@ import { confirmAction, notify } from '../src/lib/dialogs';
 import { isExpoGo } from '../src/lib/env';
 import { isHealthKitSupported, requestSleepAccess } from '../src/lib/healthkit';
 import { registerForPushAsync, scheduleReminders } from '../src/lib/notifications';
+import { enableWebPush, webPushState, type WebPushState } from '../src/lib/webPush';
 import { refreshWidgets } from '../src/lib/widgets';
-import { C, R, S } from '../src/theme';
+import { C, S } from '../src/theme';
 
-const AVATARS = ['🙂', '😎', '🦊', '🐻', '🐱', '🐶', '🐼', '🦋', '🌸', '🌙', '⭐', '🔥', '🍓', '🎧', '🧸', '🐸'];
+const WEB_PUSH_TEXT: Record<WebPushState, string> = {
+  unsupported: 'Этот браузер не поддерживает push-уведомления.',
+  'needs-install': 'Уведомления на iPhone работают, только если открыть «Двое» с экрана «Домой»: Safari → «Поделиться» → «На экран Домой». Потом включи их здесь.',
+  denied: 'Уведомления запрещены. Включить: Настройки iPhone → Уведомления → Двое.',
+  off: 'Уведомления выключены.',
+  on: 'Уведомления включены.',
+};
 
 export default function SettingsScreen() {
   const { session, signOut } = useAuth();
   const { me, partner, pair, refresh } = usePair();
   const [name, setName] = useState(me?.display_name ?? '');
-  const [avatar, setAvatar] = useState(me?.avatar_emoji ?? '🙂');
-  const [goal, setGoal] = useState(me?.water_goal ?? 8);
   const [saving, setSaving] = useState(false);
   const [pushInfo, setPushInfo] = useState<string | null>(null);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [webState, setWebState] = useState<WebPushState | null>(null);
   const [usageAccess, setUsageAccess] = useState(ScreenSleep.hasUsageAccess());
 
   useEffect(() => {
+    if (Platform.OS === 'web') webPushState().then(setWebState).catch(() => setWebState('unsupported'));
     if (Platform.OS !== 'android') return;
     const sub = AppState.addEventListener('change', (s) => {
       if (s === 'active') setUsageAccess(ScreenSleep.hasUsageAccess());
@@ -34,16 +43,16 @@ export default function SettingsScreen() {
     return () => sub.remove();
   }, []);
 
-  if (!me) return <Loading />;
+  if (!me) return null;
 
-  const saveProfile = async () => {
+  const saveName = async () => {
     if (!name.trim()) return showError('Имя не может быть пустым');
     setSaving(true);
     try {
-      await updateMyProfile(me.id, { display_name: name.trim().slice(0, 40), avatar_emoji: avatar, water_goal: goal });
+      await updateMyProfile(me.id, { display_name: name.trim().slice(0, 40) });
       await refresh();
       refreshWidgets();
-      notify('Сохранено', 'Профиль обновлён');
+      notify('Сохранено', 'Имя обновлено');
     } catch (e) {
       showError(e);
     } finally {
@@ -52,12 +61,23 @@ export default function SettingsScreen() {
   };
 
   const enablePush = async () => {
-    const res = await registerForPushAsync(me.id, true);
-    if (res.ok) {
-      await scheduleReminders().catch(() => undefined);
-      setPushInfo('Уведомления включены ✅');
-    } else {
-      setPushInfo(res.reason);
+    setPushBusy(true);
+    try {
+      if (Platform.OS === 'web') {
+        const res = await enableWebPush();
+        setPushInfo(res.message);
+        setWebState(await webPushState().catch(() => 'unsupported' as WebPushState));
+        return;
+      }
+      const res = await registerForPushAsync(me.id, true);
+      if (res.ok) {
+        await scheduleReminders().catch(() => undefined);
+        setPushInfo('Уведомления включены');
+      } else {
+        setPushInfo(res.reason);
+      }
+    } finally {
+      setPushBusy(false);
     }
   };
 
@@ -79,33 +99,19 @@ export default function SettingsScreen() {
     );
 
   return (
-    <Screen>
-      <Card title="Профиль">
-        <Input placeholder="Имя" value={name} onChangeText={setName} maxLength={40} />
-        <View style={styles.avatars}>
-          {AVATARS.map((a) => (
-            <Pressable key={a} onPress={() => setAvatar(a)} style={[styles.avatar, a === avatar && styles.avatarActive]}>
-              <Text style={styles.avatarText}>{a}</Text>
-            </Pressable>
-          ))}
-        </View>
-        <Row style={styles.between}>
-          <Txt>Цель по воде: {goal} стаканов</Txt>
-          <Row gap={S.sm}>
-            <Button title="−" variant="secondary" small onPress={() => setGoal(Math.max(1, goal - 1))} />
-            <Button title="+" variant="secondary" small onPress={() => setGoal(Math.min(30, goal + 1))} />
-          </Row>
-        </Row>
-        <Button title="Сохранить профиль" onPress={saveProfile} loading={saving} />
+    <Screen background back title="Настройки">
+      <Card title="Имя">
+        <Input placeholder="Как тебя называть" value={name} onChangeText={setName} maxLength={40} />
+        <Button title="Сохранить имя" onPress={saveName} loading={saving} disabled={!name.trim() || name.trim() === me.display_name} />
       </Card>
 
       <Card title="Пара">
-        <Txt>{partner ? `Вы в паре с ${partner.display_name} ${partner.avatar_emoji}` : 'Партнёр ещё не присоединился'}</Txt>
+        <Txt>{partner ? `Вы в паре с ${partner.display_name}` : 'Партнёр ещё не присоединился'}</Txt>
         {pair ? (
           <Row style={styles.between}>
             <Txt muted>
               Код пары:{' '}
-              <Txt bold color={C.accent}>
+              <Txt weight="display" color={C.accent}>
                 {pair.invite_code}
               </Txt>
             </Txt>
@@ -113,6 +119,7 @@ export default function SettingsScreen() {
               title="Поделиться"
               variant="ghost"
               small
+              icon="share"
               onPress={() => Share.share({ message: `Код пары в «Двое»: ${pair.invite_code}` }).catch(() => undefined)}
             />
           </Row>
@@ -122,72 +129,78 @@ export default function SettingsScreen() {
 
       <Card title="Уведомления">
         <Txt muted size={14}>
-          «Думаю о тебе», ответы на вопрос дня, исполненные желания, напоминание оценить день в 21:30 и недельный отчёт в
-          воскресенье.
+          «Думаю о тебе», ответы на вопрос дня и исполненные желания
+          {Platform.OS === 'web' ? '.' : ', а ещё напоминание оценить день в 21:30 и итоги недели в воскресенье.'}
         </Txt>
-        <Button title="Включить / проверить уведомления" variant="secondary" onPress={enablePush} />
+        {Platform.OS === 'web' && webState ? (
+          <Txt size={14} color={webState === 'on' ? C.good : C.text}>
+            {WEB_PUSH_TEXT[webState]}
+          </Txt>
+        ) : null}
+        {Platform.OS !== 'web' || (webState !== 'needs-install' && webState !== 'unsupported') ? (
+          <Button
+            title={Platform.OS === 'web' && webState === 'on' ? 'Проверить уведомления' : 'Включить уведомления'}
+            icon="bell"
+            variant="secondary"
+            onPress={enablePush}
+            loading={pushBusy}
+          />
+        ) : null}
         {pushInfo ? <Txt size={14}>{pushInfo}</Txt> : null}
       </Card>
 
+      {Platform.OS === 'android' ? (
+        <Card title="Сон">
+          <Txt size={14} muted>
+            {!ScreenSleep.isAvailable
+              ? 'Автоопределение доступно в установленном APK (в Expo Go не работает).'
+              : usageAccess
+                ? 'Доступ к истории использования выдан — сон считается сам.'
+                : 'Нужен доступ к истории использования, чтобы сон считался по экрану.'}
+          </Txt>
+          {ScreenSleep.isAvailable ? (
+            <Button
+              title={usageAccess ? 'Открыть настройки доступа' : 'Разрешить доступ'}
+              variant="secondary"
+              onPress={() => ScreenSleep.openUsageAccessSettings()}
+            />
+          ) : null}
+        </Card>
+      ) : null}
+
+      {Platform.OS === 'ios' ? (
+        <Card title="Сон">
+          <Txt size={14} muted>
+            {isHealthKitSupported()
+              ? 'Сон читается из «Здоровья». Проверить доступ: Настройки iPhone → Здоровье → Доступ к данным → Двое.'
+              : 'Apple Health доступен в сборке из TestFlight (в Expo Go не работает).'}
+          </Txt>
+          {isHealthKitSupported() ? (
+            <Button
+              title="Подключить Apple Health"
+              variant="secondary"
+              onPress={async () => {
+                const ok = await requestSleepAccess();
+                notify(ok ? 'Готово' : 'Не получилось', ok ? 'Данные сна будут подтягиваться автоматически.' : 'HealthKit недоступен.');
+              }}
+            />
+          ) : null}
+        </Card>
+      ) : null}
+
       {Platform.OS === 'web' ? (
-        <Card title="Веб-версия">
+        <Card title="Сон на iPhone">
           <Txt muted size={14}>
-            Вы открыли «Двое» в браузере. Здесь всё синхронизируется с партнёром, но нет push-уведомлений, автоопределения сна и
-            виджета. На iPhone установите сайт как приложение: Safari → «Поделиться» → «На экран Домой».
+            Сайт не видит, когда гаснет экран, поэтому сон отмечается кнопками «Иду спать» и «Проснулся» во вкладке «Сон».
           </Txt>
         </Card>
       ) : null}
 
-      {Platform.OS !== 'web' ? (
-        <Card title="Сон">
-          {Platform.OS === 'android' ? (
-            <>
-              <Txt size={14} muted>
-                {!ScreenSleep.isAvailable
-                  ? 'Автоопределение доступно в установленном APK (в Expo Go не работает).'
-                  : usageAccess
-                    ? 'Доступ к истории использования выдан ✅'
-                    : 'Нужен доступ к истории использования, чтобы определять сон по экрану.'}
-              </Txt>
-              {ScreenSleep.isAvailable ? (
-                <Button
-                  title="Открыть настройки доступа"
-                  variant="secondary"
-                  onPress={() => ScreenSleep.openUsageAccessSettings()}
-                />
-              ) : null}
-            </>
-          ) : (
-            <>
-              <Txt size={14} muted>
-                {isHealthKitSupported()
-                  ? 'Сон читается из «Здоровья». Проверить доступ: Настройки iPhone → Здоровье → Доступ к данным → Двое.'
-                  : 'Apple Health доступен в сборке из TestFlight (в Expo Go не работает).'}
-              </Txt>
-              {isHealthKitSupported() ? (
-                <Button
-                  title="Подключить Apple Health"
-                  variant="secondary"
-                  onPress={async () => {
-                    const ok = await requestSleepAccess();
-                    notify(
-                      ok ? 'Готово' : 'Не получилось',
-                      ok ? 'Данные сна будут подтягиваться автоматически.' : 'HealthKit недоступен на этом устройстве.',
-                    );
-                  }}
-                />
-              ) : null}
-            </>
-          )}
-        </Card>
-      ) : null}
-
-      {Platform.OS !== 'web' ? (
+      {Platform.OS === 'android' ? (
         <Card title="Виджет">
           <Txt muted size={14}>
-            {Platform.OS === 'ios'
-              ? 'Удерживайте палец на главном экране → «+» → найдите «Двое» → выберите размер. Виджет обновляется, когда открыто приложение, и в фоне по решению iOS.'
-              : 'Удерживайте палец на главном экране → «Виджеты» → «Двое — партнёр». Виджет обновляется сам каждые 30 минут и сразу при изменениях в приложении.'}
+            Удерживай палец на главном экране → «Виджеты» → «Двое — партнёр». На виджете — лицо настроения партнёра и оценка дня;
+            обновляется сам каждые 30 минут и сразу при изменениях в приложении.
             {isExpoGo ? ' В Expo Go виджет недоступен — нужна сборка.' : ''}
           </Txt>
         </Card>
@@ -200,14 +213,17 @@ export default function SettingsScreen() {
         <Button
           title="Выйти из аккаунта"
           variant="secondary"
+          icon="logout"
           onPress={async () => {
             await signOut().catch(showError);
             router.replace('/sign-in');
           }}
         />
-        <Txt muted size={12}>
-          Версия {Constants.expoConfig?.version ?? '1.0.0'}
-        </Txt>
+        <View style={styles.version}>
+          <Txt faint size={12}>
+            Двое · версия {Constants.expoConfig?.version ?? '0.1.0'}
+          </Txt>
+        </View>
       </Card>
     </Screen>
   );
@@ -215,17 +231,5 @@ export default function SettingsScreen() {
 
 const styles = StyleSheet.create({
   between: { justifyContent: 'space-between' },
-  avatars: { flexDirection: 'row', flexWrap: 'wrap', gap: S.sm },
-  avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: R.md,
-    backgroundColor: C.card2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  avatarActive: { borderColor: C.accent },
-  avatarText: { fontSize: 22 },
+  version: { alignItems: 'center', marginTop: S.xs },
 });

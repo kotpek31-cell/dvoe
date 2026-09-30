@@ -1,16 +1,19 @@
-import * as Haptics from 'expo-haptics';
-import { useEffect, useState } from 'react';
+// Сон: автоопределение (Android — по экрану), ручная правка, кнопки «Иду спать» / «Проснулся», неделя.
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import { AppState, Platform, StyleSheet, View } from 'react-native';
 import * as ScreenSleep from '../../modules/screen-sleep';
 import { BarChart } from '../../src/components/BarChart';
+import { Icon } from '../../src/components/Icon';
 import { TimeField } from '../../src/components/TimeField';
-import { Button, Card, Empty, ErrorBox, Loading, Row, Screen, showError, Txt } from '../../src/components/ui';
+import { Button, Card, Empty, ErrorBox, Row, Screen, showError, Txt } from '../../src/components/ui';
 import { usePair, useTableVersion } from '../../src/context/PairProvider';
 import { deleteSleep, fetchRange, updateMyProfile, upsertSleep } from '../../src/lib/api';
 import { addDays, atTime, formatDuration, formatHours, formatTime, rangeDays, todayKey, weekdayShort } from '../../src/lib/dates';
 import { confirmAction } from '../../src/lib/dialogs';
 import { requestSleepAccess } from '../../src/lib/healthkit';
 import { useLoader } from '../../src/lib/hooks';
+import { haptic } from '../../src/lib/motion';
 import { autoSleepSupport, detectLastNight, type AutoSleepResult } from '../../src/lib/sleep';
 import { refreshWidgets } from '../../src/lib/widgets';
 import { C, S } from '../../src/theme';
@@ -34,15 +37,16 @@ function bedFromPicked(day: string, picked: Date): Date {
 export default function SleepScreen() {
   const { me, partner, refresh: refreshProfiles } = usePair();
   const day = todayKey();
-  const from = addDays(day, 6 * -1);
+  const from = addDays(day, -6);
   const version = useTableVersion('sleep_entries', 'profiles');
-  const { data, loading, refreshing, error, refresh, reload } = useLoader(() => fetchRange(from, day), [from, day, version]);
+  const { data, refreshing, error, refresh, reload } = useLoader(() => fetchRange(from, day), [from, day, version]);
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [busy, setBusy] = useState(false);
   const [auto, setAuto] = useState<AutoSleepResult | null>(null);
   const [hasAccess, setHasAccess] = useState(ScreenSleep.hasUsageAccess());
   const support = autoSleepSupport();
+  const needsAccess = Platform.OS === 'android' && ScreenSleep.isAvailable && !hasAccess;
 
   // Вернулись из настроек Android — перепроверяем разрешение
   useEffect(() => {
@@ -52,13 +56,17 @@ export default function SleepScreen() {
     });
     return () => sub.remove();
   }, []);
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS === 'android') setHasAccess(ScreenSleep.hasUsageAccess());
+    }, []),
+  );
 
-  if (!me) return <Loading />;
-  if (loading && !data) return <Loading />;
+  if (!me) return null;
 
   const sleeps = data?.sleeps ?? [];
   const mine = sleeps.find((s) => s.user_id === me.id && s.day === day) ?? null;
-  const partnerSleep = partner ? (sleeps.find((s) => s.user_id === partner.id && s.day === day) ?? null) : null;
+  const partnerSleep = partner ? sleeps.find((s) => s.user_id === partner.id && s.day === day) ?? null : null;
   const days = rangeDays(from, day);
 
   const save = async (bed: Date, wake: Date, source: SleepSource, durationMin?: number) => {
@@ -70,7 +78,7 @@ export default function SleepScreen() {
     setBusy(true);
     try {
       await upsertSleep({ userId: me.id, day, bed, wake, durationMin: minutes, source });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+      haptic.success();
       reload();
       return true;
     } catch (e) {
@@ -110,7 +118,7 @@ export default function SleepScreen() {
       await updateMyProfile(me.id, { sleeping_since: new Date().toISOString() });
       await refreshProfiles();
       refreshWidgets();
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => undefined);
+      haptic.medium();
     } catch (e) {
       showError(e);
     }
@@ -126,6 +134,12 @@ export default function SleepScreen() {
       await refreshProfiles();
       refreshWidgets();
     }
+  };
+
+  const cancelSleep = async () => {
+    await updateMyProfile(me.id, { sleeping_since: null }).catch(showError);
+    await refreshProfiles();
+    refreshWidgets();
   };
 
   const remove = (entry: SleepEntry) =>
@@ -151,13 +165,32 @@ export default function SleepScreen() {
   };
 
   return (
-    <Screen refreshing={refreshing} onRefresh={refresh}>
+    <Screen tabs title="Сон" subtitle="прошлая ночь и неделя" refreshing={refreshing} onRefresh={refresh}>
       {error ? <ErrorBox message={error} onRetry={reload} /> : null}
 
+      {needsAccess ? (
+        <Card tint="rgba(155,140,255,0.16)" style={styles.accessCard}>
+          <Row gap={S.md}>
+            <View style={styles.accessIcon}>
+              <Icon name="phone" size={22} color={C.sleep} />
+            </View>
+            <Txt weight="heavy" size={16} style={styles.flex}>
+              Пусть сон считается сам
+            </Txt>
+          </Row>
+          <Txt size={14} muted>
+            «Двое» видит, когда ночью гас экран, и сама записывает сон. Нужно одно разрешение: в списке выбери «Двое» и включи
+            «Доступ к истории использования».
+          </Txt>
+          <Button title="Разрешить доступ" icon="check" onPress={() => ScreenSleep.openUsageAccessSettings()} />
+        </Card>
+      ) : null}
+
       <Card title="Прошлая ночь">
+        {!data && !error ? <Empty text="Загружаем…" /> : null}
         {mine && !draft ? (
           <>
-            <Txt size={34} bold color={C.sleep}>
+            <Txt weight="display" size={36} color={C.sleep}>
               {formatDuration(mine.duration_min)}
             </Txt>
             <Txt muted>
@@ -175,12 +208,13 @@ export default function SleepScreen() {
             </Row>
           </>
         ) : null}
-        {!mine && !draft ? (
+        {data && !mine && !draft ? (
           <>
             <Empty text="Сон за эту ночь ещё не записан" />
             <Button
               title="Ввести вручную"
               variant="secondary"
+              icon="edit"
               onPress={() => setDraft({ bed: atTime(addDays(day, -1), 23), wake: atTime(day, 7) })}
             />
           </>
@@ -211,27 +245,39 @@ export default function SleepScreen() {
         ) : null}
       </Card>
 
-      {Platform.OS !== 'web' ? (
+      <Card title="Кнопки сна">
+        {me.sleeping_since ? (
+          <Txt>Ты спишь с {formatTime(me.sleeping_since)} — твой чибик прилёг на плед, партнёр это видит</Txt>
+        ) : (
+          <Txt muted size={14}>
+            Нажми перед сном и после пробуждения — сон запишется точно, а твой чибик на главной ляжет спать.
+          </Txt>
+        )}
+        <Row gap={S.md}>
+          <Button
+            title="Иду спать"
+            icon="sleep"
+            variant="secondary"
+            style={styles.flex}
+            disabled={Boolean(me.sleeping_since)}
+            onPress={goToSleep}
+          />
+          <Button title="Проснулся" icon="sun" style={styles.flex} disabled={!me.sleeping_since} loading={busy} onPress={wakeUp} />
+        </Row>
+        {me.sleeping_since ? <Button title="Отменить «Иду спать»" variant="ghost" small onPress={cancelSleep} /> : null}
+      </Card>
+
+      {Platform.OS !== 'web' && support.supported && !needsAccess ? (
         <Card title={Platform.OS === 'ios' ? 'Apple Health' : 'Автоопределение'}>
           <Txt muted size={14}>
             {support.message}
           </Txt>
-          {Platform.OS === 'android' && support.supported && !hasAccess ? (
-            <>
-              <Txt size={14}>
-                Нужен «Доступ к истории использования»: в открывшемся списке выберите «Двое» и включите переключатель.
-              </Txt>
-              <Button title="Открыть настройки" onPress={() => ScreenSleep.openUsageAccessSettings()} />
-            </>
-          ) : null}
-          {support.supported && (Platform.OS === 'ios' || hasAccess) ? (
-            <Button
-              title={Platform.OS === 'ios' ? 'Загрузить сон из «Здоровья»' : 'Определить сон сейчас'}
-              variant="secondary"
-              loading={busy}
-              onPress={runDetection}
-            />
-          ) : null}
+          <Button
+            title={Platform.OS === 'ios' ? 'Загрузить сон из «Здоровья»' : 'Определить сон сейчас'}
+            variant="secondary"
+            loading={busy}
+            onPress={runDetection}
+          />
           {auto && auto.status !== 'found' ? (
             <Txt color={C.warn} size={14}>
               {auto.message}
@@ -240,51 +286,22 @@ export default function SleepScreen() {
           {auto && auto.status === 'found' ? (
             <Txt color={C.good} size={14}>
               Найдено: {formatTime(auto.sleep.bed)} → {formatTime(auto.sleep.wake)} ({formatDuration(auto.sleep.durationMin)})
-              {mine && mine.source !== auto.sleep.source ? ' — ваша ручная запись не изменена' : ' — сохранено'}
+              {mine && mine.source !== auto.sleep.source ? ' — твоя ручная запись не изменена' : ' — сохранено'}
             </Txt>
           ) : null}
         </Card>
       ) : null}
 
-      <Card title="Кнопки сна">
-        {me.sleeping_since ? (
-          <Txt>😴 Ты спишь с {formatTime(me.sleeping_since)} — партнёр это видит</Txt>
-        ) : (
-          <Txt muted size={14}>
-            Нажмите перед сном и после пробуждения — так сон запишется точно.
-          </Txt>
-        )}
-        <Row gap={S.md}>
-          <Button
-            title="🌙 Иду спать"
-            variant="secondary"
-            style={styles.flex}
-            disabled={Boolean(me.sleeping_since)}
-            onPress={goToSleep}
-          />
-          <Button title="☀️ Проснулся" style={styles.flex} disabled={!me.sleeping_since} loading={busy} onPress={wakeUp} />
-        </Row>
-        {me.sleeping_since ? (
-          <Button
-            title="Отменить «Иду спать»"
-            variant="ghost"
-            small
-            onPress={async () => {
-              await updateMyProfile(me.id, { sleeping_since: null }).catch(showError);
-              await refreshProfiles();
-              refreshWidgets();
-            }}
-          />
-        ) : null}
-      </Card>
-
       {partner ? (
         <Card title={`Сон: ${partner.display_name}`}>
-          {partner.sleeping_since ? <Txt>😴 Спит с {formatTime(partner.sleeping_since)}</Txt> : null}
+          {partner.sleeping_since ? <Txt>Спит с {formatTime(partner.sleeping_since)}</Txt> : null}
           {partnerSleep ? (
             <Txt>
-              {formatDuration(partnerSleep.duration_min)} · {formatTime(partnerSleep.bed_time)} →{' '}
-              {formatTime(partnerSleep.wake_time)}
+              <Txt weight="displaySemi" size={20} color={C.partner}>
+                {formatDuration(partnerSleep.duration_min)}
+              </Txt>
+              {'  '}
+              {formatTime(partnerSleep.bed_time)} → {formatTime(partnerSleep.wake_time)}
             </Txt>
           ) : (
             <Empty text="Сегодняшний сон ещё не записан" />
@@ -306,12 +323,10 @@ export default function SleepScreen() {
             ].map((v) => (Number.isFinite(v) ? v : null)),
           }))}
         />
-        <View style={styles.averages}>
-          <Txt muted size={14}>
-            В среднем: ты — {formatDuration(avgOf(me.id))}
-            {partner ? `, ${partner.display_name} — ${formatDuration(avgOf(partner.id))}` : ''}
-          </Txt>
-        </View>
+        <Txt muted size={14}>
+          В среднем: ты — {formatDuration(avgOf(me.id))}
+          {partner ? `, ${partner.display_name} — ${formatDuration(avgOf(partner.id))}` : ''}
+        </Txt>
       </Card>
     </Screen>
   );
@@ -319,5 +334,13 @@ export default function SleepScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  averages: { marginTop: S.sm },
+  accessCard: { borderColor: 'rgba(155,140,255,0.45)' },
+  accessIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(155,140,255,0.2)',
+  },
 });

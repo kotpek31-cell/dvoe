@@ -2,6 +2,11 @@
 --  «Двое» — схема базы данных Supabase
 --  Как применить: Supabase → SQL Editor → New query → вставить файл → Run.
 --  Скрипт можно запускать повторно: он пересоздаёт функции и политики.
+--
+--  Обновление 0.1: чибики в профиле (profiles.chibi), настроение-смесь
+--  (mood_entries.emotions), вода больше не влияет на серии, веб-уведомления
+--  для iPhone (web_push_subscriptions + Edge Function «push»), уведомление
+--  о новом желании партнёра.
 -- =====================================================================
 
 -- Расширение для HTTP-запросов из базы (отправка push через Expo Push API)
@@ -29,6 +34,18 @@ create table if not exists public.profiles (
   created_at     timestamptz not null default now()
 );
 create index if not exists profiles_pair_idx on public.profiles (pair_id);
+
+-- 0.1: внешность чибика (JSON). Сейчас только {"kind": "boy" | "girl" | "nb"},
+-- позже добавятся причёски, глаза, рост и остальное.
+alter table public.profiles add column if not exists chibi jsonb;
+alter table public.profiles drop constraint if exists profiles_chibi_check;
+alter table public.profiles add constraint profiles_chibi_check check (
+  chibi is null or (
+    jsonb_typeof(chibi) = 'object'
+    and pg_column_size(chibi) <= 4096
+    and coalesce(chibi ->> 'kind', 'nb') in ('boy', 'girl', 'nb')
+  )
+);
 
 -- Приватные данные пользователя (push-токен) — партнёр их не видит
 create table if not exists public.user_private (
@@ -90,6 +107,32 @@ create table if not exists public.mood_entries (
   created_at  timestamptz not null default now()
 );
 create index if not exists mood_pair_day_idx on public.mood_entries (pair_id, day);
+
+-- 0.1: настроение — смесь эмоций {"joy": 70, "calm": 30, …}, сила каждой 0…100.
+-- В emotion/intensity по-прежнему пишется главная эмоция — для старых версий приложения и виджета.
+alter table public.mood_entries add column if not exists emotions jsonb;
+alter table public.mood_entries drop constraint if exists mood_entries_emotions_check;
+alter table public.mood_entries add constraint mood_entries_emotions_check check (
+  emotions is null or (
+    jsonb_typeof(emotions) = 'object'
+    and pg_column_size(emotions) <= 2048
+    and not jsonb_path_exists(emotions, '$.* ? (@.type() != "number" || @ < 0 || @ > 100)')
+  )
+);
+-- Оттенков теперь можно выбрать несколько (через запятую) — до 200 символов вместо 40
+do $$
+declare c record;
+begin
+  for c in select conname from pg_constraint
+           where conrelid = 'public.mood_entries'::regclass and contype = 'c'
+             and pg_get_constraintdef(oid) like '%sub_emotion%'
+  loop
+    execute format('alter table public.mood_entries drop constraint %I', c.conname);
+  end loop;
+end;
+$$;
+alter table public.mood_entries add constraint mood_entries_sub_emotion_check
+  check (char_length(sub_emotion) <= 200);
 
 create table if not exists public.sleep_entries (
   id           uuid primary key default gen_random_uuid(),
@@ -180,6 +223,20 @@ create table if not exists public.nudges (
 );
 create index if not exists nudges_pair_idx on public.nudges (pair_id, created_at desc);
 
+-- 0.1: подписки на веб-уведомления (сайт на экране «Домой» iPhone, браузеры).
+-- Напрямую недоступна никому, кроме сервера: пишется только функциями save_web_push / delete_web_push.
+create table if not exists public.web_push_subscriptions (
+  endpoint   text primary key check (
+               char_length(endpoint) <= 1000
+               and endpoint ~ '^https://(web\.push\.apple\.com|fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|[a-z0-9-]+\.notify\.windows\.com)/'),
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  p256dh     text not null check (char_length(p256dh) between 40 and 200),
+  auth       text not null check (char_length(auth) between 10 and 100),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists web_push_user_idx on public.web_push_subscriptions (user_id);
+
 -- ---------------------------------------------------------------------
 -- 3. Права доступа (GRANT). С мая 2026 новые проекты Supabase не открывают
 --    таблицы для API автоматически — поэтому всё выдаём явно.
@@ -187,18 +244,20 @@ create index if not exists nudges_pair_idx on public.nudges (pair_id, created_at
 -- ---------------------------------------------------------------------
 revoke all on public.pairs, public.profiles, public.user_private, public.mood_entries,
   public.sleep_entries, public.water_logs, public.gratitudes, public.wishes,
-  public.questions, public.question_answers, public.day_scores, public.nudges
+  public.questions, public.question_answers, public.day_scores, public.nudges,
+  public.web_push_subscriptions
   from anon, authenticated;
 
 grant all on public.pairs, public.profiles, public.user_private, public.mood_entries,
   public.sleep_entries, public.water_logs, public.gratitudes, public.wishes,
-  public.questions, public.question_answers, public.day_scores, public.nudges
+  public.questions, public.question_answers, public.day_scores, public.nudges,
+  public.web_push_subscriptions
   to service_role;
 
 grant select on public.pairs, public.questions to authenticated;
 grant select on public.profiles to authenticated;
 -- В профиле можно менять только эти колонки; pair_id — только через функции ниже
-grant update (display_name, avatar_emoji, water_goal, sleeping_since) on public.profiles to authenticated;
+grant update (display_name, avatar_emoji, water_goal, sleeping_since, chibi) on public.profiles to authenticated;
 grant select, insert, update on public.user_private to authenticated;
 grant select, insert, update, delete on public.mood_entries, public.sleep_entries,
   public.water_logs, public.gratitudes, public.wishes, public.day_scores to authenticated;
@@ -214,6 +273,8 @@ alter table public.questions        enable row level security;
 alter table public.question_answers enable row level security;
 alter table public.wishes           enable row level security;
 alter table public.nudges           enable row level security;
+-- Политик нет намеренно: клиенты работают с подписками только через функции ниже
+alter table public.web_push_subscriptions enable row level security;
 
 drop policy if exists pairs_select on public.pairs;
 create policy pairs_select on public.pairs for select to authenticated
@@ -496,7 +557,7 @@ as $$
   where qa.pair_id = public.my_pair_id() and qa.day between p_from and p_to
 $$;
 
--- Серия дней подряд с любой записью в дневнике (для обоих)
+-- Серия дней подряд с любой записью в дневнике (для обоих). С 0.1 вода не считается.
 create or replace function public.pair_streaks(p_today date)
 returns table (user_id uuid, streak integer, filled_today boolean)
 language sql stable security definer set search_path = ''
@@ -508,8 +569,6 @@ as $$
     select m.user_id, m.day from public.mood_entries m, pair where m.pair_id = pair.id and m.day <= p_today
     union
     select s.user_id, s.day from public.sleep_entries s, pair where s.pair_id = pair.id and s.day <= p_today
-    union
-    select w.user_id, w.day from public.water_logs w, pair where w.pair_id = pair.id and w.day <= p_today and w.glasses > 0
     union
     select g.user_id, g.day from public.gratitudes g, pair where g.pair_id = pair.id and g.day <= p_today
     union
@@ -547,7 +606,8 @@ as $$
     'avatar',         p.avatar_emoji,
     'sleeping_since', p.sleeping_since,
     'mood', (select jsonb_build_object('emotion', m.emotion, 'sub_emotion', m.sub_emotion,
-                                       'intensity', m.intensity, 'created_at', m.created_at)
+                                       'intensity', m.intensity, 'emotions', m.emotions,
+                                       'created_at', m.created_at)
              from public.mood_entries m
              where m.user_id = p.id and m.day = p_day
              order by m.created_at desc limit 1),
@@ -560,41 +620,154 @@ as $$
 $$;
 
 -- ---------------------------------------------------------------------
--- 6. Push-уведомления партнёру через Expo Push API (бесплатно)
+-- 6. Push-уведомления партнёру
+--    Android — через Expo Push API (FCM); iPhone-сайт и браузеры — Web Push
+--    через Edge Function «push» (сама база шифровать web push не умеет).
 -- ---------------------------------------------------------------------
+
+-- Служебные настройки. Схема private не видна через API; читают её только функции ниже.
+create schema if not exists private;
+revoke all on schema private from public;
+
+create table if not exists private.app_config (
+  id            smallint primary key default 1 check (id = 1),
+  push_url      text not null,                -- адрес Edge Function «push»
+  push_secret   text not null,                -- пароль, с которым база обращается к функции
+  vapid_public  text,                         -- ключи VAPID: функция создаёт их сама при первом запуске
+  vapid_private text,
+  vapid_subject text not null default 'https://kotpek31-cell.github.io/dvoe/'
+);
+alter table private.app_config enable row level security;
+
+insert into private.app_config (id, push_url, push_secret)
+values (1, 'https://uvlausosjxzhytzyfduz.supabase.co/functions/v1/push',
+        replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''))
+on conflict (id) do nothing;
+
 create or replace function public.notify_partner(p_from uuid, p_title text, p_body text, p_data jsonb default '{}'::jsonb)
 returns void
 language plpgsql security definer set search_path = ''
 as $$
 declare
-  v_token text;
+  v_partner uuid;
+  v_token   text;
+  v_subs    jsonb;
+  v_url     text;
+  v_secret  text;
 begin
-  select up.expo_push_token into v_token
+  select partner.id into v_partner
   from public.profiles me
   join public.profiles partner on partner.pair_id = me.pair_id and partner.id <> me.id
-  join public.user_private up on up.user_id = partner.id
   where me.id = p_from and me.pair_id is not null
   limit 1;
-
-  if v_token is null or v_token = '' then
+  if v_partner is null then
     return;
   end if;
 
-  perform net.http_post(
-    url := 'https://exp.host/--/api/v2/push/send',
-    body := jsonb_build_object(
-      'to', v_token,
-      'title', p_title,
-      'body', p_body,
-      'data', p_data,
-      'sound', 'default',
-      'priority', 'high',
-      'channelId', 'default'
-    ),
-    headers := jsonb_build_object('Content-Type', 'application/json', 'Accept', 'application/json'),
-    timeout_milliseconds := 5000
-  );
+  -- Телефон (Android-приложение)
+  select up.expo_push_token into v_token from public.user_private up where up.user_id = v_partner;
+  if coalesce(v_token, '') <> '' then
+    perform net.http_post(
+      url := 'https://exp.host/--/api/v2/push/send',
+      body := jsonb_build_object(
+        'to', v_token,
+        'title', p_title,
+        'body', p_body,
+        'data', p_data,
+        'sound', 'default',
+        'priority', 'high',
+        'channelId', 'default'
+      ),
+      headers := jsonb_build_object('Content-Type', 'application/json', 'Accept', 'application/json'),
+      timeout_milliseconds := 5000
+    );
+  end if;
+
+  -- Сайт на экране «Домой» (iPhone) и браузеры
+  select jsonb_agg(jsonb_build_object('endpoint', s.endpoint, 'p256dh', s.p256dh, 'auth', s.auth))
+    into v_subs
+  from (select * from public.web_push_subscriptions
+        where user_id = v_partner order by updated_at desc limit 10) s;
+  select c.push_url, c.push_secret into v_url, v_secret from private.app_config c where c.id = 1;
+  if v_subs is not null and v_url is not null then
+    perform net.http_post(
+      url := v_url,
+      body := jsonb_build_object('title', p_title, 'body', p_body, 'data', p_data, 'subscriptions', v_subs),
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-push-secret', v_secret),
+      timeout_milliseconds := 10000
+    );
+  end if;
+exception when others then
+  -- уведомление не должно мешать сохранить запись
+  raise warning 'notify_partner: %', sqlerrm;
 end;
+$$;
+
+-- Сайт сохраняет подписку этого устройства (на человека — до 5 устройств)
+create or replace function public.save_web_push(p_endpoint text, p_p256dh text, p_auth text)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    raise exception 'Нужно войти в аккаунт';
+  end if;
+  if coalesce(p_endpoint, '') !~ '^https://(web\.push\.apple\.com|fcm\.googleapis\.com|updates\.push\.services\.mozilla\.com|[a-z0-9-]+\.notify\.windows\.com)/' then
+    raise exception 'Этот браузер присылает уведомления через неизвестный сервис';
+  end if;
+  insert into public.web_push_subscriptions (endpoint, user_id, p256dh, auth, updated_at)
+  values (p_endpoint, v_uid, p_p256dh, p_auth, clock_timestamp())
+  on conflict (endpoint) do update
+    set user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth, updated_at = excluded.updated_at;
+  delete from public.web_push_subscriptions s
+  where s.user_id = v_uid
+    and s.endpoint not in (select w.endpoint from public.web_push_subscriptions w
+                           where w.user_id = v_uid order by w.updated_at desc limit 5);
+end;
+$$;
+
+-- Выход из аккаунта: подписка этого устройства больше не нужна
+create or replace function public.delete_web_push(p_endpoint text)
+returns void
+language sql security definer set search_path = ''
+as $$
+  delete from public.web_push_subscriptions where endpoint = p_endpoint and user_id = auth.uid()
+$$;
+
+-- Для Edge Function «push» (только ключ сервера): настройки, первичная запись ключей, очистка
+create or replace function public.push_config()
+returns jsonb
+language sql stable security definer set search_path = ''
+as $$
+  select jsonb_build_object('vapid_public', c.vapid_public, 'vapid_private', c.vapid_private,
+                            'vapid_subject', c.vapid_subject, 'push_secret', c.push_secret)
+  from private.app_config c
+  where c.id = 1
+$$;
+
+create or replace function public.push_config_init(p_public text, p_private text)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if char_length(coalesce(p_public, '')) not between 80 and 100
+     or char_length(coalesce(p_private, '')) not between 40 and 50 then
+    raise exception 'Неверные ключи VAPID';
+  end if;
+  -- ключи записываются один раз: подписки браузеров привязаны к ним
+  update private.app_config set vapid_public = p_public, vapid_private = p_private
+  where id = 1 and vapid_public is null;
+  return public.push_config();
+end;
+$$;
+
+create or replace function public.web_push_gone(p_endpoints text[])
+returns void
+language sql security definer set search_path = ''
+as $$
+  delete from public.web_push_subscriptions where endpoint = any (p_endpoints)
 $$;
 
 create or replace function public.display_name_of(p_user uuid)
@@ -686,6 +859,29 @@ $$;
 create or replace trigger wishes_push after update on public.wishes
   for each row execute function public.wishes_after_update();
 
+-- Партнёр загадал желание (если загадывает несколько подряд — одно уведомление в минуту)
+create or replace function public.wishes_after_insert()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if exists (select 1 from public.wishes
+             where user_id = new.user_id and id <> new.id and created_at > now() - interval '1 minute') then
+    return new;
+  end if;
+  perform public.notify_partner(
+    new.user_id,
+    '🎁 Новое желание',
+    public.display_name_of(new.user_id) || ' загадывает: «' || left(new.title, 80) || '»',
+    jsonb_build_object('type', 'wish', 'wish_id', new.id)
+  );
+  return new;
+end;
+$$;
+
+create or replace trigger wishes_push_new after insert on public.wishes
+  for each row execute function public.wishes_after_insert();
+
 -- ---------------------------------------------------------------------
 -- 7. Права на функции: клиентам доступны только нужные RPC
 -- ---------------------------------------------------------------------
@@ -701,6 +897,11 @@ revoke execute on function public.partner_snapshot(date) from public, anon;
 revoke execute on function public.notify_partner(uuid, text, text, jsonb) from public, anon, authenticated;
 revoke execute on function public.display_name_of(uuid) from public, anon, authenticated;
 revoke execute on function public.handle_new_user() from public, anon, authenticated;
+revoke execute on function public.save_web_push(text, text, text) from public, anon;
+revoke execute on function public.delete_web_push(text) from public, anon;
+revoke execute on function public.push_config() from public, anon, authenticated;
+revoke execute on function public.push_config_init(text, text) from public, anon, authenticated;
+revoke execute on function public.web_push_gone(text[]) from public, anon, authenticated;
 
 grant execute on function public.my_pair_id() to authenticated;
 grant execute on function public.i_answered(date) to authenticated;
@@ -711,6 +912,11 @@ grant execute on function public.daily_question(date) to authenticated;
 grant execute on function public.answered_days(date, date) to authenticated;
 grant execute on function public.pair_streaks(date) to authenticated;
 grant execute on function public.partner_snapshot(date) to authenticated;
+grant execute on function public.save_web_push(text, text, text) to authenticated;
+grant execute on function public.delete_web_push(text) to authenticated;
+grant execute on function public.push_config() to service_role;
+grant execute on function public.push_config_init(text, text) to service_role;
+grant execute on function public.web_push_gone(text[]) to service_role;
 
 -- ---------------------------------------------------------------------
 -- 8. Realtime: изменения этих таблиц мгновенно приходят в приложение
@@ -794,3 +1000,6 @@ insert into public.questions (id, text) values
   (59, 'Какая черта характера тебе в себе нравится?'),
   (60, 'Какой маленький шаг к мечте ты можешь сделать завтра?')
 on conflict (id) do update set text = excluded.text;
+
+-- Готово. Если внизу видна эта строка — схема 0.1 применена целиком.
+select 'Схема «Двое» 0.1 применена' as "Готово";

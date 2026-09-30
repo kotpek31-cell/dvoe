@@ -1,7 +1,7 @@
 // Календарь-тепловая карта: цвет клетки = настроение дня
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { monthGrid, parseDayKey, todayKey, WEEK_HEADER } from '../lib/dates';
-import { C } from '../theme';
+import { C, F } from '../theme';
 
 export function MonthHeatmap({
   year,
@@ -43,7 +43,7 @@ export function MonthHeatmap({
                 onPress={() => onSelect?.(day)}
                 style={[
                   styles.cell,
-                  { backgroundColor: color ?? C.card2, opacity: future ? 0.35 : 1 },
+                  { backgroundColor: color ?? 'rgba(255,255,255,0.06)', opacity: future ? 0.35 : 1 },
                   day === today && styles.today,
                   day === selected && styles.selected,
                 ]}
@@ -62,12 +62,12 @@ export function MonthHeatmap({
 const styles = StyleSheet.create({
   wrap: { gap: 5 },
   week: { flexDirection: 'row', gap: 5 },
-  header: { flex: 1, textAlign: 'center', color: C.faint, fontSize: 12, marginBottom: 2 },
+  header: { flex: 1, textAlign: 'center', color: C.faint, fontSize: 12, marginBottom: 2, fontFamily: F.bold },
   cellEmpty: { flex: 1, aspectRatio: 1 },
-  cell: { flex: 1, aspectRatio: 1, borderRadius: 9, alignItems: 'center', justifyContent: 'center' },
+  cell: { flex: 1, aspectRatio: 1, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   today: { borderWidth: 2, borderColor: C.text },
   selected: { borderWidth: 2, borderColor: C.accent },
-  num: { color: C.muted, fontSize: 12, fontWeight: '600' },
+  num: { color: C.muted, fontSize: 12, fontFamily: F.bold },
   numOnColor: { color: '#FFFFFF' },
   mark: { fontSize: 10, marginTop: 1 },
 });

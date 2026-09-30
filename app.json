@@ -3,7 +3,7 @@
     "name": "Двое",
     "slug": "dvoe",
     "scheme": "dvoe",
-    "version": "1.0.0",
+    "version": "0.1.0",
     "orientation": "portrait",
     "platforms": [
       "ios",
@@ -12,7 +12,7 @@
     ],
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#0E0E12",
+    "backgroundColor": "#0B0A14",
     "ios": {
       "bundleIdentifier": "com.gaster.dvoe",
       "supportsTablet": false,

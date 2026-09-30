@@ -3,7 +3,7 @@ import DateTimePicker, { DateTimePickerAndroid } from '@react-native-community/d
 import { useState } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { formatTime } from '../lib/dates';
-import { C, R, S } from '../theme';
+import { C, F, R, S } from '../theme';
 import { Button } from './ui';
 
 type PickerEvent = { type: string };
@@ -70,12 +70,20 @@ export function TimeField({ label, value, onChange }: { label: string; value: Da
 }
 
 const styles = StyleSheet.create({
-  field: { flex: 1, backgroundColor: C.card2, borderRadius: R.md, padding: S.md, gap: 4 },
-  label: { color: C.muted, fontSize: 13 },
-  value: { color: C.text, fontSize: 24, fontWeight: '700' },
+  field: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.13)',
+    borderRadius: R.md,
+    padding: S.md,
+    gap: 4,
+  },
+  label: { color: C.muted, fontSize: 13, fontFamily: F.bold },
+  value: { color: C.text, fontSize: 24, fontFamily: F.display },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)' },
   sheet: { backgroundColor: C.card, padding: S.lg, paddingBottom: 36, borderTopLeftRadius: R.lg, borderTopRightRadius: R.lg },
-  sheetTitle: { color: C.text, fontSize: 17, fontWeight: '700', textAlign: 'center' },
+  sheetTitle: { color: C.text, fontSize: 17, fontFamily: F.heavy, textAlign: 'center' },
   actions: { flexDirection: 'row', gap: S.md },
   flex: { flex: 1 },
 });

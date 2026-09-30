@@ -1,7 +1,7 @@
 // Веб-версия поля времени: стандартный выбор времени браузера (на iPhone — системное колесо Safari)
 import { StyleSheet, Text, View } from 'react-native';
 import { formatTime } from '../lib/dates';
-import { C, R, S } from '../theme';
+import { C, F, R, S } from '../theme';
 
 export function TimeField({ label, value, onChange }: { label: string; value: Date; onChange: (date: Date) => void }) {
   return (
@@ -25,7 +25,7 @@ export function TimeField({ label, value, onChange }: { label: string; value: Da
           width: '100%',
           color: C.text,
           fontSize: 24,
-          fontWeight: 700,
+          fontFamily: F.display,
           colorScheme: 'dark',
         }}
       />
@@ -34,6 +34,14 @@ export function TimeField({ label, value, onChange }: { label: string; value: Da
 }
 
 const styles = StyleSheet.create({
-  field: { flex: 1, backgroundColor: C.card2, borderRadius: R.md, padding: S.md, gap: 4 },
-  label: { color: C.muted, fontSize: 13 },
+  field: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.13)',
+    borderRadius: R.md,
+    padding: S.md,
+    gap: 4,
+  },
+  label: { color: C.muted, fontSize: 13, fontFamily: F.bold },
 });
