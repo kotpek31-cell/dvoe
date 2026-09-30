@@ -21,7 +21,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { notify } from '../lib/dialogs';
 import { errorMessage } from '../lib/env';
-import { haptic } from '../lib/motion';
+import { useScreenFocused } from '../lib/focus';
+import { haptic, nativeDriver } from '../lib/motion';
 import { C, F, R, S, TAB_BAR_SPACE } from '../theme';
 import { Aurora } from './Aurora';
 import { Icon, type IconName } from './Icon';
@@ -105,7 +106,7 @@ export function Pressy({
 }) {
   const scale = useRef(new Animated.Value(1)).current;
   const springTo = (toValue: number) =>
-    Animated.spring(scale, { toValue, useNativeDriver: true, speed: 40, bounciness: toValue === 1 ? 14 : 0 }).start();
+    Animated.spring(scale, { toValue, useNativeDriver: nativeDriver, speed: 40, bounciness: toValue === 1 ? 14 : 0 }).start();
   return (
     <Pressable
       onPress={
@@ -184,13 +185,14 @@ export function Screen({
   contentStyle?: StyleProp<ViewStyle>;
 }) {
   const insets = useSafeAreaInsets();
+  const focused = useScreenFocused();
   const goBack = () => {
     if (router.canGoBack()) router.back();
     else router.replace('/home');
   };
   return (
-    <View style={[styles.root, background ? styles.rootBg : null]}>
-      {background ? <Aurora /> : null}
+    <View style={[styles.root, background || tabs ? styles.rootBg : null]}>
+      {background || tabs ? <Aurora paused={!focused} /> : null}
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           style={styles.flex}
@@ -246,7 +248,8 @@ export function Card({
   tint?: string;
 }) {
   return (
-    <View style={[styles.card, tint ? { backgroundColor: tint } : null, style]}>
+    <View style={[styles.card, style]}>
+      {tint ? <View pointerEvents="none" style={[styles.cardTint, { backgroundColor: tint }]} /> : null}
       {title || right ? (
         <View style={styles.cardHeader}>
           {title ? (
@@ -377,7 +380,7 @@ export function Segmented<T extends string>({
   );
   const x = useRef(new Animated.Value(index)).current;
   useEffect(() => {
-    Animated.spring(x, { toValue: index, useNativeDriver: true, speed: 18, bounciness: 7 }).start();
+    Animated.spring(x, { toValue: index, useNativeDriver: nativeDriver, speed: 18, bounciness: 7 }).start();
   }, [index, x]);
   const segment = width > 0 ? (width - 8) / options.length : 0;
   const last = Math.max(1, options.length - 1);
@@ -474,6 +477,7 @@ const styles = StyleSheet.create({
     padding: S.lg,
     gap: S.md,
   },
+  cardTint: { ...StyleSheet.absoluteFillObject, borderRadius: R.xl - 1 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: S.sm },
   row: { flexDirection: 'row', alignItems: 'center' },
   groupLabel: { flexDirection: 'row', alignItems: 'center', gap: S.sm, marginTop: 4 },

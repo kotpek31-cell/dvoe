@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import { saw } from '../lib/anim';
-import { useReducedMotion } from '../lib/motion';
+import { nativeDriver, useReducedMotion } from '../lib/motion';
 import { C, F } from '../theme';
 import { Icon, type IconName } from './Icon';
 
@@ -50,7 +50,7 @@ function useBursts(trigger: number, lifetime: number) {
 function HeartBurst({ x, y, scale }: { x: number; y: number; scale: number }) {
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(v, { toValue: 1, duration: 1700, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
+    Animated.timing(v, { toValue: 1, duration: 1700, easing: Easing.out(Easing.cubic), useNativeDriver: nativeDriver }).start();
   }, [v]);
   return (
     <View pointerEvents="none" style={[styles.origin, { left: x - 12, top: y - 12 }]}>
@@ -95,7 +95,7 @@ export function HeartsBurst({ trigger, x, y, scale = 1 }: { trigger: number; x: 
 function ConfettiBurst({ colors, width }: { colors: string[]; width: number }) {
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.timing(v, { toValue: 1, duration: 1300, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
+    Animated.timing(v, { toValue: 1, duration: 1300, easing: Easing.out(Easing.quad), useNativeDriver: nativeDriver }).start();
   }, [v]);
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
@@ -149,9 +149,9 @@ export function Toast({ text, icon = 'heart', top }: { text: string | null; icon
     if (text) {
       setShown(text);
       v.setValue(0);
-      Animated.spring(v, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 10 }).start();
+      Animated.spring(v, { toValue: 1, useNativeDriver: nativeDriver, speed: 14, bounciness: 10 }).start();
     } else {
-      Animated.timing(v, { toValue: 0, duration: 220, useNativeDriver: true }).start(({ finished }) => {
+      Animated.timing(v, { toValue: 0, duration: 220, useNativeDriver: nativeDriver }).start(({ finished }) => {
         if (finished) setShown(null);
       });
     }
@@ -187,7 +187,7 @@ export function Snore({ x, y, scale = 1 }: { x: number; y: number; scale?: numbe
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (reduce) return;
-    const loop = Animated.loop(Animated.timing(v, { toValue: 1, duration: 3000, easing: Easing.linear, useNativeDriver: true }));
+    const loop = Animated.loop(Animated.timing(v, { toValue: 1, duration: 3000, easing: Easing.linear, useNativeDriver: nativeDriver }));
     loop.start();
     return () => loop.stop();
   }, [reduce, v]);

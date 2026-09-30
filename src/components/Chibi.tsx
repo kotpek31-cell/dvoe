@@ -6,7 +6,8 @@ import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Ellipse, G, Path, Rect } from 'react-native-svg';
 import { CHIBI, CHIBI_PARTS as P, darken } from '../lib/chibi';
 import type { FaceKey } from '../lib/face';
-import { useReducedMotion } from '../lib/motion';
+import { useScreenFocused } from '../lib/focus';
+import { nativeDriver, useReducedMotion } from '../lib/motion';
 import type { ChibiKind } from '../types';
 import { Face } from './Face';
 
@@ -35,6 +36,7 @@ function Layer({ w, h, children }: { w: number; h: number; children: ReactNode }
 
 function ChibiView({ kind, emotion, value, pose, size, look, flip = false }: Props) {
   const reduce = useReducedMotion();
+  const visible = useScreenFocused();
   const def = CHIBI[kind] ?? CHIBI.nb;
   const w = size;
   const h = Math.round((size * 170) / 120);
@@ -49,17 +51,17 @@ function ChibiView({ kind, emotion, value, pose, size, look, flip = false }: Pro
     walk.setValue(0);
     breath.setValue(0);
     wave.setValue(0);
-    if (reduce) return;
+    if (reduce || !visible) return;
     const anims: Animated.CompositeAnimation[] = [];
     if (pose === 'walk') {
-      anims.push(Animated.loop(Animated.timing(walk, { toValue: 1, duration: 560, easing: Easing.linear, useNativeDriver: true })));
+      anims.push(Animated.loop(Animated.timing(walk, { toValue: 1, duration: 560, easing: Easing.linear, useNativeDriver: nativeDriver })));
     } else {
       const half = pose === 'sleep' ? 2000 : 1600;
       anims.push(
         Animated.loop(
           Animated.sequence([
-            Animated.timing(breath, { toValue: 1, duration: half, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-            Animated.timing(breath, { toValue: 0, duration: half, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+            Animated.timing(breath, { toValue: 1, duration: half, easing: Easing.inOut(Easing.sin), useNativeDriver: nativeDriver }),
+            Animated.timing(breath, { toValue: 0, duration: half, easing: Easing.inOut(Easing.sin), useNativeDriver: nativeDriver }),
           ]),
         ),
       );
@@ -68,15 +70,15 @@ function ChibiView({ kind, emotion, value, pose, size, look, flip = false }: Pro
       anims.push(
         Animated.loop(
           Animated.sequence([
-            Animated.timing(wave, { toValue: 1, duration: 420, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-            Animated.timing(wave, { toValue: 0, duration: 420, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+            Animated.timing(wave, { toValue: 1, duration: 420, easing: Easing.inOut(Easing.quad), useNativeDriver: nativeDriver }),
+            Animated.timing(wave, { toValue: 0, duration: 420, easing: Easing.inOut(Easing.quad), useNativeDriver: nativeDriver }),
           ]),
         ),
       );
     }
     anims.forEach((a) => a.start());
     return () => anims.forEach((a) => a.stop());
-  }, [pose, reduce, walk, breath, wave]);
+  }, [pose, reduce, visible, walk, breath, wave]);
 
   const a = useMemo(
     () => ({

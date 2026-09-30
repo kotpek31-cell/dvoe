@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import type { FaceKey } from '../lib/face';
-import { useReducedMotion } from '../lib/motion';
+import { nativeDriver, useReducedMotion } from '../lib/motion';
 import type { ChibiKind } from '../types';
 import { Chibi, type ChibiPose } from './Chibi';
 
@@ -56,7 +56,7 @@ export function Walker({ kind, emotion, value, size, top, minX, maxX, startX, sp
         toValue: target,
         duration: Math.max(600, (distance / speed) * 1000),
         easing: Easing.linear,
-        useNativeDriver: true,
+        useNativeDriver: nativeDriver,
       }).start(({ finished }) => {
         if (!finished || cancelled) return;
         pos.current = target;

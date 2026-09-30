@@ -1,10 +1,10 @@
 // Локация «Луг у озера»: небо по времени суток, холмы, озеро, деревья, плед.
-// Живые детали (облака, бабочки, светлячки, фонарик) — лёгкие анимации на native driver.
+// Живые детали (облака, бабочки, светлячки, фонарик) — лёгкие анимации (на телефоне — native driver).
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 import { saw, tri } from '../../lib/anim';
-import { useReducedMotion } from '../../lib/motion';
+import { nativeDriver, useReducedMotion } from '../../lib/motion';
 import { FLOWERS, PALETTES, sceneTransform, STARS, type DayTime } from '../../lib/scene';
 
 const CLOUD = 'M14 42 C3 42 1 29 12 27 C12 14 29 10 37 19 C41 6 64 4 70 17 C78 8 95 12 95 25 C108 23 116 34 107 42 Z';
@@ -25,13 +25,13 @@ function MeadowView({ width, height, time, active }: Props) {
   useEffect(() => {
     if (reduce || !active) return;
     const loops = [
-      Animated.loop(Animated.timing(clock, { toValue: 1, duration: 100000, easing: Easing.linear, useNativeDriver: true })),
-      Animated.loop(Animated.timing(drift, { toValue: 1, duration: 22000, easing: Easing.linear, useNativeDriver: true })),
-      Animated.loop(Animated.timing(blink, { toValue: 1, duration: 2400, easing: Easing.linear, useNativeDriver: true })),
+      Animated.loop(Animated.timing(clock, { toValue: 1, duration: 100000, easing: Easing.linear, useNativeDriver: nativeDriver })),
+      Animated.loop(Animated.timing(drift, { toValue: 1, duration: 22000, easing: Easing.linear, useNativeDriver: nativeDriver })),
+      Animated.loop(Animated.timing(blink, { toValue: 1, duration: 2400, easing: Easing.linear, useNativeDriver: nativeDriver })),
       Animated.loop(
         Animated.sequence([
-          Animated.timing(flap, { toValue: 1, duration: 220, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
-          Animated.timing(flap, { toValue: 0, duration: 220, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+          Animated.timing(flap, { toValue: 1, duration: 220, easing: Easing.inOut(Easing.quad), useNativeDriver: nativeDriver }),
+          Animated.timing(flap, { toValue: 0, duration: 220, easing: Easing.inOut(Easing.quad), useNativeDriver: nativeDriver }),
         ]),
       ),
     ];

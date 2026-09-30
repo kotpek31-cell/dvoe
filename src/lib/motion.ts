@@ -1,7 +1,11 @@
 // «Уменьшить движение» из настроек системы и короткие тактильные отклики.
 import * as Haptics from 'expo-haptics';
 import { useEffect, useState } from 'react';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, Platform } from 'react-native';
+
+// В браузере native driver нет. Если его всё же попросить, Animated.loop из одной анимации
+// проигрывается там ровно один раз (шаги чибика, облака, звёзды замирали) — поэтому в вебе выключаем.
+export const nativeDriver = Platform.OS !== 'web';
 
 let reduceMotion = false;
 const listeners = new Set<(value: boolean) => void>();

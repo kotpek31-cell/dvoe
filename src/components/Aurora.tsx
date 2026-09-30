@@ -3,7 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, StyleSheet, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
-import { useReducedMotion } from '../lib/motion';
+import { nativeDriver, useReducedMotion } from '../lib/motion';
 import { C } from '../theme';
 
 type Blob = { color: string; opacity: number; size: number; x: number; y: number; dx: number; dy: number; scale: number };
@@ -25,8 +25,8 @@ export function Aurora({ paused = false }: { paused?: boolean }) {
     if (reduce || paused) return;
     const loop = Animated.loop(
       Animated.sequence([
-        Animated.timing(t, { toValue: 1, duration: 16000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
-        Animated.timing(t, { toValue: 0, duration: 16000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+        Animated.timing(t, { toValue: 1, duration: 16000, easing: Easing.inOut(Easing.sin), useNativeDriver: nativeDriver }),
+        Animated.timing(t, { toValue: 0, duration: 16000, easing: Easing.inOut(Easing.sin), useNativeDriver: nativeDriver }),
       ]),
     );
     loop.start();

@@ -1,7 +1,7 @@
 // Карточка-перевёртыш: когда ответили оба, вопрос дня переворачивается и открывает ответы
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
-import { useReducedMotion } from '../lib/motion';
+import { nativeDriver, useReducedMotion } from '../lib/motion';
 
 export function FlipCard({ flipped, front, back }: { flipped: boolean; front: ReactNode; back: ReactNode }) {
   const reduce = useReducedMotion();
@@ -10,7 +10,7 @@ export function FlipCard({ flipped, front, back }: { flipped: boolean; front: Re
 
   useEffect(() => {
     if (reduce) v.setValue(flipped ? 1 : 0);
-    else Animated.spring(v, { toValue: flipped ? 1 : 0, useNativeDriver: true, speed: 7, bounciness: 5 }).start();
+    else Animated.spring(v, { toValue: flipped ? 1 : 0, useNativeDriver: nativeDriver, speed: 7, bounciness: 5 }).start();
   }, [flipped, reduce, v]);
 
   const height = flipped ? heights.back : heights.front;

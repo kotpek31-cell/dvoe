@@ -1,7 +1,6 @@
-import { Redirect, Tabs, usePathname } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Aurora } from '../../src/components/Aurora';
 import { TabBar } from '../../src/components/TabBar';
 import { Loading } from '../../src/components/ui';
 import { useAuth } from '../../src/context/AuthProvider';
@@ -14,7 +13,6 @@ import { C } from '../../src/theme';
 export default function TabsLayout() {
   const { session, initializing } = useAuth();
   const { me, loading } = usePair();
-  const pathname = usePathname();
   const [onboarded, setOnboarded] = useState<boolean | null>(null);
   useBackgroundSync();
 
@@ -29,11 +27,11 @@ export default function TabsLayout() {
 
   return (
     <View style={styles.root}>
-      {/* Один фон на все вкладки; на главной его закрывает локация — там аврору не крутим */}
-      <Aurora paused={pathname === '/home' || pathname === '/'} />
       <Tabs
         tabBar={(props) => <TabBar {...props} />}
-        screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: 'transparent' } }}
+        // Каждая вкладка непрозрачная (свой фон-аврора): активная целиком закрывает остальные —
+        // в вебе навигатор не всегда прячет неактивные вкладки
+        screenOptions={{ headerShown: false, sceneStyle: styles.scene }}
       >
         <Tabs.Screen name="home" options={{ title: 'Главная' }} />
         <Tabs.Screen name="mood" options={{ title: 'Настроение' }} />
@@ -48,4 +46,5 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: C.bg },
+  scene: { backgroundColor: C.bg },
 });

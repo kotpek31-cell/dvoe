@@ -4,7 +4,7 @@
 import { memo, useMemo, useRef, useState } from 'react';
 import { Animated, PanResponder, Platform, StyleSheet, View, type ViewStyle } from 'react-native';
 import { intensityWord, type Emotion } from '../lib/emotions';
-import { haptic } from '../lib/motion';
+import { haptic, nativeDriver } from '../lib/motion';
 import { C } from '../theme';
 import { Face } from './Face';
 import { Txt } from './ui';
@@ -45,7 +45,7 @@ function EmotionSliderView({ emotion, value, onChange }: Props) {
     }
   };
 
-  const spring = (to: number) => Animated.spring(grow, { toValue: to, useNativeDriver: true, speed: 22, bounciness: 9 }).start();
+  const spring = (to: number) => Animated.spring(grow, { toValue: to, useNativeDriver: nativeDriver, speed: 22, bounciness: 9 }).start();
 
   const responder = useMemo(() => {
     let startX = 0;
