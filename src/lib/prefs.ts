@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const KEYS = {
   onboarded: 'dvoe:onboarded-0.1',
   nudgeHint: 'dvoe:hint-nudge',
+  abilitySoundsOff: 'dvoe:ability-sounds-off',
 } as const;
 
 type Key = keyof typeof KEYS;

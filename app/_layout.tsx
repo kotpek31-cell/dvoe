@@ -8,6 +8,8 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { CastBanner } from '../src/components/CastBanner';
+import { AbilityProvider } from '../src/context/AbilityProvider';
 import { AuthProvider } from '../src/context/AuthProvider';
 import { PairProvider } from '../src/context/PairProvider';
 import { routeForNotification } from '../src/lib/notifications';
@@ -58,6 +60,7 @@ export default function RootLayout() {
     <SafeAreaProvider style={{ flex: 1, backgroundColor: C.bg }}>
       <AuthProvider>
         <PairProvider>
+          <AbilityProvider>
           <StatusBar style="light" />
           <NotificationRouter />
           <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: C.bg }, animation: 'fade_from_bottom' }}>
@@ -71,6 +74,8 @@ export default function RootLayout() {
             <Stack.Screen name="questions" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="wardrobe" options={{ animation: 'slide_from_right' }} />
           </Stack>
+          <CastBanner />
+          </AbilityProvider>
         </PairProvider>
       </AuthProvider>
     </SafeAreaProvider>

@@ -1,15 +1,19 @@
 // Главная: только чибики на локации. Нажатие на чибика партнёра = «Думаю о тебе».
+// Справа внизу — кнопка способности; сцены способностей играют здесь (AbilityScene).
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Share, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Animated, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AbilityButton } from '../../src/components/AbilityButton';
 import { Chibi } from '../../src/components/Chibi';
 import { HeartsBurst, Snore, Toast } from '../../src/components/Effects';
 import { Face } from '../../src/components/Face';
 import { Icon } from '../../src/components/Icon';
+import { AbilityScene, sceneKind, worldTransform } from '../../src/components/scene/AbilityScene';
 import { Meadow } from '../../src/components/scene/Meadow';
 import { IconButton, Pill, Pressy, Txt } from '../../src/components/ui';
 import { Walker } from '../../src/components/Walker';
+import { useAbility } from '../../src/context/AbilityProvider';
 import { usePair, useTableVersion } from '../../src/context/PairProvider';
 import { fetchMoods, fetchStreaks, sendNudge } from '../../src/lib/api';
 import { lookOf } from '../../src/lib/chibi';
@@ -19,7 +23,8 @@ import { errorMessage } from '../../src/lib/env';
 import type { FaceKey } from '../../src/lib/face';
 import { useScreenFocused } from '../../src/lib/focus';
 import { useLoader } from '../../src/lib/hooks';
-import { haptic } from '../../src/lib/motion';
+import { haptic, useReducedMotion } from '../../src/lib/motion';
+import { canAutoplay } from '../../src/lib/sound';
 import { getFlag, setFlag } from '../../src/lib/prefs';
 import { dayTimeOf, sceneTransform } from '../../src/lib/scene';
 import { C } from '../../src/theme';
@@ -60,6 +65,16 @@ export default function HomeScreen() {
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const lastSent = useRef(0);
   const mountedAt = useRef(Date.now());
+  const { scene, finishScene, setHomeVisible } = useAbility();
+  const reduce = useReducedMotion();
+  const sceneT = useRef(new Animated.Value(0)).current;
+  const [allowed, setAllowed] = useState<string | null>(null); // сцена, которую разрешили кнопкой «Смотреть»
+
+  // Плашка «Смотреть» на других экранах нужна, только пока главная не видна
+  useEffect(() => {
+    setHomeVisible(focused);
+  }, [focused, setHomeVisible]);
+  useEffect(() => () => setHomeVisible(false), [setHomeVisible]);
 
   const later = (key: string, ms: number, fn: () => void) => {
     if (timers.current[key]) clearTimeout(timers.current[key]);
@@ -202,10 +217,38 @@ export default function HomeScreen() {
   const pFace = faceFor(partnerFace, partnerAct ? 'love' : null);
   const mFace = faceFor(myFace, meAct);
 
+  // Сцена идёт сразу; в браузере без единого касания звук запрещён — сначала кнопка «Смотреть»
+  const sceneReady = Boolean(scene && focused && partner && (scene.from === 'me' || allowed === scene.key || canAutoplay()));
+  const playing = sceneReady ? scene : null;
+  const waiting = scene && focused && partner && !sceneReady ? scene : null;
+  const kind = playing ? sceneKind(playing.ability) : 'hug';
+  const world = playing ? worldTransform(sceneT, kind, reduce) : [];
+  const meActor = { look: myLook, emotion: mFace.emotion, value: mFace.value };
+  const partnerActor = { look: partnerLook, emotion: pFace.emotion, value: pFace.value };
+
   return (
     <View style={styles.root}>
-      <Meadow width={width} height={height} time={time} active={focused} />
+      <Animated.View style={[StyleSheet.absoluteFill, { transform: world }]}>
+        <Meadow width={width} height={height} time={time} active={focused} />
+      </Animated.View>
 
+      {playing ? (
+        <AbilityScene
+          key={playing.key}
+          scene={playing}
+          t={sceneT}
+          reduce={reduce}
+          caster={playing.from === 'me' ? meActor : partnerActor}
+          target={playing.from === 'me' ? partnerActor : meActor}
+          width={width}
+          height={height}
+          size={size}
+          ground={tf.y(534)}
+          onDone={finishScene}
+        />
+      ) : null}
+
+      <View style={[StyleSheet.absoluteFill, playing ? styles.hidden : null]} pointerEvents={playing ? 'none' : 'box-none'}>
       {partner && !partnerSleeps ? (
         <Walker
           look={partnerLook}
@@ -280,8 +323,9 @@ export default function HomeScreen() {
           <HeartsBurst trigger={heartsM} x={size / 2} y={chibiH * 0.36} scale={tf.s} />
         </Walker>
       ) : null}
+      </View>
 
-      <View style={[styles.topBar, { top: insets.top + 8 }]} pointerEvents="box-none">
+      <View style={[styles.topBar, { top: insets.top + 8 }, playing ? styles.hidden : null]} pointerEvents="box-none">
         <Pill>
           <Icon name="pin" size={17} color="#FFFFFF" />
           <Txt weight="heavy" size={13}>
@@ -324,7 +368,7 @@ export default function HomeScreen() {
             </View>
           ) : null}
         </View>
-      ) : hint && !partnerSleeps && !toast ? (
+      ) : hint && !partnerSleeps && !toast && !playing && !waiting ? (
         <View style={[styles.hint, { top: insets.top + 56 }]}>
           <View style={styles.hintIcon}>
             <Icon name="heart" size={18} color={C.accent} fill={C.accent} />
@@ -345,6 +389,23 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
+      {waiting ? (
+        <View style={[styles.watchWrap, { top: insets.top + 56 }]}>
+          <Pressy
+            onPress={() => setAllowed(waiting.key)}
+            innerStyle={styles.watch}
+            accessibilityLabel={`${partnerName} применяет способность. Смотреть`}
+          >
+            <Icon name="sparkle" size={20} color={C.onAccent} fill={C.onAccent} />
+            <Txt weight="heavy" size={15} color={C.onAccent}>
+              {partnerName}: {waiting.ability === 'ability.mog' ? '«Мог»' : 'объятия'} — смотреть
+            </Txt>
+          </Pressy>
+        </View>
+      ) : null}
+
+      {!playing ? <AbilityButton onMessage={showToast} busy={Boolean(scene)} /> : null}
+
       <Toast text={toast} top={insets.top + 58} />
     </View>
   );
@@ -352,6 +413,18 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#6FB7F5', overflow: 'hidden' },
+  hidden: { opacity: 0 },
+  watchWrap: { position: 'absolute', left: 16, right: 16, alignItems: 'center' },
+  watch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    height: 48,
+    paddingHorizontal: 20,
+    borderRadius: 24,
+    backgroundColor: C.accent,
+    boxShadow: '0px 10px 26px rgba(255,107,138,0.4)',
+  },
   flex: { flex: 1 },
   topBar: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   tagWrap: { position: 'absolute', alignItems: 'center' },

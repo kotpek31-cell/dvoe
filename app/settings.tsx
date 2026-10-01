@@ -2,7 +2,7 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { AppState, Platform, Share, StyleSheet, View } from 'react-native';
+import { AppState, Platform, Share, StyleSheet, Switch, View } from 'react-native';
 import * as ScreenSleep from '../modules/screen-sleep';
 import { Button, Card, Input, Row, Screen, showError, Txt } from '../src/components/ui';
 import { useAuth } from '../src/context/AuthProvider';
@@ -12,6 +12,7 @@ import { confirmAction, notify } from '../src/lib/dialogs';
 import { isExpoGo } from '../src/lib/env';
 import { isHealthKitSupported, requestSleepAccess } from '../src/lib/healthkit';
 import { registerForPushAsync, scheduleReminders } from '../src/lib/notifications';
+import { loadSoundsEnabled, setSoundsEnabled } from '../src/lib/sound';
 import { enableWebPush, webPushState, type WebPushState } from '../src/lib/webPush';
 import { refreshWidgets } from '../src/lib/widgets';
 import { C, S } from '../src/theme';
@@ -33,6 +34,11 @@ export default function SettingsScreen() {
   const [pushBusy, setPushBusy] = useState(false);
   const [webState, setWebState] = useState<WebPushState | null>(null);
   const [usageAccess, setUsageAccess] = useState(ScreenSleep.hasUsageAccess());
+  const [sounds, setSounds] = useState(true);
+
+  useEffect(() => {
+    loadSoundsEnabled().then(setSounds).catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (Platform.OS === 'web') webPushState().then(setWebState).catch(() => setWebState('unsupported'));
@@ -149,6 +155,29 @@ export default function SettingsScreen() {
         {pushInfo ? <Txt size={14}>{pushInfo}</Txt> : null}
       </Card>
 
+      <Card title="Способности">
+        <Row style={styles.between}>
+          <View style={styles.flex}>
+            <Txt weight="heavy" size={16}>
+              Звуки способностей
+            </Txt>
+            <Txt muted size={13}>
+              {Platform.OS === 'web' ? 'В беззвучном режиме iPhone звука не будет' : 'Играют на громкости медиа'}
+            </Txt>
+          </View>
+          <Switch
+            value={sounds}
+            onValueChange={(v) => {
+              setSounds(v);
+              setSoundsEnabled(v).catch(() => undefined);
+            }}
+            trackColor={{ false: 'rgba(255,255,255,0.18)', true: C.accent }}
+            thumbColor="#FFFFFF"
+            accessibilityLabel="Звуки способностей"
+          />
+        </Row>
+      </Card>
+
       {Platform.OS === 'android' ? (
         <Card title="Сон">
           <Txt size={14} muted>
@@ -230,6 +259,7 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  between: { justifyContent: 'space-between' },
+  between: { justifyContent: 'space-between', alignItems: 'center' },
+  flex: { flex: 1 },
   version: { alignItems: 'center', marginTop: S.xs },
 });

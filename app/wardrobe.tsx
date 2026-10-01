@@ -13,6 +13,7 @@ import { IconTile, LookThumb, Tile, type Crop } from '../src/components/ItemTile
 import { Sheet } from '../src/components/Sheet';
 import { Button, ErrorBox, IconButton, Pressy, Txt, showError } from '../src/components/ui';
 import { usePair } from '../src/context/PairProvider';
+import { abilityInfo } from '../src/lib/abilities';
 import { fetchInventory, updateMyProfile } from '../src/lib/api';
 import { useCatalog, type ItemRow } from '../src/lib/catalog';
 import {
@@ -65,10 +66,6 @@ const SKIN_LABELS = ['Светлая', 'Персик', 'Медовая', 'Кар
 const REQUIRED = new Set<Cat>(['body', 'skin', 'eyes', 'top', 'ability']);
 const CROP: Partial<Record<Cat, Crop>> = { skin: 'head', hair: 'head', eyes: 'head', hat: 'head', face: 'head', top: 'torso', back: 'wide' };
 
-const ABILITY_TEXT: Record<string, { icon: IconName; color: string; sub: string }> = {
-  'ability.hug': { icon: 'heart', color: C.partner, sub: 'обнять партнёра' },
-  'ability.mog': { icon: 'flame', color: C.warn, sub: 'раз в 10 минут' },
-};
 
 const slotOf = (look: Look, cat: WearCat): Slot | null => (look as Record<WearCat, Slot | null | undefined>)[cat] ?? null;
 
@@ -202,7 +199,7 @@ export default function WardrobeScreen() {
   } else if (cat === 'ability') {
     const current = draft.ability ?? DEFAULT_ABILITY;
     itemsOf('ability').forEach((it) => {
-      const t = ABILITY_TEXT[it.id] ?? { icon: 'sparkle' as IconName, color: C.accent, sub: '' };
+      const t = abilityInfo(it.id);
       tiles.push(
         <Tile key={it.id} size={tile} label={it.name} selected={current === it.id} exclusive={it.source !== 'free'} onPress={() => setDraft((d) => ({ ...d, ability: it.id }))}>
           <IconTile icon={t.icon} color={t.color} sub={t.sub} />

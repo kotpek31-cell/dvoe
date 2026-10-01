@@ -328,3 +328,62 @@ export async function redeemCode(code: string): Promise<RedeemResult> {
   }
   throw new Error('Сервер ответил непонятно — попробуй ещё раз');
 }
+
+// ---------- Способности (0.2) ----------
+
+export type AbilityCast = {
+  id: string;
+  pair_id: string;
+  from_user: string;
+  to_user: string;
+  ability: string;
+  created_at: string;
+  seen_at: string | null;
+};
+
+export type CastResult =
+  | { ok: true; id: string; created_at: string; cooldown_s: number }
+  | { ok: false; error: string; message: string; wait_s?: number };
+
+// Всё проверяет сервер: способность надета и есть, перезарядка прошла, партнёр есть и не спит
+export async function castAbility(ability: string): Promise<CastResult> {
+  const { data, error } = await supabase.rpc('cast_ability', { p_ability: ability });
+  check(error);
+  const res = (data ?? {}) as Record<string, unknown>;
+  if (res.ok === true) {
+    return { ok: true, id: String(res.id), created_at: String(res.created_at), cooldown_s: Number(res.cooldown_s) || 10 };
+  }
+  return {
+    ok: false,
+    error: typeof res.error === 'string' ? res.error : 'unknown',
+    message: typeof res.message === 'string' ? res.message : 'Не получилось',
+    wait_s: typeof res.wait_s === 'number' ? res.wait_s : undefined,
+  };
+}
+
+// Сцены, которые мне показали, пока приложение было закрыто (за сутки)
+export async function fetchPendingCasts(): Promise<AbilityCast[]> {
+  const { data, error } = await supabase.rpc('pending_casts');
+  check(error);
+  return (data ?? []) as AbilityCast[];
+}
+
+export async function markCastsSeen(ids: string[]): Promise<void> {
+  if (!ids.length) return;
+  const { error } = await supabase.rpc('mark_casts_seen', { p_ids: ids });
+  check(error);
+}
+
+// Мои последние применения — для кольца перезарядки после перезапуска
+export async function fetchMyRecentCasts(userId: string): Promise<Pick<AbilityCast, 'ability' | 'created_at'>[]> {
+  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from('ability_casts')
+    .select('ability, created_at')
+    .eq('from_user', userId)
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  check(error);
+  return (data ?? []) as Pick<AbilityCast, 'ability' | 'created_at'>[];
+}

@@ -10,12 +10,11 @@ const isWeb = Platform.OS === 'web';
 // Как показывать уведомления, пока приложение открыто (в браузере не используется)
 if (!isWeb) {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: true,
-      shouldSetBadge: false,
-    }),
+    // Способность, пока приложение открыто, показывает сама сцена (или плашка «Смотреть») — без второго баннера
+    handleNotification: async (n) => {
+      const cast = (n.request.content.data as { type?: unknown } | undefined)?.type === 'cast';
+      return { shouldShowBanner: !cast, shouldShowList: !cast, shouldPlaySound: !cast, shouldSetBadge: false };
+    },
   });
 }
 

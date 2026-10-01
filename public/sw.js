@@ -5,7 +5,7 @@ self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
 // Куда вести по нажатию на уведомление
-const ROUTES = { nudge: 'home', question: 'us', wish: 'profile', score: 'day-score', report: 'stats' };
+const ROUTES = { nudge: 'home', cast: 'home', question: 'us', wish: 'profile', score: 'day-score', report: 'stats' };
 
 self.addEventListener('push', (event) => {
   let message = {};
