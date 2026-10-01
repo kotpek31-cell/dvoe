@@ -7,6 +7,10 @@
 --  (mood_entries.emotions), вода больше не влияет на серии, веб-уведомления
 --  для iPhone (web_push_subscriptions + Edge Function «push»), уведомление
 --  о новом желании партнёра.
+--
+--  Обновление 0.2 (раздел 10 в конце): каталог вещей, инвентарь, способности,
+--  локации пары, секретные коды (только отпечатки), роли разработчиков.
+--  После этого файла применить supabase/catalog.sql.
 -- =====================================================================
 
 -- Расширение для HTTP-запросов из базы (отправка push через Expo Push API)
@@ -1001,5 +1005,792 @@ insert into public.questions (id, text) values
   (60, 'Какой маленький шаг к мечте ты можешь сделать завтра?')
 on conflict (id) do update set text = excluded.text;
 
--- Готово. Если внизу видна эта строка — схема 0.1 применена целиком.
-select 'Схема «Двое» 0.1 применена' as "Готово";
+-- =====================================================================
+-- 10. Обновление 0.2 — «Гардероб и способности»
+--     Каталог вещей, инвентарь, способности, локации пары, секретные коды,
+--     роли разработчиков. Всё, что даёт вещи, проверяет сервер.
+--     После этого блока применить supabase/catalog.sql (стартовые вещи).
+--     Старые таблицы и функции 0.1 не меняются — версия 0.1.1 работает как раньше.
+-- =====================================================================
+create extension if not exists pgcrypto with schema extensions;
+
+-- ---------------------------------------------------------------------
+-- 10.1 Каталог вещей и способностей (рисунок — слои SVG или картинка в art)
+-- ---------------------------------------------------------------------
+create table if not exists public.items (
+  id         text primary key check (id ~ '^[a-z]+\.[a-z0-9_]+$' and char_length(id) <= 40),
+  cat        text not null check (cat in ('hair', 'eyes', 'hat', 'face', 'top', 'bottom', 'shoes', 'back', 'hand', 'ability')),
+  name       text not null check (char_length(name) between 1 and 60),
+  rarity     smallint not null default 0 check (rarity between 0 and 5),   -- названия редкостей появятся позже
+  source     text not null default 'free' check (source in ('free', 'code', 'shop', 'dev')),
+  palette    text check (palette in ('cloth', 'hair')),                     -- null — не перекрашивается
+  def_color  text check (char_length(def_color) <= 20),
+  sort       integer not null default 0,
+  art        jsonb not null default '{}'::jsonb check (jsonb_typeof(art) = 'object' and pg_column_size(art) <= 65536),
+  meta       jsonb not null default '{}'::jsonb check (jsonb_typeof(meta) = 'object' and pg_column_size(meta) <= 4096),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Небесплатные вещи человека (бесплатные есть у всех и сюда не пишутся)
+create table if not exists public.inventory (
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  item_id    text not null references public.items (id) on delete cascade,
+  source     text not null check (source in ('code', 'dev', 'shop')),
+  code_id    uuid,
+  granted_by uuid references auth.users (id) on delete set null,
+  granted_at timestamptz not null default now(),
+  primary key (user_id, item_id)
+);
+
+-- ---------------------------------------------------------------------
+-- 10.2 Локации: одна на пару. Рисунки — в приложении, здесь список и доступ.
+-- ---------------------------------------------------------------------
+create table if not exists public.locations (
+  id              text primary key check (id ~ '^[a-z_]+$' and char_length(id) <= 30),
+  name            text not null check (char_length(name) between 1 and 60),
+  sort            integer not null default 0,
+  open_by_default boolean not null default true    -- false — откроется за мини-игру (позже)
+);
+
+insert into public.locations (id, name, sort, open_by_default) values
+  ('meadow', 'Луг у озера',     10, true),
+  ('aurora', 'Северное сияние', 20, true),
+  ('roof',   'Крыша города',    30, true),
+  ('beach',  'Пляж',            40, true)
+on conflict (id) do update set name = excluded.name, sort = excluded.sort, open_by_default = excluded.open_by_default;
+
+-- Закрытые по умолчанию локации, которые пара уже открыла
+create table if not exists public.pair_locations (
+  pair_id     uuid not null references public.pairs (id) on delete cascade,
+  location_id text not null references public.locations (id) on delete cascade,
+  opened_at   timestamptz not null default now(),
+  primary key (pair_id, location_id)
+);
+
+alter table public.pairs add column if not exists location text not null default 'meadow' references public.locations (id);
+
+-- ---------------------------------------------------------------------
+-- 10.3 Применения способностей: кто, кому, что, когда, видел ли партнёр
+-- ---------------------------------------------------------------------
+create table if not exists public.ability_casts (
+  id         uuid primary key default gen_random_uuid(),
+  pair_id    uuid not null references public.pairs (id) on delete cascade,
+  from_user  uuid not null references auth.users (id) on delete cascade,
+  to_user    uuid not null references auth.users (id) on delete cascade,
+  ability    text not null references public.items (id),
+  pushed     boolean not null default false,
+  created_at timestamptz not null default now(),
+  seen_at    timestamptz
+);
+create index if not exists casts_to_idx on public.ability_casts (to_user, created_at desc);
+create index if not exists casts_from_idx on public.ability_casts (from_user, ability, created_at desc);
+create index if not exists casts_created_idx on public.ability_casts (created_at);
+
+-- ---------------------------------------------------------------------
+-- 10.4 Закрытая схема: роли, секретные коды, попытки ввода.
+--      Через API не видна; читают и пишут только функции ниже.
+--      В таблице кодов лежит не код, а его отпечаток HMAC-SHA256 с солью сервера.
+-- ---------------------------------------------------------------------
+create table if not exists private.user_roles (
+  user_id    uuid primary key references auth.users (id) on delete cascade,
+  role       text not null check (role in ('owner', 'developer')),
+  granted_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+create unique index if not exists user_roles_one_owner on private.user_roles ((true)) where role = 'owner';
+
+create table if not exists private.codes (
+  id         uuid primary key default gen_random_uuid(),
+  fp         text not null unique,                 -- отпечаток кода, сам код нигде не хранится
+  title      text not null check (char_length(title) between 1 and 60),
+  is_core    boolean not null default false,       -- Core: получает только первый, кто ввёл
+  rewards    text[] not null check (cardinality(rewards) between 1 and 30),
+  active     boolean not null default true,
+  created_by uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists private.code_redemptions (
+  code_id    uuid not null references private.codes (id) on delete cascade,
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  core       boolean not null default false,
+  created_at timestamptz not null default now(),
+  primary key (code_id, user_id)
+);
+-- Core-код физически нельзя получить дважды, даже при одновременном вводе
+create unique index if not exists code_redemptions_core on private.code_redemptions (code_id) where core;
+
+create table if not exists private.code_attempts (
+  id         bigint generated always as identity primary key,
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+create index if not exists code_attempts_user_idx on private.code_attempts (user_id, created_at);
+
+alter table private.user_roles       enable row level security;
+alter table private.codes            enable row level security;
+alter table private.code_redemptions enable row level security;
+alter table private.code_attempts    enable row level security;
+
+-- Соль для отпечатков кодов: создаётся один раз и больше не меняется
+alter table private.app_config add column if not exists code_salt text;
+update private.app_config set code_salt = encode(extensions.gen_random_bytes(32), 'hex')
+where id = 1 and code_salt is null;
+
+-- ---------------------------------------------------------------------
+-- 10.5 Права и RLS на новые таблицы
+-- ---------------------------------------------------------------------
+revoke all on public.items, public.inventory, public.locations, public.pair_locations, public.ability_casts
+  from anon, authenticated;
+grant all on public.items, public.inventory, public.locations, public.pair_locations, public.ability_casts
+  to service_role;
+-- Клиенты только читают; всё остальное — через функции
+grant select on public.items, public.inventory, public.locations, public.pair_locations, public.ability_casts
+  to authenticated;
+
+alter table public.items          enable row level security;
+alter table public.inventory      enable row level security;
+alter table public.locations      enable row level security;
+alter table public.pair_locations enable row level security;
+alter table public.ability_casts  enable row level security;
+
+-- Каталог читают все вошедшие: чтобы нарисовать и свои вещи, и вещи партнёра
+drop policy if exists items_select on public.items;
+create policy items_select on public.items for select to authenticated using (true);
+
+drop policy if exists inventory_select on public.inventory;
+create policy inventory_select on public.inventory for select to authenticated
+  using (user_id = (select auth.uid()));
+
+drop policy if exists locations_select on public.locations;
+create policy locations_select on public.locations for select to authenticated using (true);
+
+drop policy if exists pair_locations_select on public.pair_locations;
+create policy pair_locations_select on public.pair_locations for select to authenticated
+  using (pair_id = (select public.my_pair_id()));
+
+drop policy if exists casts_select on public.ability_casts;
+create policy casts_select on public.ability_casts for select to authenticated
+  using (pair_id = (select public.my_pair_id()));
+
+create or replace trigger touch_items before update on public.items
+  for each row execute function public.touch_updated_at();
+
+-- ---------------------------------------------------------------------
+-- 10.6 Служебные функции (закрытая схема)
+-- ---------------------------------------------------------------------
+
+-- Отпечаток кода: регистр и пробелы по краям не важны
+create or replace function private.code_fp(p_code text)
+returns text
+language sql stable security definer set search_path = ''
+as $$
+  select encode(extensions.hmac(convert_to(lower(btrim(coalesce(p_code, ''), E' \t\r\n')), 'UTF8'),
+                                convert_to(c.code_salt, 'UTF8'), 'sha256'), 'hex')
+  from private.app_config c
+  where c.id = 1
+$$;
+
+-- Есть ли у человека вещь: бесплатная или в инвентаре
+create or replace function private.has_item(p_user uuid, p_item text)
+returns boolean
+language sql stable security definer set search_path = ''
+as $$
+  select exists (
+    select 1 from public.items i
+    where i.id = p_item
+      and (i.source = 'free'
+           or exists (select 1 from public.inventory v where v.user_id = p_user and v.item_id = i.id))
+  )
+$$;
+
+-- Палитры по 10 цветов (сами оттенки — в приложении)
+create or replace function private.color_ok(p_palette text, p_color text)
+returns boolean
+language sql immutable set search_path = ''
+as $$
+  select case p_palette
+    when 'cloth' then p_color = any (array['coal', 'milk', 'strawberry', 'cherry', 'apricot',
+                                           'lemon', 'mint', 'sky', 'blueberry', 'lavender'])
+    when 'hair'  then p_color = any (array['coal', 'chocolate', 'chestnut', 'caramel', 'blond',
+                                           'ginger', 'plum', 'pink', 'blue', 'silver'])
+    else false
+  end
+$$;
+
+-- Проверка роли: каждая функция комнаты разработчиков начинается с неё
+create or replace function private.require_role(p_owner_only boolean default false)
+returns uuid
+language plpgsql stable security definer set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null or not exists (
+       select 1 from private.user_roles r
+       where r.user_id = v_uid and (not p_owner_only or r.role = 'owner')) then
+    raise exception 'Нет доступа' using errcode = '42501';
+  end if;
+  return v_uid;
+end;
+$$;
+
+-- Создать код. Вызывается из комнаты разработчиков или через коннектор Supabase:
+--   select private.create_code('<код>', '<название набора>', array['<id вещи>', ...]);
+-- Core определяется сам: код заканчивается на «core» (без учёта регистра).
+create or replace function private.create_code(p_code text, p_title text, p_rewards text[], p_by uuid default null)
+returns uuid
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_norm text := lower(btrim(coalesce(p_code, ''), E' \t\r\n'));
+  v_bad  text;
+  v_id   uuid;
+begin
+  if char_length(v_norm) not between 4 and 100 then
+    raise exception 'Код должен быть от 4 до 100 символов';
+  end if;
+  if char_length(btrim(coalesce(p_title, ''))) not between 1 and 60 then
+    raise exception 'Нужно название набора (до 60 символов)';
+  end if;
+  if coalesce(cardinality(p_rewards), 0) = 0 then
+    raise exception 'Код должен что-то давать';
+  end if;
+  select string_agg(r, ', ') into v_bad
+  from unnest(p_rewards) r
+  where not exists (select 1 from public.items i where i.id = r);
+  if v_bad is not null then
+    raise exception 'Таких вещей нет в каталоге: %', v_bad;
+  end if;
+  if exists (select 1 from private.codes where fp = private.code_fp(v_norm)) then
+    raise exception 'Такой код уже есть';
+  end if;
+  insert into private.codes (fp, title, is_core, rewards, created_by)
+  values (private.code_fp(v_norm), btrim(p_title), v_norm like '%core',
+          array(select distinct r from unnest(p_rewards) r), p_by)
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+-- ---------------------------------------------------------------------
+-- 10.7 Образ чибика: сервер проверяет каждую надетую вещь
+--      profiles.chibi = {"kind", "v": 2, "skin": 0..4, "hair": {"id", "c"}, "eyes", "hat", "face",
+--                        "top", "bottom", "shoes", "back", "hand", "ability": "ability.hug"}
+--      Старая версия пишет только {"kind"} — это по-прежнему разрешено.
+-- ---------------------------------------------------------------------
+create or replace function public.profiles_chibi_guard()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  k   text;
+  val jsonb;
+  it  public.items;
+begin
+  if new.chibi is null or new.chibi is not distinct from old.chibi or auth.uid() is null then
+    return new;
+  end if;
+  for k, val in select e.key, e.value from jsonb_each(new.chibi) e loop
+    -- что уже было надето, не перепроверяем (вещь могли забрать — образ всё равно сохранится)
+    continue when old.chibi is not null and (old.chibi -> k) is not distinct from val;
+    if k in ('kind', 'v') then
+      continue;  -- kind проверяет ограничение profiles_chibi_check
+    elsif k = 'skin' then
+      if jsonb_typeof(val) <> 'number' or val::numeric not in (0, 1, 2, 3, 4) then
+        raise exception 'Неверный тон кожи';
+      end if;
+    elsif k = 'ability' then
+      select * into it from public.items i where i.id = val #>> '{}' and i.cat = 'ability';
+      if jsonb_typeof(val) <> 'string' or it.id is null or not private.has_item(new.id, it.id) then
+        raise exception 'Этой способности нет в инвентаре';
+      end if;
+    elsif k = any (array['hair', 'eyes', 'hat', 'face', 'top', 'bottom', 'shoes', 'back', 'hand']) then
+      continue when jsonb_typeof(val) = 'null';
+      if jsonb_typeof(val) <> 'object' or exists (select 1 from jsonb_object_keys(val) x where x not in ('id', 'c')) then
+        raise exception 'Неверное описание вещи в образе';
+      end if;
+      select * into it from public.items i where i.id = val ->> 'id';
+      if it.id is null or it.cat <> k then
+        raise exception 'Неизвестная вещь: %', coalesce(val ->> 'id', '—');
+      end if;
+      if not private.has_item(new.id, it.id) then
+        raise exception 'Вещи «%» нет в инвентаре', it.name;
+      end if;
+      if jsonb_typeof(val -> 'c') not in ('null') and not private.color_ok(it.palette, val ->> 'c') then
+        raise exception 'Вещь «%» нельзя перекрасить в этот цвет', it.name;
+      end if;
+    else
+      raise exception 'Лишнее поле в образе: %', k;
+    end if;
+  end loop;
+  return new;
+end;
+$$;
+
+create or replace trigger profiles_chibi_guard before update of chibi on public.profiles
+  for each row execute function public.profiles_chibi_guard();
+
+-- ---------------------------------------------------------------------
+-- 10.8 Функции для приложения
+-- ---------------------------------------------------------------------
+
+-- Ввести секретный код. Ошибки возвращаются ответом, а не исключением,
+-- чтобы неверная попытка записалась (лимит: 5 неверных за 10 минут).
+create or replace function public.redeem_code(p_code text)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_uid   uuid := auth.uid();
+  v_fails integer;
+  v_first timestamptz;
+  v_wait  integer;
+  v_code  private.codes;
+  v_items jsonb;
+begin
+  if v_uid is null then
+    raise exception 'Нужно войти в аккаунт';
+  end if;
+
+  select count(*), min(a.created_at) into v_fails, v_first
+  from private.code_attempts a
+  where a.user_id = v_uid and a.created_at > now() - interval '10 minutes';
+  if v_fails >= 5 then
+    v_wait := greatest(1, ceil(extract(epoch from (v_first + interval '10 minutes' - now())) / 60)::integer);
+    return jsonb_build_object('ok', false, 'error', 'rate', 'wait_min', v_wait,
+                              'message', 'Слишком много попыток. Попробуй через ' || v_wait || ' мин');
+  end if;
+
+  if char_length(btrim(coalesce(p_code, ''))) between 1 and 100 then
+    select * into v_code from private.codes c
+    where c.fp = private.code_fp(p_code) and c.active
+    for update;
+  end if;
+  if v_code.id is null then
+    insert into private.code_attempts (user_id) values (v_uid);
+    return jsonb_build_object('ok', false, 'error', 'not_found', 'message', 'Код не найден');
+  end if;
+
+  if exists (select 1 from private.code_redemptions r where r.code_id = v_code.id and r.user_id = v_uid) then
+    return jsonb_build_object('ok', false, 'error', 'already', 'message', 'Ты уже вводил этот код');
+  end if;
+  if v_code.is_core and exists (select 1 from private.code_redemptions r where r.code_id = v_code.id) then
+    return jsonb_build_object('ok', false, 'error', 'taken', 'message', 'Этот код уже забрали');
+  end if;
+
+  begin
+    insert into private.code_redemptions (code_id, user_id, core) values (v_code.id, v_uid, v_code.is_core);
+  exception when unique_violation then
+    return jsonb_build_object('ok', false, 'error', 'taken', 'message', 'Этот код уже забрали');
+  end;
+
+  insert into public.inventory (user_id, item_id, source, code_id)
+  select v_uid, i.id, 'code', v_code.id
+  from public.items i
+  where i.id = any (v_code.rewards) and i.source <> 'free'
+  on conflict (user_id, item_id) do nothing;
+
+  select coalesce(jsonb_agg(jsonb_build_object('id', i.id, 'cat', i.cat, 'name', i.name) order by i.cat, i.sort), '[]'::jsonb)
+    into v_items
+  from public.items i
+  where i.id = any (v_code.rewards);
+
+  return jsonb_build_object('ok', true, 'title', v_code.title, 'items', v_items);
+end;
+$$;
+
+-- Применить надетую способность к партнёру
+create or replace function public.cast_ability(p_ability text)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_uid     uuid := auth.uid();
+  v_me      public.profiles;
+  v_partner public.profiles;
+  v_item    public.items;
+  v_cd      integer;
+  v_every   integer;
+  v_last    timestamptz;
+  v_push    boolean;
+  v_cast    public.ability_casts;
+  v_name    text;
+begin
+  if v_uid is null then
+    raise exception 'Нужно войти в аккаунт';
+  end if;
+  -- блокировка своей строки: два нажатия подряд не обойдут перезарядку
+  select * into v_me from public.profiles where id = v_uid for update;
+  if v_me.pair_id is not null then
+    select * into v_partner from public.profiles
+    where pair_id = v_me.pair_id and id <> v_uid
+    limit 1;
+  end if;
+  if v_partner.id is null then
+    return jsonb_build_object('ok', false, 'error', 'no_partner', 'message', 'Сначала нужна пара');
+  end if;
+
+  select * into v_item from public.items where id = p_ability and cat = 'ability';
+  if v_item.id is null then
+    return jsonb_build_object('ok', false, 'error', 'unknown', 'message', 'Такой способности нет');
+  end if;
+  if coalesce(v_me.chibi ->> 'ability', 'ability.hug') <> v_item.id then
+    return jsonb_build_object('ok', false, 'error', 'not_equipped', 'message', 'Сначала надень эту способность');
+  end if;
+  if not private.has_item(v_uid, v_item.id) then
+    return jsonb_build_object('ok', false, 'error', 'not_owned', 'message', 'Этой способности нет в инвентаре');
+  end if;
+  if v_partner.sleeping_since is not null then
+    return jsonb_build_object('ok', false, 'error', 'partner_sleeping',
+                              'message', 'Тсс, ' || v_partner.display_name || ' спит');
+  end if;
+
+  v_cd := coalesce((v_item.meta ->> 'cooldown_s')::integer, 10);
+  select max(c.created_at) into v_last
+  from public.ability_casts c
+  where c.from_user = v_uid and c.ability = v_item.id;
+  if v_last is not null and v_last > now() - make_interval(secs => v_cd) then
+    return jsonb_build_object('ok', false, 'error', 'cooldown',
+                              'wait_s', ceil(extract(epoch from (v_last + make_interval(secs => v_cd) - now())))::integer,
+                              'message', 'Способность ещё перезаряжается');
+  end if;
+
+  -- пуш: «Мог» — всегда, «Объятия» — не чаще раза в push_every_s секунд
+  v_every := coalesce((v_item.meta ->> 'push_every_s')::integer, 0);
+  v_push := v_every = 0 or not exists (
+    select 1 from public.ability_casts c
+    where c.from_user = v_uid and c.ability = v_item.id and c.pushed
+      and c.created_at > now() - make_interval(secs => v_every));
+
+  insert into public.ability_casts (pair_id, from_user, to_user, ability, pushed)
+  values (v_me.pair_id, v_uid, v_partner.id, v_item.id, v_push)
+  returning * into v_cast;
+
+  if v_push then
+    v_name := v_me.display_name;
+    perform public.notify_partner(
+      v_uid,
+      v_item.name,
+      case v_item.id
+        when 'ability.hug' then v_name || ' обнимает тебя'
+        else v_name || ' применяет «' || v_item.name || '». Открой, чтобы увидеть'
+      end,
+      jsonb_build_object('type', 'cast', 'ability', v_item.id, 'cast_id', v_cast.id)
+    );
+  end if;
+
+  return jsonb_build_object('ok', true, 'id', v_cast.id, 'created_at', v_cast.created_at, 'cooldown_s', v_cd);
+end;
+$$;
+
+-- Сцены, которые мне показали, пока приложение было закрыто (за последние сутки)
+create or replace function public.pending_casts()
+returns setof public.ability_casts
+language sql stable security definer set search_path = ''
+as $$
+  select * from public.ability_casts c
+  where c.to_user = auth.uid() and c.seen_at is null and c.created_at > now() - interval '1 day'
+  order by c.created_at
+$$;
+
+create or replace function public.mark_casts_seen(p_ids uuid[])
+returns integer
+language sql security definer set search_path = ''
+as $$
+  with done as (
+    update public.ability_casts set seen_at = now()
+    where id = any (p_ids) and to_user = auth.uid() and seen_at is null
+    returning 1
+  )
+  select count(*)::integer from done
+$$;
+
+-- Сменить локацию пары (партнёр увидит сразу — realtime на pairs)
+create or replace function public.set_location(p_location text)
+returns text
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_pair uuid := public.my_pair_id();
+begin
+  if v_pair is null then
+    raise exception 'Сначала создайте пару';
+  end if;
+  if not exists (
+       select 1 from public.locations l
+       where l.id = p_location
+         and (l.open_by_default
+              or exists (select 1 from public.pair_locations pl where pl.pair_id = v_pair and pl.location_id = l.id))) then
+    raise exception 'Эта локация пока закрыта';
+  end if;
+  update public.pairs set location = p_location where id = v_pair;
+  return p_location;
+end;
+$$;
+
+-- Моя роль: 'owner', 'developer' или null
+create or replace function public.my_role()
+returns text
+language sql stable security definer set search_path = ''
+as $$
+  select r.role from private.user_roles r where r.user_id = auth.uid()
+$$;
+
+-- ---------------------------------------------------------------------
+-- 10.9 Комната разработчиков: каждая функция сначала проверяет роль
+-- ---------------------------------------------------------------------
+
+-- Найти человека по email: профиль, роль, инвентарь
+create or replace function public.dev_find_user(p_email text)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_user auth.users;
+begin
+  perform private.require_role();
+  select * into v_user from auth.users u where lower(u.email) = lower(btrim(coalesce(p_email, '')));
+  if v_user.id is null then
+    return null;
+  end if;
+  return (
+    select jsonb_build_object(
+      'id', v_user.id,
+      'email', v_user.email,
+      'display_name', p.display_name,
+      'pair_id', p.pair_id,
+      'role', (select r.role from private.user_roles r where r.user_id = v_user.id),
+      'inventory', coalesce((select jsonb_agg(jsonb_build_object('item_id', v.item_id, 'source', v.source, 'granted_at', v.granted_at)
+                                              order by v.granted_at)
+                             from public.inventory v where v.user_id = v_user.id), '[]'::jsonb)
+    )
+    from public.profiles p where p.id = v_user.id
+  );
+end;
+$$;
+
+create or replace function public.dev_grant_item(p_user uuid, p_item text)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_dev uuid := private.require_role();
+begin
+  if not exists (select 1 from public.items where id = p_item) then
+    raise exception 'Такой вещи нет в каталоге';
+  end if;
+  if not exists (select 1 from auth.users where id = p_user) then
+    raise exception 'Такого аккаунта нет';
+  end if;
+  insert into public.inventory (user_id, item_id, source, granted_by)
+  values (p_user, p_item, 'dev', v_dev)
+  on conflict (user_id, item_id) do nothing;
+end;
+$$;
+
+-- Забрать вещь: если она надета — снимается
+create or replace function public.dev_revoke_item(p_user uuid, p_item text)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_cat text;
+begin
+  perform private.require_role();
+  delete from public.inventory where user_id = p_user and item_id = p_item;
+  select cat into v_cat from public.items where id = p_item;
+  if v_cat = 'ability' then
+    update public.profiles set chibi = chibi - 'ability'
+    where id = p_user and chibi ->> 'ability' = p_item;
+  elsif v_cat is not null then
+    update public.profiles set chibi = chibi - v_cat
+    where id = p_user and chibi -> v_cat ->> 'id' = p_item;
+  end if;
+end;
+$$;
+
+create or replace function public.dev_create_code(p_code text, p_title text, p_rewards text[])
+returns uuid
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_dev uuid := private.require_role();
+begin
+  return private.create_code(p_code, p_title, p_rewards, v_dev);
+end;
+$$;
+
+-- Список кодов (без самих кодов): сколько раз введён, кто и когда
+create or replace function public.dev_list_codes()
+returns jsonb
+language plpgsql stable security definer set search_path = ''
+as $$
+begin
+  perform private.require_role();
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+             'id', c.id, 'title', c.title, 'is_core', c.is_core, 'active', c.active,
+             'rewards', to_jsonb(c.rewards), 'created_at', c.created_at,
+             'count', (select count(*) from private.code_redemptions r where r.code_id = c.id),
+             'redeemed', coalesce((
+               select jsonb_agg(jsonb_build_object('name', p.display_name, 'email', u.email, 'at', r.created_at)
+                                order by r.created_at desc)
+               from (select * from private.code_redemptions r2 where r2.code_id = c.id
+                     order by r2.created_at desc limit 50) r
+               left join public.profiles p on p.id = r.user_id
+               left join auth.users u on u.id = r.user_id), '[]'::jsonb))
+           order by c.created_at desc)
+    from private.codes c), '[]'::jsonb);
+end;
+$$;
+
+-- Выключить или включить код (полученные вещи остаются у людей)
+create or replace function public.dev_set_code_active(p_code_id uuid, p_active boolean)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  perform private.require_role();
+  update private.codes set active = p_active where id = p_code_id;
+end;
+$$;
+
+-- Общая статистика. «Сегодня» — по московскому времени.
+create or replace function public.dev_stats()
+returns jsonb
+language plpgsql stable security definer set search_path = ''
+as $$
+declare
+  v_today timestamptz := date_trunc('day', now() at time zone 'Europe/Moscow') at time zone 'Europe/Moscow';
+  v_week  timestamptz := now() - interval '7 days';
+begin
+  perform private.require_role();
+  return (
+    with acts as (
+      select pair_id, user_id, created_at from public.mood_entries
+      union all select pair_id, user_id, created_at from public.sleep_entries
+      union all select pair_id, user_id, created_at from public.gratitudes
+      union all select pair_id, user_id, updated_at from public.day_scores
+      union all select pair_id, user_id, created_at from public.question_answers
+      union all select pair_id, user_id, created_at from public.wishes
+    )
+    select jsonb_build_object(
+      'accounts',       (select count(*) from public.profiles),
+      'pairs',          (select count(*) from (select pair_id from public.profiles where pair_id is not null
+                                               group by pair_id having count(*) = 2) x),
+      'active_pairs_7d', (select count(distinct pair_id) from acts where created_at >= v_week),
+      'active_today',   (select count(distinct user_id) from acts where created_at >= v_today),
+      'casts_today',    (select count(*) from public.ability_casts where created_at >= v_today),
+      'codes_today',    (select count(*) from private.code_redemptions where created_at >= v_today)
+    )
+  );
+end;
+$$;
+
+-- Разработчики (только владелец)
+create or replace function public.dev_list_developers()
+returns jsonb
+language plpgsql stable security definer set search_path = ''
+as $$
+begin
+  perform private.require_role(true);
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('user_id', r.user_id, 'role', r.role, 'email', u.email,
+                                        'name', p.display_name, 'since', r.created_at)
+                     order by r.role desc, r.created_at)
+    from private.user_roles r
+    join auth.users u on u.id = r.user_id
+    left join public.profiles p on p.id = r.user_id), '[]'::jsonb);
+end;
+$$;
+
+create or replace function public.dev_set_developer(p_email text, p_on boolean)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_owner uuid := private.require_role(true);
+  v_user  uuid;
+begin
+  select id into v_user from auth.users where lower(email) = lower(btrim(coalesce(p_email, '')));
+  if v_user is null then
+    raise exception 'Аккаунт с таким email не найден';
+  end if;
+  if v_user = v_owner then
+    raise exception 'Роль владельца так не меняется';
+  end if;
+  if p_on then
+    insert into private.user_roles (user_id, role, granted_by) values (v_user, 'developer', v_owner)
+    on conflict (user_id) do nothing;
+  else
+    delete from private.user_roles where user_id = v_user and role = 'developer';
+  end if;
+end;
+$$;
+
+-- ---------------------------------------------------------------------
+-- 10.10 Права на новые функции
+-- ---------------------------------------------------------------------
+revoke all on all functions in schema private from public, anon, authenticated;
+
+revoke execute on function public.profiles_chibi_guard() from public, anon, authenticated;
+-- триггерные функции 0.1 тоже не должны вызываться через API
+revoke execute on function public.touch_updated_at() from public, anon, authenticated;
+revoke execute on function public.wishes_guard() from public, anon, authenticated;
+revoke execute on function public.nudges_before_insert() from public, anon, authenticated;
+revoke execute on function public.nudges_after_insert() from public, anon, authenticated;
+revoke execute on function public.answers_after_insert() from public, anon, authenticated;
+revoke execute on function public.wishes_after_insert() from public, anon, authenticated;
+revoke execute on function public.wishes_after_update() from public, anon, authenticated;
+revoke execute on function public.redeem_code(text) from public, anon;
+revoke execute on function public.cast_ability(text) from public, anon;
+revoke execute on function public.pending_casts() from public, anon;
+revoke execute on function public.mark_casts_seen(uuid[]) from public, anon;
+revoke execute on function public.set_location(text) from public, anon;
+revoke execute on function public.my_role() from public, anon;
+revoke execute on function public.dev_find_user(text) from public, anon;
+revoke execute on function public.dev_grant_item(uuid, text) from public, anon;
+revoke execute on function public.dev_revoke_item(uuid, text) from public, anon;
+revoke execute on function public.dev_create_code(text, text, text[]) from public, anon;
+revoke execute on function public.dev_list_codes() from public, anon;
+revoke execute on function public.dev_set_code_active(uuid, boolean) from public, anon;
+revoke execute on function public.dev_stats() from public, anon;
+revoke execute on function public.dev_list_developers() from public, anon;
+revoke execute on function public.dev_set_developer(text, boolean) from public, anon;
+
+grant execute on function public.redeem_code(text) to authenticated;
+grant execute on function public.cast_ability(text) to authenticated;
+grant execute on function public.pending_casts() to authenticated;
+grant execute on function public.mark_casts_seen(uuid[]) to authenticated;
+grant execute on function public.set_location(text) to authenticated;
+grant execute on function public.my_role() to authenticated;
+-- dev_* открыты вошедшим, но внутри каждой — проверка роли на сервере
+grant execute on function public.dev_find_user(text) to authenticated;
+grant execute on function public.dev_grant_item(uuid, text) to authenticated;
+grant execute on function public.dev_revoke_item(uuid, text) to authenticated;
+grant execute on function public.dev_create_code(text, text, text[]) to authenticated;
+grant execute on function public.dev_list_codes() to authenticated;
+grant execute on function public.dev_set_code_active(uuid, boolean) to authenticated;
+grant execute on function public.dev_stats() to authenticated;
+grant execute on function public.dev_list_developers() to authenticated;
+grant execute on function public.dev_set_developer(text, boolean) to authenticated;
+
+-- ---------------------------------------------------------------------
+-- 10.11 Realtime: применения способностей и смена локации приходят сразу
+-- ---------------------------------------------------------------------
+do $$
+declare t text;
+begin
+  foreach t in array array['ability_casts', 'pairs', 'inventory'] loop
+    if not exists (select 1 from pg_publication_tables
+                   where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end;
+$$;
+
+-- Готово. Если внизу видна эта строка — схема применена целиком.
+select 'Схема «Двое» 0.2 применена' as "Готово";
