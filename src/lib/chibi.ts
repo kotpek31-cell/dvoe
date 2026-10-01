@@ -1,8 +1,8 @@
 // Образ чибика 2.0: основа (вид и тон кожи) + надетые вещи из каталога.
 // В профиле хранится profiles.chibi = {"kind", "v": 2, "skin", "hair": {"id", "c"}, …}.
 // Старый формат {"kind"} (0.1.1) превращается в похожий образ из бесплатных вещей.
-import type { ChibiKind } from '../types';
-import { requestItem, type Catalog, type ItemCat, type ItemRow } from './catalog';
+import type { ChibiKind, ChibiLook } from '../types';
+import { getCatalog, requestItem, type Catalog, type ItemCat, type ItemRow } from './catalog';
 import { CLOTH, HAIR, SKIN } from './palette';
 
 export type Slot = { id: string; c?: string };
@@ -122,4 +122,45 @@ export function dress(look: Look, catalog: Catalog): Dressed {
     if (slot && item) worn[cat] = { slot, item, color: itemColor(slot, item) };
   }
   return { skin: skinColor(look), worn };
+}
+
+// ---------- Гардероб ----------
+
+export const DEFAULT_ABILITY = 'ability.hug';
+
+// Образ → profiles.chibi. Порядок ключей всегда один, поэтому строки можно сравнивать.
+export function lookToChibi(look: Look): ChibiLook {
+  const out: ChibiLook = { kind: look.kind, v: 2, skin: look.skin };
+  for (const cat of WEAR_CATS) out[cat] = (look as Record<WearCat, Slot | null | undefined>)[cat] ?? null;
+  if (look.ability) out.ability = look.ability;
+  return out;
+}
+
+export const sameLook = (a: Look, b: Look) => JSON.stringify(lookToChibi(a)) === JSON.stringify(lookToChibi(b));
+
+// Надеть вещь (или снять: item = null). Цвет сохраняется, если новая вещь из той же палитры.
+export function wear(look: Look, cat: WearCat, item: ItemRow | null): Look {
+  const slot = (look as Record<WearCat, Slot | null | undefined>)[cat];
+  if (!item) return REQUIRED.has(cat) ? look : { ...look, [cat]: null };
+  const old = slot ? getCatalog().get(slot.id) : undefined;
+  const keep = slot?.c && item.palette && old?.palette === item.palette;
+  return { ...look, [cat]: keep ? { id: item.id, c: slot!.c } : { id: item.id } };
+}
+
+export function recolor(look: Look, cat: WearCat, color: string): Look {
+  const slot = (look as Record<WearCat, Slot | null | undefined>)[cat];
+  return slot ? { ...look, [cat]: { id: slot.id, c: color } } : look;
+}
+
+// Надеть всё из набора: в каждой категории — первую вещь, способность — первую
+export function wearAll(look: Look, ids: string[], catalog: Catalog): Look {
+  let next = look;
+  const done = new Set<string>();
+  for (const id of ids) {
+    const item = catalog.get(id);
+    if (!item || done.has(item.cat)) continue;
+    done.add(item.cat);
+    next = item.cat === 'ability' ? { ...next, ability: item.id } : wear(next, item.cat, item);
+  }
+  return next;
 }

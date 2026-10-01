@@ -139,6 +139,12 @@ export default function HomeScreen() {
     later('bubble', 6000, () => setBubble(false));
   };
 
+  // Долгое нажатие на своего чибика — гардероб
+  const openWardrobe = () => {
+    haptic.medium();
+    router.push('/wardrobe');
+  };
+
   // Спящие лежат на пледе; если спят оба — рядышком
   const sleepSpot = (who: 'me' | 'partner') => {
     const both = partnerSleeps && meSleeps;
@@ -171,6 +177,7 @@ export default function HomeScreen() {
       <View key={`sleep-${who}`} style={{ position: 'absolute', left: spot.left, top: spot.top }}>
         <Pressy
           onPress={isMe ? () => router.push('/sleep') : tapPartner}
+          onLongPress={isMe ? openWardrobe : undefined}
           haptics={false}
           scaleTo={0.97}
           accessibilityLabel={isMe ? 'Это ты, ты спишь. Нажми, чтобы открыть сон' : `${partnerName} спит. Нажми — увидит «думаю о тебе» утром`}
@@ -244,8 +251,9 @@ export default function HomeScreen() {
           speed={30 * tf.s}
           paused={!focused || meAct !== null || bubble}
           pose={meAct === 'wave' ? 'wave' : 'idle'}
-          label="Это ты. Нажми, чтобы отметить настроение"
+          label="Это ты. Нажми, чтобы отметить настроение; подержи — гардероб"
           onPress={tapMe}
+          onLongPress={openWardrobe}
         >
           {nameTag('ты', C.me)}
           {bubble ? (

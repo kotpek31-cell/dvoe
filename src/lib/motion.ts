@@ -46,4 +46,7 @@ export const haptic = {
   success: () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
   },
+  warning: () => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
+  },
 };

@@ -69,6 +69,7 @@ export default function RootLayout() {
             <Stack.Screen name="day-score" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
             <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="questions" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="wardrobe" options={{ animation: 'slide_from_right' }} />
           </Stack>
         </PairProvider>
       </AuthProvider>

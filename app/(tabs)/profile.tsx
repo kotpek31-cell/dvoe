@@ -3,25 +3,33 @@ import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Chibi } from '../../src/components/Chibi';
+import { CodeSheet } from '../../src/components/CodeSheet';
 import { HeartsBurst } from '../../src/components/Effects';
-import { Icon } from '../../src/components/Icon';
+import { Icon, type IconName } from '../../src/components/Icon';
 import { Button, Card, Empty, ErrorBox, IconButton, Input, Pressy, Row, Screen, Segmented, showError, Txt } from '../../src/components/ui';
 import { usePair, useTableVersion } from '../../src/context/PairProvider';
-import { addWish, deleteWish, fetchMoods, fetchWishes, setWishDone, updateMyProfile } from '../../src/lib/api';
-import { CHIBI_KINDS, CHIBI_LABELS, chibiKindOf, lookOf, LOOKS } from '../../src/lib/chibi';
+import { addWish, deleteWish, fetchMoods, fetchWishes, setWishDone } from '../../src/lib/api';
+import { lookOf } from '../../src/lib/chibi';
 import { dayKeyOf, formatDayShort, relativeDay, todayKey } from '../../src/lib/dates';
 import { confirmAction } from '../../src/lib/dialogs';
 import { entryMix, mixDominant } from '../../src/lib/emotions';
 import { useLoader } from '../../src/lib/hooks';
 import { haptic } from '../../src/lib/motion';
 import { wishStats } from '../../src/lib/report';
-import { C, R, S } from '../../src/theme';
-import type { ChibiKind, Profile, Wish } from '../../src/types';
+import { C, S } from '../../src/theme';
+import type { Profile, Wish } from '../../src/types';
 
 type Who = 'me' | 'partner';
 
+// Круглые плитки под карточкой: всё второстепенное собрано здесь
+const HUB: { key: string; label: string; icon: IconName; color: string; ring: string; href?: '/wardrobe' | '/settings' }[] = [
+  { key: 'wardrobe', label: 'Гардероб', icon: 'hanger', color: C.partner, ring: 'rgba(255,158,187,0.4)', href: '/wardrobe' },
+  { key: 'codes', label: 'Коды', icon: 'key', color: C.warn, ring: 'rgba(255,194,102,0.4)' },
+  { key: 'settings', label: 'Настройки', icon: 'settings', color: C.me, ring: 'rgba(143,162,255,0.4)', href: '/settings' },
+];
+
 export default function ProfileScreen() {
-  const { me, partner, refresh: refreshProfiles } = usePair();
+  const { me, partner } = usePair();
   const day = todayKey();
   const version = useTableVersion('wishes', 'mood_entries', 'profiles');
   const { data, setData, refreshing, error, refresh, reload } = useLoader(async () => {
@@ -32,7 +40,7 @@ export default function ProfileScreen() {
   const [who, setWho] = useState<Who>('me');
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
-  const [picking, setPicking] = useState(false);
+  const [codes, setCodes] = useState(false);
   const [hearts, setHearts] = useState(0);
 
   const person: Profile | null = who === 'me' ? me : partner;
@@ -93,17 +101,6 @@ export default function ProfileScreen() {
       true,
     );
 
-  const pick = async (kind: ChibiKind) => {
-    setPicking(false);
-    try {
-      await updateMyProfile(me.id, { chibi: { ...(me.chibi ?? {}), kind } });
-      haptic.success();
-      await refreshProfiles();
-    } catch (e) {
-      showError(e);
-    }
-  };
-
   const isMe = who === 'me';
 
   return (
@@ -112,7 +109,6 @@ export default function ProfileScreen() {
       title="Профиль"
       refreshing={refreshing}
       onRefresh={refresh}
-      right={<IconButton icon="settings" label="Настройки" onPress={() => router.push('/settings')} />}
     >
       {partner ? (
         <Segmented
@@ -121,65 +117,58 @@ export default function ProfileScreen() {
             { value: 'partner', label: partner.display_name },
           ]}
           value={who}
-          onChange={(v) => {
-            setWho(v);
-            setPicking(false);
-          }}
+          onChange={setWho}
         />
       ) : null}
       {error ? <ErrorBox message={error} onRetry={reload} /> : null}
 
       {person ? (
         <Card style={styles.hero}>
-          <View>
-            <Chibi look={lookOf(person)} emotion={top?.key ?? 'calm'} value={top?.value ?? 30} pose="idle" size={110} />
-            <HeartsBurst trigger={hearts} x={55} y={50} scale={0.8} />
-          </View>
+          <Pressy
+            onPress={isMe ? () => router.push('/wardrobe') : () => setHearts((n) => n + 1)}
+            haptics={!isMe}
+            scaleTo={0.96}
+            accessibilityLabel={isMe ? 'Твой чибик. Нажми, чтобы открыть гардероб' : `Чибик: ${person.display_name}`}
+          >
+            <View style={styles.stage}>
+              <View style={styles.stageGlow} />
+              <Chibi look={lookOf(person)} emotion={top?.key ?? 'calm'} value={top?.value ?? 30} pose="idle" size={124} />
+            </View>
+            <HeartsBurst trigger={hearts} x={62} y={56} scale={0.8} />
+          </Pressy>
           <View style={styles.heroText}>
             <Txt weight="display" size={22} numberOfLines={1}>
               {person.display_name}
             </Txt>
             <Txt muted size={14}>
-              {CHIBI_LABELS[chibiKindOf(person)]} · {top ? `сейчас: ${top.emotion.label.toLowerCase()}` : 'настроение не отмечено'}
+              {top ? `Сейчас: ${top.emotion.label.toLowerCase()}` : 'Настроение не отмечено'}
             </Txt>
             <Txt faint size={13}>
               Желаний исполнено: {isMe ? stats.byPartner : stats.byMe} для {isMe ? 'тебя' : person.display_name}
             </Txt>
-            {isMe ? (
-              <Button title={picking ? 'Отмена' : 'Сменить чибика'} variant="secondary" small onPress={() => setPicking((p) => !p)} />
-            ) : null}
+            {isMe ? <Button title="Гардероб" icon="hanger" variant="secondary" small onPress={() => router.push('/wardrobe')} /> : null}
           </View>
         </Card>
       ) : null}
 
-      {isMe && picking ? (
-        <Card title="Какой чибик твой?">
-          <View style={styles.kinds}>
-            {CHIBI_KINDS.map((kind) => {
-              const selected = chibiKindOf(me) === kind;
-              return (
-                <Pressy
-                  key={kind}
-                  onPress={() => pick(kind)}
-                  style={styles.kindItem}
-                  innerStyle={[styles.kindInner, selected ? styles.kindSelected : null]}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selected }}
-                  accessibilityLabel={CHIBI_LABELS[kind]}
-                >
-                  <Chibi look={LOOKS[kind]} emotion="joy" value={35} pose="idle" size={72} still />
-                  <Txt weight="heavy" size={12} center>
-                    {CHIBI_LABELS[kind]}
-                  </Txt>
-                </Pressy>
-              );
-            })}
-          </View>
-          <Txt faint size={12}>
-            Причёски, глаза, рост и остальное можно будет настроить в следующих обновлениях.
-          </Txt>
-        </Card>
-      ) : null}
+      <View style={styles.hub}>
+        {HUB.map((h) => (
+          <Pressy
+            key={h.key}
+            onPress={() => (h.key === 'codes' ? setCodes(true) : router.push(h.href!))}
+            style={styles.hubItem}
+            scaleTo={0.9}
+            accessibilityLabel={h.label}
+          >
+            <View style={[styles.hubCircle, { borderColor: h.ring }]}>
+              <Icon name={h.icon} size={24} color={h.color} />
+            </View>
+            <Txt weight="bold" size={12} center muted numberOfLines={1}>
+              {h.label}
+            </Txt>
+          </Pressy>
+        ))}
+      </View>
 
       {isMe ? (
         <Card title="Желание на сегодня">
@@ -247,26 +236,46 @@ export default function ProfileScreen() {
           </Row>
         ))}
       </Card>
+
+      <CodeSheet
+        visible={codes}
+        onClose={() => setCodes(false)}
+        onWear={(ids) => {
+          setCodes(false);
+          router.push({ pathname: '/wardrobe', params: { wear: ids.join(',') } });
+        }}
+      />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  hero: { flexDirection: 'row', alignItems: 'center', gap: S.lg },
+  hero: { flexDirection: 'row', alignItems: 'center', gap: S.md },
   heroText: { flex: 1, gap: 4, alignItems: 'flex-start' },
-  kinds: { flexDirection: 'row', gap: S.sm },
-  kindItem: { flex: 1 },
-  kindInner: {
-    alignItems: 'center',
-    gap: 4,
-    paddingVertical: S.md,
-    borderRadius: R.lg,
+  stage: { width: 124, height: 176, alignItems: 'center' },
+  stageGlow: {
+    position: 'absolute',
+    bottom: -2,
+    width: 116,
+    height: 22,
+    borderRadius: 999,
+    backgroundColor: 'rgba(155,140,255,0.2)',
     borderWidth: 1.5,
-    borderColor: 'rgba(255,255,255,0.12)',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    borderColor: 'rgba(255,158,187,0.35)',
   },
-  kindSelected: { borderColor: C.accent, backgroundColor: 'rgba(255,107,138,0.14)' },
+  hub: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: S.sm },
+  hubItem: { width: 84, alignItems: 'center' },
+  hubCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginBottom: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: C.glass,
+    borderWidth: 1.5,
+  },
   wish: { flexDirection: 'row', alignItems: 'center', gap: S.md, paddingVertical: 4 },
   wishIcon: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
   doneRow: { paddingVertical: 2 },

@@ -21,10 +21,11 @@ type Props = {
   pose?: ChibiPose; // поза, пока стоит: например, машет рукой
   label: string;
   onPress: () => void;
+  onLongPress?: () => void;
   children?: ReactNode; // то, что двигается вместе с чибиком: пузырь, имя, сердечки
 };
 
-export function Walker({ look, emotion, value, size, top, minX, maxX, startX, speed, paused, pose, label, onPress, children }: Props) {
+export function Walker({ look, emotion, value, size, top, minX, maxX, startX, speed, paused, pose, label, onPress, onLongPress, children }: Props) {
   const reduce = useReducedMotion();
   const x = useRef(new Animated.Value(startX)).current;
   const pos = useRef(startX);
@@ -78,7 +79,7 @@ export function Walker({ look, emotion, value, size, top, minX, maxX, startX, sp
 
   return (
     <Animated.View style={[styles.box, { top, width: size, height, transform: [{ translateX: x }] }]} pointerEvents="box-none">
-      <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={{ width: size, height }}>
+      <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={450} accessibilityRole="button" accessibilityLabel={label} style={{ width: size, height }}>
         <Chibi look={look} emotion={emotion} value={value} pose={currentPose} size={size} flip={dir === -1} />
       </Pressable>
       <View style={StyleSheet.absoluteFill} pointerEvents="box-none">

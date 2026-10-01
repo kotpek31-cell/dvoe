@@ -296,3 +296,35 @@ export async function deleteWebPush(endpoint: string): Promise<void> {
   const { error } = await supabase.rpc('delete_web_push', { p_endpoint: endpoint });
   check(error);
 }
+
+// ---------- Гардероб и секретные коды (0.2) ----------
+
+export type InventoryRow = { item_id: string; granted_at: string };
+
+// Небесплатные вещи, которые у меня есть (бесплатные есть у всех и в инвентарь не пишутся)
+export async function fetchInventory(): Promise<InventoryRow[]> {
+  const { data, error } = await supabase.from('inventory').select('item_id, granted_at');
+  check(error);
+  return (data ?? []) as InventoryRow[];
+}
+
+export type RewardItem = { id: string; cat: string; name: string };
+export type RedeemResult =
+  | { ok: true; title: string; items: RewardItem[] }
+  | { ok: false; error: 'rate' | 'not_found' | 'already' | 'taken'; message: string };
+
+// Код проверяет только сервер: регистр и пробелы по краям не важны.
+// Неверный код — не исключение, а ответ { ok: false } с готовым текстом.
+export async function redeemCode(code: string): Promise<RedeemResult> {
+  const { data, error } = await supabase.rpc('redeem_code', { p_code: code });
+  check(error);
+  const res = (data ?? {}) as { ok?: unknown; title?: unknown; items?: unknown; error?: unknown; message?: unknown };
+  if (res.ok === true) {
+    return { ok: true, title: typeof res.title === 'string' ? res.title : '', items: Array.isArray(res.items) ? (res.items as RewardItem[]) : [] };
+  }
+  if (res.ok === false) {
+    const kind = res.error === 'rate' || res.error === 'already' || res.error === 'taken' ? res.error : 'not_found';
+    return { ok: false, error: kind, message: typeof res.message === 'string' ? res.message : 'Код не найден' };
+  }
+  throw new Error('Сервер ответил непонятно — попробуй ещё раз');
+}
