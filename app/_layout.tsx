@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { CastBanner } from '../src/components/CastBanner';
+import { WhatsNew } from '../src/components/WhatsNew';
 import { AbilityProvider } from '../src/context/AbilityProvider';
 import { AuthProvider } from '../src/context/AuthProvider';
 import { PairProvider } from '../src/context/PairProvider';
@@ -75,6 +76,7 @@ export default function RootLayout() {
             <Stack.Screen name="wardrobe" options={{ animation: 'slide_from_right' }} />
           </Stack>
           <CastBanner />
+          <WhatsNew />
           </AbilityProvider>
         </PairProvider>
       </AuthProvider>

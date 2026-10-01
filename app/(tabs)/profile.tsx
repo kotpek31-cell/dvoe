@@ -14,6 +14,7 @@ import { dayKeyOf, formatDayShort, relativeDay, todayKey } from '../../src/lib/d
 import { confirmAction } from '../../src/lib/dialogs';
 import { entryMix, mixDominant } from '../../src/lib/emotions';
 import { useLoader } from '../../src/lib/hooks';
+import { openWhatsNew, useWhatsNew } from '../../src/lib/whatsNew';
 import { haptic } from '../../src/lib/motion';
 import { wishStats } from '../../src/lib/report';
 import { C, S } from '../../src/theme';
@@ -25,11 +26,13 @@ type Who = 'me' | 'partner';
 const HUB: { key: string; label: string; icon: IconName; color: string; ring: string; href?: '/wardrobe' | '/settings' }[] = [
   { key: 'wardrobe', label: 'Гардероб', icon: 'hanger', color: C.partner, ring: 'rgba(255,158,187,0.4)', href: '/wardrobe' },
   { key: 'codes', label: 'Коды', icon: 'key', color: C.warn, ring: 'rgba(255,194,102,0.4)' },
+  { key: 'news', label: 'Что нового', icon: 'gift', color: C.good, ring: 'rgba(94,211,160,0.4)' },
   { key: 'settings', label: 'Настройки', icon: 'settings', color: C.me, ring: 'rgba(143,162,255,0.4)', href: '/settings' },
 ];
 
 export default function ProfileScreen() {
   const { me, partner } = usePair();
+  const news = useWhatsNew();
   const day = todayKey();
   const version = useTableVersion('wishes', 'mood_entries', 'profiles');
   const { data, setData, refreshing, error, refresh, reload } = useLoader(async () => {
@@ -155,13 +158,14 @@ export default function ProfileScreen() {
         {HUB.map((h) => (
           <Pressy
             key={h.key}
-            onPress={() => (h.key === 'codes' ? setCodes(true) : router.push(h.href!))}
+            onPress={() => (h.key === 'codes' ? setCodes(true) : h.key === 'news' ? openWhatsNew() : router.push(h.href!))}
             style={styles.hubItem}
             scaleTo={0.9}
             accessibilityLabel={h.label}
           >
             <View style={[styles.hubCircle, { borderColor: h.ring }]}>
               <Icon name={h.icon} size={24} color={h.color} />
+              {h.key === 'news' && !news.seen ? <View style={styles.newDot} /> : null}
             </View>
             <Txt weight="bold" size={12} center muted numberOfLines={1}>
               {h.label}
@@ -265,7 +269,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,158,187,0.35)',
   },
   hub: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: S.sm },
-  hubItem: { width: 84, alignItems: 'center' },
+  hubItem: { width: 72, alignItems: 'center' },
+  newDot: { position: 'absolute', top: 4, right: 4, width: 11, height: 11, borderRadius: 6, backgroundColor: C.accent, borderWidth: 2, borderColor: '#1A1530' },
   hubCircle: {
     width: 60,
     height: 60,

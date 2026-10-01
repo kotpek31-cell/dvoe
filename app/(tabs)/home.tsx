@@ -27,6 +27,7 @@ import type { FaceKey } from '../../src/lib/face';
 import { hasOverride, setDevOverride, useDevOverride } from '../../src/lib/devOverride';
 import { useScreenFocused } from '../../src/lib/focus';
 import { useLoader } from '../../src/lib/hooks';
+import { openWhatsNew, useWhatsNew } from '../../src/lib/whatsNew';
 import { isLocationId, LOCATION_BG, locationName, type LocationId } from '../../src/lib/locations';
 import { haptic, useReducedMotion } from '../../src/lib/motion';
 import { canAutoplay } from '../../src/lib/sound';
@@ -82,6 +83,12 @@ export default function HomeScreen() {
   const reduce = useReducedMotion();
   const sceneT = useRef(new Animated.Value(0)).current;
   const [allowed, setAllowed] = useState<string | null>(null); // сцена, которую разрешили кнопкой «Смотреть»
+
+  // «Что нового» — само, один раз после обновления
+  const news = useWhatsNew();
+  useEffect(() => {
+    if (focused && news.loaded && !news.seen && !news.open && me) openWhatsNew();
+  }, [focused, news.loaded, news.seen, news.open, me]);
 
   // Плашка «Смотреть» на других экранах нужна, только пока главная не видна
   useEffect(() => {

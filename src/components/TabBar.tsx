@@ -1,11 +1,14 @@
-// Плавающие стеклянные вкладки внизу экрана
+// Нижняя панель Б3 «Капсула с подписью»: каждая вкладка — отдельный стеклянный островок со значком,
+// активный растягивается в капсулу «значок + название». Переход — мягкая пружина ~0,3 с;
+// при «Уменьшить движение» капсула сразу появляется на месте.
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
-import { useEffect, useState } from 'react';
-import { Keyboard, Platform, StyleSheet, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Keyboard, Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { C, R } from '../theme';
+import { useReducedMotion } from '../lib/motion';
+import { C, F } from '../theme';
 import { Icon, type IconName } from './Icon';
-import { Pressy, Txt } from './ui';
+import { Pressy } from './ui';
 
 const TABS: Record<string, { label: string; icon: IconName }> = {
   home: { label: 'Главная', icon: 'home' },
@@ -16,9 +19,68 @@ const TABS: Record<string, { label: string; icon: IconName }> = {
   profile: { label: 'Профиль', icon: 'profile' },
 };
 
+
+function Tab({ label, icon, focused, onPress, size }: { label: string; icon: IconName; focused: boolean; onPress: () => void; size: number }) {
+  const reduce = useReducedMotion();
+  const v = useRef(new Animated.Value(focused ? 1 : 0)).current;
+  const [labelW, setLabelW] = useState(label.length * 7.6);
+
+  useEffect(() => {
+    if (reduce) {
+      v.setValue(focused ? 1 : 0);
+      return;
+    }
+    // ширина не умеет native driver — анимация на JS, всего шесть маленьких кнопок
+    const a = Animated.spring(v, { toValue: focused ? 1 : 0, useNativeDriver: false, speed: 18, bounciness: 6 });
+    a.start();
+    return () => a.stop();
+  }, [focused, reduce, v]);
+
+  const width = v.interpolate({ inputRange: [0, 1], outputRange: [size, size + labelW + 10] });
+  return (
+    <Pressy
+      onPress={onPress}
+      scaleTo={0.9}
+      accessibilityRole="tab"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: focused }}
+    >
+      <Animated.View
+        style={[
+          styles.island,
+          {
+            width,
+            height: size,
+            borderRadius: size / 2,
+            backgroundColor: v.interpolate({ inputRange: [0, 1], outputRange: ['rgba(22,18,38,0.86)', 'rgba(70,30,52,0.94)'] }),
+            borderColor: v.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255,255,255,0.14)', 'rgba(255,107,138,0.55)'] }),
+          },
+        ]}
+      >
+        <View style={{ width: size - 2, height: size - 2, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name={icon} size={22} color={focused ? '#FF8FA8' : 'rgba(255,255,255,0.66)'} strokeWidth={focused ? 2.3 : 2} />
+        </View>
+        <Animated.Text
+          numberOfLines={1}
+          onLayout={(e) => {
+            const w = Math.ceil(e.nativeEvent.layout.width);
+            if (w > 0 && Math.abs(w - labelW) > 1) setLabelW(w);
+          }}
+          style={[styles.label, { left: size - 6, opacity: v.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 0, 1] }) }]}
+        >
+          {label}
+        </Animated.Text>
+      </Animated.View>
+    </Pressy>
+  );
+}
+
 export function TabBar({ state, navigation }: BottomTabBarProps) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const [keyboard, setKeyboard] = useState(false);
+  // 5 островков + капсула («Настроение» ~ 80 px) должны влезть в ширину экрана
+  const size = Math.max(36, Math.min(46, Math.floor((Math.min(width, 560) - 16 - 25 - 84) / 6)));
 
   // На Android клавиатура поднимает вкладки — прячем их, пока она открыта
   useEffect(() => {
@@ -34,8 +96,8 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
   if (keyboard) return null;
 
   return (
-    <View pointerEvents="box-none" style={[styles.wrap, { bottom: Math.max(insets.bottom, 10) + 6 }]}>
-      <View style={styles.bar} accessibilityRole="tablist">
+    <View pointerEvents="box-none" style={[styles.wrap, { bottom: Math.max(insets.bottom, 10) + 8 }]}>
+      <View style={styles.row} accessibilityRole="tablist" pointerEvents="box-none">
         {state.routes.map((route, index) => {
           const meta = TABS[route.name];
           if (!meta) return null;
@@ -44,25 +106,7 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
             const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
             if (!focused && !event.defaultPrevented) navigation.navigate(route.name, route.params);
           };
-          return (
-            <Pressy
-              key={route.key}
-              onPress={onPress}
-              scaleTo={0.88}
-              style={styles.item}
-              innerStyle={styles.itemInner}
-              accessibilityRole="tab"
-              accessibilityLabel={meta.label}
-              accessibilityState={{ selected: focused }}
-            >
-              <View style={[styles.pill, focused ? styles.pillActive : null]}>
-                <Icon name={meta.icon} size={23} color={focused ? '#FF8FA8' : 'rgba(255,255,255,0.62)'} strokeWidth={focused ? 2.3 : 2} />
-              </View>
-              <Txt weight="heavy" size={10.5} color={focused ? C.text : 'rgba(255,255,255,0.62)'} numberOfLines={1}>
-                {meta.label}
-              </Txt>
-            </Pressy>
-          );
+          return <Tab key={route.key} label={meta.label} icon={meta.icon} focused={focused} onPress={onPress} size={size} />;
         })}
       </View>
     </View>
@@ -70,22 +114,14 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { position: 'absolute', left: 12, right: 12, alignItems: 'center' },
-  bar: {
-    width: '100%',
-    maxWidth: 520,
-    height: 68,
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    paddingHorizontal: 4,
-    borderRadius: R.xl,
-    backgroundColor: 'rgba(22,18,38,0.86)',
+  wrap: { position: 'absolute', left: 8, right: 8, alignItems: 'center' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 5, maxWidth: 560 },
+  island: {
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
-    boxShadow: '0px 12px 30px rgba(8,4,20,0.35)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+    boxShadow: '0px 10px 24px rgba(8,4,20,0.35)',
   },
-  item: { flex: 1 },
-  itemInner: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  pill: { width: 46, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-  pillActive: { backgroundColor: 'rgba(255,107,138,0.2)' },
+  label: { position: 'absolute', fontFamily: F.heavy, fontSize: 13, color: C.text },
 });

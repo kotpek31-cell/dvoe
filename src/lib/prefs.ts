@@ -5,6 +5,7 @@ const KEYS = {
   onboarded: 'dvoe:onboarded-0.1',
   nudgeHint: 'dvoe:hint-nudge',
   abilitySoundsOff: 'dvoe:ability-sounds-off',
+  whatsNew: 'dvoe:whats-new-0.2',
 } as const;
 
 type Key = keyof typeof KEYS;
