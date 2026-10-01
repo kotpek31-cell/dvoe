@@ -387,3 +387,11 @@ export async function fetchMyRecentCasts(userId: string): Promise<Pick<AbilityCa
   check(error);
   return (data ?? []) as Pick<AbilityCast, 'ability' | 'created_at'>[];
 }
+
+// ---------- Локации (0.2) ----------
+
+// Сменить место пары: партнёр увидит сразу (realtime на pairs). Закрытую локацию сервер не даст.
+export async function setLocation(id: string): Promise<void> {
+  const { error } = await supabase.rpc('set_location', { p_location: id });
+  check(error);
+}

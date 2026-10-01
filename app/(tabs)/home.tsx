@@ -1,16 +1,19 @@
 // Главная: только чибики на локации. Нажатие на чибика партнёра = «Думаю о тебе».
 // Справа внизу — кнопка способности; сцены способностей играют здесь (AbilityScene).
+// Нажатие на землю — твой чибик идёт туда. Оба в приложении — зелёная точка у партнёра и раз в 1–2 минуты
+// чибики подходят дать пять или машут издалека. Плашка с местом сверху — выбор локации.
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Animated, Pressable, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AbilityButton } from '../../src/components/AbilityButton';
 import { Chibi } from '../../src/components/Chibi';
-import { HeartsBurst, Snore, Toast } from '../../src/components/Effects';
+import { HeartsBurst, Snore, SparkPop, Toast } from '../../src/components/Effects';
 import { Face } from '../../src/components/Face';
 import { Icon } from '../../src/components/Icon';
 import { AbilityScene, sceneKind, worldTransform } from '../../src/components/scene/AbilityScene';
-import { Meadow } from '../../src/components/scene/Meadow';
+import { Location } from '../../src/components/scene/Location';
+import { LocationSheet } from '../../src/components/LocationSheet';
 import { IconButton, Pill, Pressy, Txt } from '../../src/components/ui';
 import { Walker } from '../../src/components/Walker';
 import { useAbility } from '../../src/context/AbilityProvider';
@@ -21,8 +24,10 @@ import { formatTime, plural, toDayKey } from '../../src/lib/dates';
 import { entryMix, mixDominant } from '../../src/lib/emotions';
 import { errorMessage } from '../../src/lib/env';
 import type { FaceKey } from '../../src/lib/face';
+import { hasOverride, setDevOverride, useDevOverride } from '../../src/lib/devOverride';
 import { useScreenFocused } from '../../src/lib/focus';
 import { useLoader } from '../../src/lib/hooks';
+import { isLocationId, LOCATION_BG, locationName, type LocationId } from '../../src/lib/locations';
 import { haptic, useReducedMotion } from '../../src/lib/motion';
 import { canAutoplay } from '../../src/lib/sound';
 import { getFlag, setFlag } from '../../src/lib/prefs';
@@ -42,13 +47,15 @@ function currentFace(moods: MoodEntry[], userId: string | undefined): FaceState 
 }
 
 export default function HomeScreen() {
-  const { me, partner, pair, lastNudgeAt } = usePair();
+  const { me, partner, pair, lastNudgeAt, partnerOnline } = usePair();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const focused = useScreenFocused();
   const [now, setNow] = useState(() => new Date());
   const day = toDayKey(now);
-  const time = dayTimeOf(now);
+  const override = useDevOverride();
+  const time = override.time ?? dayTimeOf(now);
+  const loc: LocationId = override.location ?? (isLocationId(pair?.location) ? pair.location : 'meadow');
   const version = useTableVersion('mood_entries', 'profiles', 'sleep_entries');
   const { data } = useLoader(async () => {
     const [moods, streaks] = await Promise.all([fetchMoods(day, day), fetchStreaks(day)]);
@@ -58,7 +65,13 @@ export default function HomeScreen() {
   const [toast, setToast] = useState<string | null>(null);
   const [hint, setHint] = useState(false);
   const [bubble, setBubble] = useState(false);
-  const [meAct, setMeAct] = useState<'wave' | 'love' | null>(null);
+  const [meAct, setMeAct] = useState<'wave' | 'jump' | 'love' | null>(null);
+  const [picker, setPicker] = useState(false);
+  const [goMe, setGoMe] = useState<{ x: number; id: number } | null>(null);
+  const [goPartner, setGoPartner] = useState<{ x: number; id: number } | null>(null);
+  const [meet, setMeet] = useState<'go' | 'five' | 'wave' | null>(null);
+  const [sparks, setSparks] = useState(0);
+  const arrived = useRef(new Set<string>());
   const [partnerAct, setPartnerAct] = useState(false);
   const [heartsP, setHeartsP] = useState(0);
   const [heartsM, setHeartsM] = useState(0);
@@ -108,6 +121,39 @@ export default function HomeScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastNudgeAt]);
 
+  // Оба в приложении и не спят: раз в 1–2 минуты чибики встречаются (у каждого на своём телефоне)
+  const canMeet = Boolean(partner && partnerOnline && focused && !partner.sleeping_since && !me?.sleeping_since && !scene);
+  useEffect(() => {
+    if (!canMeet) return;
+    const t = setTimeout(() => {
+      if (Math.random() < 0.6) {
+        const id = Date.now();
+        const cx = width / 2;
+        const sz = Math.round(104 * sceneTransform(width, height).s);
+        arrived.current.clear();
+        setMeet('go');
+        setGoMe({ x: cx - sz * 0.92, id });
+        setGoPartner({ x: cx - sz * 0.08, id });
+        later('meet', 7000, () => setMeet(null)); // не дошли — не страшно
+      } else {
+        setMeet('wave');
+        later('meet', 2400, () => setMeet(null));
+      }
+    }, 60_000 + Math.random() * 60_000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canMeet, meet === null, width, height]);
+
+  const onArrive = (who: 'me' | 'partner') => () => {
+    if (meet !== 'go') return;
+    arrived.current.add(who);
+    if (arrived.current.size < 2) return;
+    setMeet('five');
+    setSparks((n) => n + 1);
+    haptic.light();
+    later('meet', 1500, () => setMeet(null));
+  };
+
   const tf = useMemo(() => sceneTransform(width, height), [width, height]);
   const size = Math.round(104 * tf.s);
   const chibiH = Math.round((size * 170) / 120);
@@ -148,7 +194,7 @@ export default function HomeScreen() {
 
   const tapMe = () => {
     haptic.light();
-    setMeAct('wave');
+    setMeAct(!reduce && Math.random() < 0.4 ? 'jump' : 'wave');
     setBubble(true);
     later('me', 2600, () => setMeAct(null));
     later('bubble', 6000, () => setBubble(false));
@@ -170,16 +216,27 @@ export default function HomeScreen() {
     return { left: tf.x(center.x) - w / 2, top: tf.y(center.y) - h / 2, w, h };
   };
 
-  const faceFor = (face: FaceState, act: 'wave' | 'love' | null) =>
-    act === 'wave' ? { emotion: 'joy' as FaceKey, value: 80 } : act === 'love' ? { emotion: 'love' as FaceKey, value: 72 } : face;
+  const faceFor = (face: FaceState, act: 'wave' | 'jump' | 'love' | null) =>
+    act === 'wave' || act === 'jump' ? { emotion: 'joy' as FaceKey, value: 80 } : act === 'love' ? { emotion: 'love' as FaceKey, value: 72 } : face;
 
-  const nameTag = (label: string, color: string) => (
+  // Нажали на пустую землю — идём туда
+  const tapGround = (pageX: number) => {
+    if (meSleeps) return;
+    haptic.tap();
+    setBubble(false);
+    setMeAct(null);
+    setGoMe({ x: pageX - size / 2, id: Date.now() });
+  };
+  const meetPose = meet === 'five' ? 'cheer' : meet === 'wave' ? 'wave' : null;
+
+  const nameTag = (label: string, color: string, online = false) => (
     <View pointerEvents="none" style={[styles.tagWrap, { top: chibiH - 2, width: size + 80, left: -40 }]}>
       <View style={styles.tag}>
         <View style={[styles.dot, { backgroundColor: color }]} />
         <Txt weight="heavy" size={12} numberOfLines={1}>
           {label}
         </Txt>
+        {online ? <View style={styles.online} accessibilityLabel="сейчас в приложении" /> : null}
       </View>
     </View>
   );
@@ -227,9 +284,9 @@ export default function HomeScreen() {
   const partnerActor = { look: partnerLook, emotion: pFace.emotion, value: pFace.value };
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: LOCATION_BG[loc][time] }]}>
       <Animated.View style={[StyleSheet.absoluteFill, { transform: world }]}>
-        <Meadow width={width} height={height} time={time} active={focused} />
+        <Location id={loc} width={width} height={height} time={time} active={focused} />
       </Animated.View>
 
       {playing ? (
@@ -249,6 +306,11 @@ export default function HomeScreen() {
       ) : null}
 
       <View style={[StyleSheet.absoluteFill, playing ? styles.hidden : null]} pointerEvents={playing ? 'none' : 'box-none'}>
+      <Pressable
+        style={[styles.ground, { top: tf.y(505) }]}
+        onPress={(e) => tapGround(e.nativeEvent.pageX)}
+        accessibilityLabel="Земля: нажми, и твой чибик пойдёт туда"
+      />
       {partner && !partnerSleeps ? (
         <Walker
           look={partnerLook}
@@ -260,8 +322,11 @@ export default function HomeScreen() {
           maxX={maxX}
           startX={minX + (maxX - minX) * 0.85}
           speed={34 * tf.s}
-          paused={!focused || partnerAct}
-          pose={partnerAct ? 'wave' : 'idle'}
+          paused={!focused || partnerAct || meet === 'five' || meet === 'wave'}
+          pose={partnerAct ? 'wave' : meetPose ?? 'idle'}
+          face={meet === 'five' ? -1 : undefined}
+          goTo={goPartner}
+          onArrive={onArrive('partner')}
           label={`${partnerName}. Нажми — придёт «думаю о тебе»`}
           onPress={tapPartner}
         >
@@ -273,7 +338,7 @@ export default function HomeScreen() {
               </Txt>
             </View>
           </View>
-          {nameTag(partnerName, C.partner)}
+          {nameTag(partnerName, C.partner, partnerOnline)}
           <HeartsBurst trigger={heartsP} x={size / 2} y={chibiH * 0.36} scale={tf.s} />
         </Walker>
       ) : null}
@@ -292,8 +357,11 @@ export default function HomeScreen() {
           maxX={maxX}
           startX={minX + (maxX - minX) * 0.15}
           speed={30 * tf.s}
-          paused={!focused || meAct !== null || bubble}
-          pose={meAct === 'wave' ? 'wave' : 'idle'}
+          paused={!focused || meAct !== null || bubble || meet === 'five' || meet === 'wave'}
+          pose={meAct === 'wave' ? 'wave' : meAct === 'jump' ? 'jump' : meetPose ?? 'idle'}
+          face={meet === 'five' ? 1 : undefined}
+          goTo={goMe}
+          onArrive={onArrive('me')}
           label="Это ты. Нажми, чтобы отметить настроение; подержи — гардероб"
           onPress={tapMe}
           onLongPress={openWardrobe}
@@ -323,18 +391,22 @@ export default function HomeScreen() {
           <HeartsBurst trigger={heartsM} x={size / 2} y={chibiH * 0.36} scale={tf.s} />
         </Walker>
       ) : null}
+      <SparkPop trigger={sparks} x={width / 2} y={tf.y(520) + chibiH * 0.05} scale={tf.s} />
       </View>
 
       <View style={[styles.topBar, { top: insets.top + 8 }, playing ? styles.hidden : null]} pointerEvents="box-none">
-        <Pill>
-          <Icon name="pin" size={17} color="#FFFFFF" />
-          <Txt weight="heavy" size={13}>
-            Луг у озера
-          </Txt>
-          <Txt weight="heavy" size={13} color="rgba(255,255,255,0.8)">
-            · {formatTime(now)}
-          </Txt>
-        </Pill>
+        <Pressy onPress={() => setPicker(true)} scaleTo={0.95} accessibilityLabel={`Место: ${locationName(loc)}. Нажми, чтобы сменить`}>
+          <Pill>
+            <Icon name="pin" size={17} color="#FFFFFF" />
+            <Txt weight="heavy" size={13}>
+              {locationName(loc)}
+            </Txt>
+            <Txt weight="heavy" size={13} color="rgba(255,255,255,0.8)">
+              · {formatTime(now)}
+            </Txt>
+            <Icon name="chevronRight" size={14} color="rgba(255,255,255,0.8)" strokeWidth={2.4} />
+          </Pill>
+        </Pressy>
         {streak > 0 ? (
           <Pill>
             <Icon name="flame" size={17} color="#FFFFFF" fill="#FFB36B" strokeWidth={1.6} />
@@ -344,6 +416,20 @@ export default function HomeScreen() {
           </Pill>
         ) : null}
       </View>
+
+      {hasOverride(override) && !playing ? (
+        <View style={[styles.checkMode, { bottom: Math.max(insets.bottom, 10) + 6 + 68 + 96 }]}>
+          <Icon name="settings" size={16} color={C.warn} />
+          <Txt weight="heavy" size={13}>
+            Режим проверки
+          </Txt>
+          <Pressy onPress={() => setDevOverride(null)} innerStyle={styles.reset} accessibilityLabel="Сбросить режим проверки">
+            <Txt weight="heavy" size={12} color={C.onAccent}>
+              Сбросить
+            </Txt>
+          </Pressy>
+        </View>
+      ) : null}
 
       {!partner ? (
         <View style={[styles.card, { top: insets.top + 56 }]}>
@@ -407,6 +493,7 @@ export default function HomeScreen() {
       {!playing ? <AbilityButton onMessage={showToast} busy={Boolean(scene)} /> : null}
 
       <Toast text={toast} top={insets.top + 58} />
+      <LocationSheet visible={picker} onClose={() => setPicker(false)} current={loc} time={time} onError={showToast} />
     </View>
   );
 }
@@ -414,6 +501,23 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#6FB7F5', overflow: 'hidden' },
   hidden: { opacity: 0 },
+  ground: { position: 'absolute', left: 0, right: 0, bottom: 0 },
+  online: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.good, marginLeft: 2 },
+  checkMode: {
+    position: 'absolute',
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 5,
+    paddingLeft: 12,
+    paddingRight: 5,
+    borderRadius: 20,
+    backgroundColor: 'rgba(24,18,40,0.82)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,194,102,0.5)',
+  },
+  reset: { height: 28, paddingHorizontal: 12, borderRadius: 14, backgroundColor: C.warn, justifyContent: 'center' },
   watchWrap: { position: 'absolute', left: 16, right: 16, alignItems: 'center' },
   watch: {
     flexDirection: 'row',

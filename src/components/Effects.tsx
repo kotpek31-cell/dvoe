@@ -239,3 +239,51 @@ const styles = StyleSheet.create({
   },
   toastText: { color: C.text, fontFamily: F.heavy, fontSize: 14, flexShrink: 1 },
 });
+
+// Искорки «дай пять»: короткая вспышка из трёх звёздочек в точке встречи ладошек
+const SPARKS: [number, number, number][] = [
+  [0, -26, 1.2],
+  [-22, -8, 0.8],
+  [22, -10, 0.9],
+];
+
+function SparkBurst({ x, y, scale }: { x: number; y: number; scale: number }) {
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(v, { toValue: 1, duration: 900, easing: Easing.out(Easing.cubic), useNativeDriver: nativeDriver }).start();
+  }, [v]);
+  return (
+    <View pointerEvents="none" style={[styles.origin, { left: x - 12, top: y - 12 }]}>
+      {SPARKS.map(([dx, dy, sc], i) => (
+        <Animated.View
+          key={i}
+          style={[
+            styles.abs,
+            {
+              opacity: v.interpolate({ inputRange: [0, 0.15, 0.7, 1], outputRange: [0, 1, 1, 0] }),
+              transform: [
+                { translateX: v.interpolate({ inputRange: [0, 1], outputRange: [0, dx * scale] }) },
+                { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [0, dy * scale] }) },
+                { scale: v.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0.2, sc * 1.2, sc] }) },
+              ],
+            },
+          ]}
+        >
+          <Icon name="sparkle" size={24} color={C.ink} fill="#FFE89A" strokeWidth={1.4} />
+        </Animated.View>
+      ))}
+    </View>
+  );
+}
+
+export function SparkPop({ trigger, x, y, scale = 1 }: { trigger: number; x: number; y: number; scale?: number }) {
+  const reduce = useReducedMotion();
+  const bursts = useBursts(reduce ? 0 : trigger, 1000);
+  return (
+    <>
+      {bursts.map((id) => (
+        <SparkBurst key={id} x={x} y={y} scale={scale} />
+      ))}
+    </>
+  );
+}

@@ -23,6 +23,8 @@ type PairValue = {
   lastNudgeAt: number | null;
   refresh: () => Promise<void>;
   bump: (table?: TableName) => void;
+  patchPair: (patch: Partial<Pair>) => void; // сразу показать своё изменение, не дожидаясь realtime
+  partnerOnline: boolean; // партнёр сейчас в приложении (присутствие realtime, в базу не пишется)
 };
 
 const initialVersions = REALTIME_TABLES.reduce((acc, t) => ({ ...acc, [t]: 0 }), {} as Versions);
@@ -37,6 +39,7 @@ export function PairProvider({ children }: { children: React.ReactNode }) {
   const [pair, setPair] = useState<Pair | null>(null);
   const [versions, setVersions] = useState<Versions>(initialVersions);
   const [lastNudgeAt, setLastNudgeAt] = useState<number | null>(null);
+  const [online, setOnline] = useState<string[]>([]);
   const widgetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const bump = useCallback((table?: TableName) => {
@@ -49,6 +52,8 @@ export function PairProvider({ children }: { children: React.ReactNode }) {
       return next;
     });
   }, []);
+
+  const patchPair = useCallback((patch: Partial<Pair>) => setPair((prev) => (prev ? { ...prev, ...patch } : prev)), []);
 
   const refresh = useCallback(async () => {
     if (!userId) return;
@@ -113,11 +118,38 @@ export function PairProvider({ children }: { children: React.ReactNode }) {
         },
       );
     });
+    // Пара: смена локации (у pairs нет pair_id — фильтр по id)
+    channel.on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pairs', filter: `id=eq.${pairId}` }, (payload) => {
+      const row = payload.new as Pair;
+      if (row?.id) setPair((prev) => (prev ? { ...prev, ...row } : row));
+    });
     channel.subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
   }, [pairId, userId, bump, refresh, scheduleWidgetRefresh]);
+
+  // Присутствие: кто из пары сейчас в приложении. В фоне — уходим из списка.
+  useEffect(() => {
+    if (!pairId || !userId) {
+      setOnline([]);
+      return;
+    }
+    const channel = supabase.channel(`online-${pairId}`, { config: { presence: { key: userId } } });
+    const sync = () => setOnline(Object.keys(channel.presenceState()));
+    channel.on('presence', { event: 'sync' }, sync);
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED' && AppState.currentState !== 'background') channel.track({ at: Date.now() }).catch(() => undefined);
+    });
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') channel.track({ at: Date.now() }).catch(() => undefined);
+      else if (state === 'background') channel.untrack().catch(() => undefined);
+    });
+    return () => {
+      sub.remove();
+      supabase.removeChannel(channel);
+    };
+  }, [pairId, userId]);
 
   // Вернулись в приложение — обновляем всё (на случай, если realtime был недоступен)
   useEffect(() => {
@@ -138,8 +170,8 @@ export function PairProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo<PairValue>(
-    () => ({ loading, error, me, partner, pair, versions, lastNudgeAt, refresh, bump }),
-    [loading, error, me, partner, pair, versions, lastNudgeAt, refresh, bump],
+    () => ({ loading, error, me, partner, pair, versions, lastNudgeAt, refresh, bump, patchPair, partnerOnline: Boolean(partner && online.includes(partner.id)) }),
+    [loading, error, me, partner, pair, versions, lastNudgeAt, refresh, bump, patchPair, partner, online],
   );
 
   return <PairContext.Provider value={value}>{children}</PairContext.Provider>;

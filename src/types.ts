@@ -37,6 +37,7 @@ export type Pair = {
   invite_code: string;
   created_by: string;
   created_at: string;
+  location?: string; // 0.2: локация пары
 };
 
 export type MoodEntry = {
