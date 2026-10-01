@@ -15,6 +15,7 @@ import { confirmAction } from '../../src/lib/dialogs';
 import { entryMix, mixDominant } from '../../src/lib/emotions';
 import { useLoader } from '../../src/lib/hooks';
 import { openWhatsNew, useWhatsNew } from '../../src/lib/whatsNew';
+import { useAccess } from '../../src/lib/access';
 import { haptic } from '../../src/lib/motion';
 import { wishStats } from '../../src/lib/report';
 import { C, S } from '../../src/theme';
@@ -23,7 +24,7 @@ import type { Profile, Wish } from '../../src/types';
 type Who = 'me' | 'partner';
 
 // Круглые плитки под карточкой: всё второстепенное собрано здесь
-const HUB: { key: string; label: string; icon: IconName; color: string; ring: string; href?: '/wardrobe' | '/settings' }[] = [
+const HUB: { key: string; label: string; icon: IconName; color: string; ring: string; href?: '/wardrobe' | '/settings' | '/dev' }[] = [
   { key: 'wardrobe', label: 'Гардероб', icon: 'hanger', color: C.partner, ring: 'rgba(255,158,187,0.4)', href: '/wardrobe' },
   { key: 'codes', label: 'Коды', icon: 'key', color: C.warn, ring: 'rgba(255,194,102,0.4)' },
   { key: 'news', label: 'Что нового', icon: 'gift', color: C.good, ring: 'rgba(94,211,160,0.4)' },
@@ -33,6 +34,8 @@ const HUB: { key: string; label: string; icon: IconName; color: string; ring: st
 export default function ProfileScreen() {
   const { me, partner } = usePair();
   const news = useWhatsNew();
+  const access = useAccess();
+  const hub = access ? [...HUB, { key: 'dev', label: 'Разработка', icon: 'widget' as IconName, color: C.sleep, ring: 'rgba(155,140,255,0.4)', href: '/dev' as const }] : HUB;
   const day = todayKey();
   const version = useTableVersion('wishes', 'mood_entries', 'profiles');
   const { data, setData, refreshing, error, refresh, reload } = useLoader(async () => {
@@ -155,7 +158,7 @@ export default function ProfileScreen() {
       ) : null}
 
       <View style={styles.hub}>
-        {HUB.map((h) => (
+        {hub.map((h) => (
           <Pressy
             key={h.key}
             onPress={() => (h.key === 'codes' ? setCodes(true) : h.key === 'news' ? openWhatsNew() : router.push(h.href!))}
@@ -269,7 +272,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,158,187,0.35)',
   },
   hub: { flexDirection: 'row', justifyContent: 'space-around', paddingHorizontal: S.sm },
-  hubItem: { width: 72, alignItems: 'center' },
+  hubItem: { width: 68, alignItems: 'center' },
   newDot: { position: 'absolute', top: 4, right: 4, width: 11, height: 11, borderRadius: 6, backgroundColor: C.accent, borderWidth: 2, borderColor: '#1A1530' },
   hubCircle: {
     width: 60,

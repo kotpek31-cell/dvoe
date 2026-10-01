@@ -19,7 +19,7 @@ import { Walker } from '../../src/components/Walker';
 import { useAbility } from '../../src/context/AbilityProvider';
 import { usePair, useTableVersion } from '../../src/context/PairProvider';
 import { fetchMoods, fetchStreaks, sendNudge } from '../../src/lib/api';
-import { lookOf } from '../../src/lib/chibi';
+import { LOOKS, lookOf } from '../../src/lib/chibi';
 import { formatTime, plural, toDayKey } from '../../src/lib/dates';
 import { entryMix, mixDominant } from '../../src/lib/emotions';
 import { errorMessage } from '../../src/lib/env';
@@ -282,13 +282,14 @@ export default function HomeScreen() {
   const mFace = faceFor(myFace, meAct);
 
   // Сцена идёт сразу; в браузере без единого касания звук запрещён — сначала кнопка «Смотреть»
-  const sceneReady = Boolean(scene && focused && partner && (scene.from === 'me' || allowed === scene.key || canAutoplay()));
+  const sceneReady = Boolean(scene && focused && (partner || scene.dry) && (scene.from === 'me' || allowed === scene.key || canAutoplay()));
   const playing = sceneReady ? scene : null;
   const waiting = scene && focused && partner && !sceneReady ? scene : null;
   const kind = playing ? sceneKind(playing.ability) : 'hug';
   const world = playing ? worldTransform(sceneT, kind, reduce) : [];
   const meActor = { look: myLook, emotion: mFace.emotion, value: mFace.value };
-  const partnerActor = { look: partnerLook, emotion: pFace.emotion, value: pFace.value };
+  // без партнёра (проверка «вхолостую») — стоит чибик по умолчанию
+  const partnerActor = { look: partner ? partnerLook : LOOKS.girl, emotion: pFace.emotion, value: pFace.value };
 
   return (
     <View style={[styles.root, { backgroundColor: LOCATION_BG[loc][time] }]}>

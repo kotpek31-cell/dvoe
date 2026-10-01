@@ -3,7 +3,7 @@
 // Долгое нажатие — панель быстрой смены. Партнёр спит — кнопка неактивна: «Тсс, {имя} спит».
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Share, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { useAbility } from '../context/AbilityProvider';
@@ -37,7 +37,7 @@ function useLeft(until: number | undefined): number {
 }
 
 export function AbilityButton({ onMessage, busy }: { onMessage: (text: string) => void; busy: boolean }) {
-  const { me, partner, refresh } = usePair();
+  const { me, partner, pair, refresh } = usePair();
   const { cast, cooldowns } = useAbility();
   const catalog = useCatalog();
   const insets = useSafeAreaInsets();
@@ -45,6 +45,7 @@ export function AbilityButton({ onMessage, busy }: { onMessage: (text: string) =
   const [picker, setPicker] = useState(false);
   const [owned, setOwned] = useState<Set<string> | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  const [lonely, setLonely] = useState(false);
 
   const look = me ? lookOf(me) : null;
   const equipped = look?.ability ?? DEFAULT_ABILITY;
@@ -73,9 +74,14 @@ export function AbilityButton({ onMessage, busy }: { onMessage: (text: string) =
     [catalog, owned, equipped],
   );
 
-  if (!me || !partner) return null;
+  if (!me) return null;
 
   const press = async () => {
+    if (!partner) {
+      haptic.light();
+      setLonely(true);
+      return;
+    }
     if (sleeping) {
       haptic.warning();
       onMessage(`Тсс, ${name} спит`);
@@ -183,6 +189,33 @@ export function AbilityButton({ onMessage, busy }: { onMessage: (text: string) =
         ) : null}
       </View>
 
+      <Sheet visible={lonely} onClose={() => setLonely(false)} title="Способности работают вдвоём">
+        <Txt muted size={14}>
+          Объятия и другие способности срабатывают у партнёра. Отправь ему код пары — как только он его введёт, кнопка оживёт.
+        </Txt>
+        {pair ? (
+          <>
+            <Txt weight="display" size={30} color={C.accent} center style={styles.code}>
+              {pair.invite_code}
+            </Txt>
+            <Button
+              title="Поделиться"
+              icon="share"
+              onPress={() => Share.share({ message: `Давай вести общий дневник в «Двое». Мой код пары: ${pair.invite_code}` }).catch(() => undefined)}
+            />
+          </>
+        ) : (
+          <Button
+            title="Создать пару"
+            icon="plus"
+            onPress={() => {
+              setLonely(false);
+              router.push('/pair');
+            }}
+          />
+        )}
+      </Sheet>
+
       <Sheet visible={picker} onClose={() => setPicker(false)} title="Способность">
         <Txt muted size={14}>
           Надета может быть одна. Нажми на кнопку на главной — и она сработает у {name}.
@@ -267,6 +300,7 @@ const styles = StyleSheet.create({
     borderColor: C.glassBorder,
   },
   list: { gap: S.sm },
+  code: { letterSpacing: 6, paddingVertical: S.sm },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -395,3 +395,120 @@ export async function setLocation(id: string): Promise<void> {
   const { error } = await supabase.rpc('set_location', { p_location: id });
   check(error);
 }
+
+// ---------- Комната разработчиков (0.2) ----------
+// Каждую функцию сервер проверяет по роли; без роли ответ — «Нет доступа».
+
+export type Access = { role: 'owner' | 'developer'; title: string } | null;
+
+export async function fetchMyAccess(): Promise<Access> {
+  const { data, error } = await supabase.rpc('my_access');
+  if (error) return null; // старая база без функции — комнаты просто нет
+  return (data as Access) ?? null;
+}
+
+export type DevUser = {
+  id: string;
+  email: string;
+  short_id: string | null;
+  display_name: string;
+  pair_id: string | null;
+  is_bot: boolean;
+  role: string | null;
+  title: string | null;
+  inventory: { item_id: string; source: string; granted_at: string }[];
+};
+
+export async function devFindUser(query: string): Promise<DevUser | null> {
+  const { data, error } = await supabase.rpc('dev_find_user', { p_email: query.trim() });
+  check(error);
+  return (data as DevUser | null) ?? null;
+}
+
+export async function devGrantItem(userId: string, itemId: string): Promise<void> {
+  const { error } = await supabase.rpc('dev_grant_item', { p_user: userId, p_item: itemId });
+  check(error);
+}
+
+export async function devRevokeItem(userId: string, itemId: string): Promise<void> {
+  const { error } = await supabase.rpc('dev_revoke_item', { p_user: userId, p_item: itemId });
+  check(error);
+}
+
+export type DevCode = {
+  id: string;
+  title: string;
+  is_core: boolean;
+  active: boolean;
+  rewards: string[];
+  created_at: string;
+  count: number;
+  redeemed: { name: string | null; email: string | null; at: string }[];
+};
+
+export async function devListCodes(): Promise<DevCode[]> {
+  const { data, error } = await supabase.rpc('dev_list_codes');
+  check(error);
+  return (data ?? []) as DevCode[];
+}
+
+// Сам код уходит только на сервер (в базе — отпечаток); в приложении и логах его нет
+export async function devCreateCode(code: string, title: string, rewards: string[]): Promise<void> {
+  const { error } = await supabase.rpc('dev_create_code', { p_code: code, p_title: title, p_rewards: rewards });
+  check(error);
+}
+
+export async function devSetCodeActive(id: string, active: boolean): Promise<void> {
+  const { error } = await supabase.rpc('dev_set_code_active', { p_code_id: id, p_active: active });
+  check(error);
+}
+
+export type DevStats = {
+  accounts: number;
+  pairs: number;
+  active_pairs_7d: number;
+  active_today: number;
+  casts_today: number;
+  codes_today: number;
+  test_bots?: number;
+};
+
+export async function devStats(): Promise<DevStats> {
+  const { data, error } = await supabase.rpc('dev_stats');
+  check(error);
+  return data as DevStats;
+}
+
+export type DevRole = { user_id: string; role: string; title: string; email: string; short_id: string | null; name: string | null; since: string };
+
+export async function devListRoles(): Promise<DevRole[]> {
+  const { data, error } = await supabase.rpc('dev_list_developers');
+  check(error);
+  return (data ?? []) as DevRole[];
+}
+
+export async function devSetRole(query: string, title: string): Promise<void> {
+  const { error } = await supabase.rpc('dev_set_role', { p_query: query.trim(), p_title: title.trim() || null });
+  check(error);
+}
+
+export async function devRemoveRole(query: string): Promise<void> {
+  const { error } = await supabase.rpc('dev_remove_role', { p_query: query.trim() });
+  check(error);
+}
+
+export async function devTestPartnerCreate(): Promise<void> {
+  const { error } = await supabase.rpc('dev_test_partner_create');
+  check(error);
+}
+
+export async function devTestPartnerRemove(): Promise<number> {
+  const { data, error } = await supabase.rpc('dev_test_partner_remove');
+  check(error);
+  return Number(data) || 0;
+}
+
+export async function devTestPartnerSleep(on: boolean): Promise<void> {
+  const { error } = await supabase.rpc('dev_test_partner_sleep', { p_on: on });
+  check(error);
+}

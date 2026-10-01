@@ -1,16 +1,19 @@
 // Настройки: имя, пара, уведомления, сон, виджет, аккаунт
+import * as Clipboard from 'expo-clipboard';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppState, Platform, Share, StyleSheet, Switch, View } from 'react-native';
 import * as ScreenSleep from '../modules/screen-sleep';
-import { Button, Card, Input, Row, Screen, showError, Txt } from '../src/components/ui';
+import { Button, Card, Input, Pressy, Row, Screen, showError, Txt } from '../src/components/ui';
 import { useAuth } from '../src/context/AuthProvider';
 import { usePair } from '../src/context/PairProvider';
 import { leavePair, updateMyProfile } from '../src/lib/api';
 import { confirmAction, notify } from '../src/lib/dialogs';
 import { isExpoGo } from '../src/lib/env';
 import { isHealthKitSupported, requestSleepAccess } from '../src/lib/healthkit';
+import { refreshAccess, useAccess } from '../src/lib/access';
+import { haptic } from '../src/lib/motion';
 import { registerForPushAsync, scheduleReminders } from '../src/lib/notifications';
 import { loadSoundsEnabled, setSoundsEnabled } from '../src/lib/sound';
 import { enableWebPush, webPushState, type WebPushState } from '../src/lib/webPush';
@@ -35,6 +38,23 @@ export default function SettingsScreen() {
   const [webState, setWebState] = useState<WebPushState | null>(null);
   const [usageAccess, setUsageAccess] = useState(ScreenSleep.hasUsageAccess());
   const [sounds, setSounds] = useState(true);
+  const [copied, setCopied] = useState(false);
+  const access = useAccess();
+  const taps = useRef<number[]>([]);
+
+  // 7 нажатий на номер версии за 4 секунды — комната разработчиков (только с ролью; у остальных ничего)
+  const tapVersion = () => {
+    const now = Date.now();
+    taps.current = [...taps.current.filter((t) => now - t < 4000), now];
+    if (taps.current.length < 7) return;
+    taps.current = [];
+    if (access) {
+      haptic.success();
+      router.push('/dev');
+    } else if (session?.user.id) {
+      refreshAccess(session.user.id); // вдруг роль выдали только что
+    }
+  };
 
   useEffect(() => {
     loadSoundsEnabled().then(setSounds).catch(() => undefined);
@@ -239,6 +259,32 @@ export default function SettingsScreen() {
         <Txt muted size={14}>
           {session?.user.email}
         </Txt>
+        {me.short_id ? (
+          <Row style={styles.between}>
+            <View style={styles.flex}>
+              <Txt weight="heavy" size={16}>
+                Твой ID: {me.short_id}
+              </Txt>
+              <Txt muted size={13}>
+                {copied ? 'Скопировано' : 'Нужен, если тебе выдают роль или вещь'}
+              </Txt>
+            </View>
+            <Button
+              title="Скопировать"
+              small
+              variant="secondary"
+              onPress={() => {
+                Clipboard.setStringAsync(me.short_id!)
+                  .then(() => {
+                    haptic.tap();
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  })
+                  .catch(() => undefined);
+              }}
+            />
+          </Row>
+        ) : null}
         <Button
           title="Выйти из аккаунта"
           variant="secondary"
@@ -248,11 +294,11 @@ export default function SettingsScreen() {
             router.replace('/sign-in');
           }}
         />
-        <View style={styles.version}>
+        <Pressy onPress={tapVersion} haptics={false} scaleTo={1} style={styles.version} accessibilityRole="none" accessibilityLabel={`Версия ${Constants.expoConfig?.version ?? ''}`}>
           <Txt faint size={12}>
-            Двое · версия {Constants.expoConfig?.version ?? '0.1.0'}
+            Двое · версия {Constants.expoConfig?.version ?? '0.2.0'}
           </Txt>
-        </View>
+        </Pressy>
       </Card>
     </Screen>
   );

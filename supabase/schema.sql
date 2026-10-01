@@ -1792,5 +1792,384 @@ begin
 end;
 $$;
 
+-- =====================================================================
+-- 11. 0.2, шаг 6: короткий ID, роли с названием, тестовый партнёр
+-- =====================================================================
+
+-- 11.1 Короткий ID аккаунта: 6 символов без похожих (0/O, 1/I). Виден в настройках,
+--      по нему владелец находит человека в комнате разработчиков. Сам человек его не меняет.
+alter table public.profiles add column if not exists short_id text;
+
+create or replace function private.new_short_id()
+returns text
+language plpgsql volatile security definer set search_path = ''
+as $$
+declare
+  v_alphabet constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  v_bytes bytea;
+  v_id    text;
+begin
+  loop
+    v_bytes := uuid_send(gen_random_uuid());
+    v_id := '';
+    for i in 0..5 loop
+      v_id := v_id || substr(v_alphabet, 1 + (get_byte(v_bytes, i) % 32), 1);
+    end loop;
+    exit when not exists (select 1 from public.profiles where short_id = v_id);
+  end loop;
+  return v_id;
+end;
+$$;
+
+create or replace function public.profiles_short_id()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if tg_op = 'UPDATE' then
+    new.short_id := coalesce(old.short_id, new.short_id);
+  end if;
+  if new.short_id is null then
+    new.short_id := private.new_short_id();
+  end if;
+  return new;
+end;
+$$;
+
+create or replace trigger profiles_short_id before insert or update on public.profiles
+  for each row execute function public.profiles_short_id();
+
+update public.profiles set short_id = private.new_short_id() where short_id is null;
+create unique index if not exists profiles_short_id_key on public.profiles (short_id);
+
+-- 11.2 Роли: у любой роли, кроме владельца, есть название (по умолчанию «тестер»).
+--      Любая роль даёт всю комнату разработчиков, кроме управления ролями — это только владелец.
+alter table private.user_roles add column if not exists title text;
+update private.user_roles set title = 'тестер' where role = 'developer' and title is null;
+
+-- Тестовые партнёры (чибики-боты): чей бот и в какой паре
+create table if not exists private.test_bots (
+  bot_id     uuid primary key references auth.users (id) on delete cascade,
+  owner_id   uuid not null references auth.users (id) on delete cascade,
+  pair_id    uuid not null references public.pairs (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+alter table private.test_bots enable row level security;
+
+create or replace function private.is_bot(p_user uuid)
+returns boolean
+language sql stable security definer set search_path = ''
+as $$
+  select exists (select 1 from private.test_bots b where b.bot_id = p_user)
+$$;
+
+-- Человек по email или по короткому ID
+create or replace function private.find_user(p_query text)
+returns uuid
+language sql stable security definer set search_path = ''
+as $$
+  select case
+    when position('@' in coalesce(p_query, '')) > 0 then
+      (select u.id from auth.users u where lower(u.email) = lower(btrim(p_query)))
+    else
+      (select p.id from public.profiles p where p.short_id = upper(btrim(coalesce(p_query, ''))))
+  end
+$$;
+
+-- Моя роль с названием: {"role": "owner" | "developer", "title": "…"} или null
+create or replace function public.my_access()
+returns jsonb
+language sql stable security definer set search_path = ''
+as $$
+  select jsonb_build_object('role', r.role, 'title', coalesce(r.title, case when r.role = 'owner' then 'владелец' else 'тестер' end))
+  from private.user_roles r where r.user_id = auth.uid()
+$$;
+
+-- Найти человека по email или ID (параметр называется p_email ради совместимости)
+create or replace function public.dev_find_user(p_email text)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_id uuid;
+begin
+  perform private.require_role();
+  v_id := private.find_user(p_email);
+  if v_id is null then
+    return null;
+  end if;
+  return (
+    select jsonb_build_object(
+      'id', p.id,
+      'email', u.email,
+      'short_id', p.short_id,
+      'display_name', p.display_name,
+      'pair_id', p.pair_id,
+      'is_bot', private.is_bot(p.id),
+      'role', r.role,
+      'title', coalesce(r.title, case when r.role = 'owner' then 'владелец' end),
+      'inventory', coalesce((select jsonb_agg(jsonb_build_object('item_id', v.item_id, 'source', v.source, 'granted_at', v.granted_at)
+                                              order by v.granted_at)
+                             from public.inventory v where v.user_id = p.id), '[]'::jsonb)
+    )
+    from public.profiles p
+    join auth.users u on u.id = p.id
+    left join private.user_roles r on r.user_id = p.id
+    where p.id = v_id
+  );
+end;
+$$;
+
+-- Выдать роль (только владелец): своё название или «тестер»
+create or replace function public.dev_set_role(p_query text, p_title text default null)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_owner uuid := private.require_role(true);
+  v_user  uuid := private.find_user(p_query);
+  v_title text := left(coalesce(nullif(btrim(coalesce(p_title, '')), ''), 'тестер'), 30);
+begin
+  if v_user is null then
+    raise exception 'Аккаунт не найден — проверь email или ID';
+  end if;
+  if v_user = v_owner then
+    raise exception 'Роль владельца так не меняется';
+  end if;
+  if private.is_bot(v_user) then
+    raise exception 'Тестовому партнёру роль не нужна';
+  end if;
+  insert into private.user_roles (user_id, role, title, granted_by) values (v_user, 'developer', v_title, v_owner)
+  on conflict (user_id) do update set title = excluded.title, granted_by = excluded.granted_by
+  where private.user_roles.role <> 'owner';
+  return jsonb_build_object('user_id', v_user, 'title', v_title);
+end;
+$$;
+
+-- Снять роль (только владелец)
+create or replace function public.dev_remove_role(p_query text)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_owner uuid := private.require_role(true);
+  v_user  uuid := private.find_user(p_query);
+begin
+  if v_user is null then
+    raise exception 'Аккаунт не найден — проверь email или ID';
+  end if;
+  if v_user = v_owner then
+    raise exception 'Роль владельца так не меняется';
+  end if;
+  delete from private.user_roles where user_id = v_user and role <> 'owner';
+end;
+$$;
+
+-- Старая кнопка «разработчик да/нет» — теперь через роли с названием
+create or replace function public.dev_set_developer(p_email text, p_on boolean)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if p_on then
+    perform public.dev_set_role(p_email, null);
+  else
+    perform public.dev_remove_role(p_email);
+  end if;
+end;
+$$;
+
+create or replace function public.dev_list_developers()
+returns jsonb
+language plpgsql stable security definer set search_path = ''
+as $$
+begin
+  perform private.require_role(true);
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('user_id', r.user_id, 'role', r.role, 'email', u.email, 'short_id', p.short_id,
+                                        'title', coalesce(r.title, case when r.role = 'owner' then 'владелец' else 'тестер' end),
+                                        'name', p.display_name, 'since', r.created_at)
+                     order by (r.role = 'owner') desc, r.created_at)
+    from private.user_roles r
+    join auth.users u on u.id = r.user_id
+    left join public.profiles p on p.id = r.user_id), '[]'::jsonb);
+end;
+$$;
+
+-- Статистика без тестовых партнёров
+create or replace function public.dev_stats()
+returns jsonb
+language plpgsql stable security definer set search_path = ''
+as $$
+declare
+  v_today timestamptz := date_trunc('day', now() at time zone 'Europe/Moscow') at time zone 'Europe/Moscow';
+  v_week  timestamptz := now() - interval '7 days';
+begin
+  perform private.require_role();
+  return (
+    with bots as (select bot_id, pair_id from private.test_bots),
+    acts as (
+      select pair_id, user_id, created_at from public.mood_entries
+      union all select pair_id, user_id, created_at from public.sleep_entries
+      union all select pair_id, user_id, created_at from public.gratitudes
+      union all select pair_id, user_id, updated_at from public.day_scores
+      union all select pair_id, user_id, created_at from public.question_answers
+      union all select pair_id, user_id, created_at from public.wishes
+    ),
+    real_acts as (select * from acts where user_id not in (select bot_id from bots))
+    select jsonb_build_object(
+      'accounts',        (select count(*) from public.profiles where id not in (select bot_id from bots)),
+      'pairs',           (select count(*) from (select pair_id from public.profiles
+                                                where pair_id is not null and id not in (select bot_id from bots)
+                                                group by pair_id having count(*) = 2) x),
+      'active_pairs_7d', (select count(distinct pair_id) from real_acts where created_at >= v_week),
+      'active_today',    (select count(distinct user_id) from real_acts where created_at >= v_today),
+      'casts_today',     (select count(*) from public.ability_casts
+                          where created_at >= v_today and from_user not in (select bot_id from bots)),
+      'codes_today',     (select count(*) from private.code_redemptions where created_at >= v_today),
+      'test_bots',       (select count(*) from bots)
+    )
+  );
+end;
+$$;
+
+-- 11.3 Тестовый партнёр: чибик-бот в паре того, кто проверяет.
+--      Аккаунт без пароля и без входа; удаляется одной кнопкой вместе со всеми своими данными.
+create or replace function public.dev_test_partner_create()
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_uid  uuid := private.require_role();
+  v_pair uuid;
+  v_bot  uuid := gen_random_uuid();
+  v_code text;
+begin
+  select pair_id into v_pair from public.profiles where id = v_uid;
+  if v_pair is not null and exists (select 1 from public.profiles where pair_id = v_pair and id <> v_uid) then
+    raise exception 'У тебя уже есть партнёр — тестовый нужен, только когда ты один';
+  end if;
+  if v_pair is null then
+    -- своя пара: код как у create_pair
+    loop
+      v_code := upper(substr(md5(gen_random_uuid()::text), 1, 6));
+      exit when not exists (select 1 from public.pairs where invite_code = v_code);
+    end loop;
+    insert into public.pairs (invite_code, created_by) values (v_code, v_uid) returning id into v_pair;
+    update public.profiles set pair_id = v_pair where id = v_uid;
+  end if;
+
+  insert into auth.users (instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+                          raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+  values ('00000000-0000-0000-0000-000000000000', v_bot, 'authenticated', 'authenticated',
+          'bot-' || replace(v_bot::text, '-', '') || '@test.dvoe.invalid', '', now(),
+          '{"provider": "bot", "providers": ["bot"]}'::jsonb, '{"display_name": "Тестик"}'::jsonb, now(), now());
+  insert into public.profiles (id, display_name) values (v_bot, 'Тестик') on conflict (id) do nothing;
+  update public.profiles
+     set display_name = 'Тестик', pair_id = v_pair,
+         chibi = '{"kind": "girl", "v": 2, "skin": 2, "hair": {"id": "hair.ponytail", "c": "pink"}, "top": {"id": "top.tee", "c": "mint"}}'::jsonb
+   where id = v_bot;
+  insert into private.test_bots (bot_id, owner_id, pair_id) values (v_bot, v_uid, v_pair);
+  return jsonb_build_object('bot_id', v_bot, 'pair_id', v_pair);
+end;
+$$;
+
+-- Убрать тестового партнёра: аккаунт бота и всё, что к нему привязано (каскадом)
+create or replace function public.dev_test_partner_remove()
+returns integer
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_uid uuid := private.require_role();
+  v_n   integer;
+begin
+  with gone as (
+    delete from auth.users u
+    where u.id in (select b.bot_id from private.test_bots b where b.owner_id = v_uid)
+    returning 1
+  )
+  select count(*) into v_n from gone;
+  return v_n;
+end;
+$$;
+
+-- Уложить тестового партнёра спать или разбудить — проверить «Тсс, спит»
+create or replace function public.dev_test_partner_sleep(p_on boolean)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_uid uuid := private.require_role();
+begin
+  update public.profiles set sleeping_since = case when p_on then now() else null end
+  where id in (select b.bot_id from private.test_bots b where b.owner_id = v_uid);
+end;
+$$;
+
+-- Бот отвечает: на «Думаю о тебе» — тем же, на способность — объятиями (не чаще раза в 15 секунд)
+create or replace function public.bot_reply_nudge()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_bot uuid;
+begin
+  if private.is_bot(new.from_user) then
+    return new;
+  end if;
+  select b.bot_id into v_bot from private.test_bots b where b.pair_id = new.pair_id limit 1;
+  if v_bot is null or exists (select 1 from public.nudges n where n.from_user = v_bot and n.created_at > now() - interval '15 seconds') then
+    return new;
+  end if;
+  begin
+    insert into public.nudges (pair_id, from_user) values (new.pair_id, v_bot);
+  exception when others then
+    null; -- ответ бота не должен ломать настоящий «Думаю о тебе»
+  end;
+  return new;
+end;
+$$;
+
+create or replace trigger nudges_bot_reply after insert on public.nudges
+  for each row execute function public.bot_reply_nudge();
+
+create or replace function public.bot_reply_cast()
+returns trigger
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  if not private.is_bot(new.to_user) or private.is_bot(new.from_user) then
+    return new;
+  end if;
+  if exists (select 1 from public.ability_casts c where c.from_user = new.to_user and c.created_at > now() - interval '15 seconds') then
+    return new;
+  end if;
+  insert into public.ability_casts (pair_id, from_user, to_user, ability, pushed)
+  values (new.pair_id, new.to_user, new.from_user, 'ability.hug', false);
+  return new;
+end;
+$$;
+
+create or replace trigger casts_bot_reply after insert on public.ability_casts
+  for each row execute function public.bot_reply_cast();
+
+-- 11.4 Права: вошедшим — только API; триггерные и закрытые — никому
+revoke all on all functions in schema private from public, anon, authenticated;
+revoke execute on function public.profiles_short_id() from public, anon, authenticated;
+revoke execute on function public.bot_reply_nudge() from public, anon, authenticated;
+revoke execute on function public.bot_reply_cast() from public, anon, authenticated;
+revoke execute on function public.my_access() from public, anon;
+revoke execute on function public.dev_set_role(text, text) from public, anon;
+revoke execute on function public.dev_remove_role(text) from public, anon;
+revoke execute on function public.dev_test_partner_create() from public, anon;
+revoke execute on function public.dev_test_partner_remove() from public, anon;
+revoke execute on function public.dev_test_partner_sleep(boolean) from public, anon;
+grant execute on function public.my_access() to authenticated;
+grant execute on function public.dev_set_role(text, text) to authenticated;
+grant execute on function public.dev_remove_role(text) to authenticated;
+grant execute on function public.dev_test_partner_create() to authenticated;
+grant execute on function public.dev_test_partner_remove() to authenticated;
+grant execute on function public.dev_test_partner_sleep(boolean) to authenticated;
+
 -- Готово. Если внизу видна эта строка — схема применена целиком.
 select 'Схема «Двое» 0.2 применена' as "Готово";

@@ -74,6 +74,7 @@ export default function RootLayout() {
             <Stack.Screen name="settings" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="questions" options={{ animation: 'slide_from_right' }} />
             <Stack.Screen name="wardrobe" options={{ animation: 'slide_from_right' }} />
+            <Stack.Screen name="dev" options={{ animation: 'slide_from_right' }} />
           </Stack>
           <CastBanner />
           <WhatsNew />

@@ -19,6 +19,7 @@ export type Scene = {
   from: 'me' | 'partner';
   castId?: string;
   at: number; // когда применили (мс)
+  dry?: boolean; // «вхолостую» из комнаты разработчиков: только у себя, без записи и пуша
 };
 
 type CastOutcome = { ok: true } | { ok: false; message: string };
@@ -28,6 +29,7 @@ type AbilityValue = {
   finishScene: () => void;
   dismissScene: () => void; // закрыли плашку — не показываем
   cast: (ability: string) => Promise<CastOutcome>;
+  rehearse: (ability: string) => void;
   cooldowns: Record<string, number>; // способность → до какого момента перезарядка (мс)
   homeVisible: boolean;
   setHomeVisible: (v: boolean) => void;
@@ -153,9 +155,13 @@ export function AbilityProvider({ children }: { children: React.ReactNode }) {
     [partner, enqueue],
   );
 
+  const rehearse = useCallback((ability: string) => {
+    enqueue({ key: `dry-${Date.now()}`, ability, from: 'me', at: Date.now(), dry: true });
+  }, [enqueue]);
+
   const value = useMemo<AbilityValue>(
-    () => ({ scene, finishScene, dismissScene: finishScene, cast, cooldowns, homeVisible, setHomeVisible }),
-    [scene, finishScene, cast, cooldowns, homeVisible],
+    () => ({ scene, finishScene, dismissScene: finishScene, cast, rehearse, cooldowns, homeVisible, setHomeVisible }),
+    [scene, finishScene, cast, rehearse, cooldowns, homeVisible],
   );
 
   return <AbilityContext.Provider value={value}>{children}</AbilityContext.Provider>;

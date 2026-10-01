@@ -29,6 +29,7 @@ export type Profile = {
   water_goal: number;
   sleeping_since: string | null;
   chibi?: ChibiLook | null;
+  short_id?: string | null; // 0.2: короткий ID из 6 символов (виден в настройках)
   created_at: string;
 };
 
