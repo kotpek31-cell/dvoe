@@ -7,7 +7,7 @@ import { Chibi } from '../src/components/Chibi';
 import { Button, Card, Pressy, Screen, showError, Txt } from '../src/components/ui';
 import { usePair } from '../src/context/PairProvider';
 import { updateMyProfile } from '../src/lib/api';
-import { CHIBI_KINDS, CHIBI_LABELS, chibiKindOf, hasChosenChibi } from '../src/lib/chibi';
+import { CHIBI_KINDS, CHIBI_LABELS, chibiKindOf, hasChosenChibi, LOOKS } from '../src/lib/chibi';
 import { haptic } from '../src/lib/motion';
 import { registerForPushAsync, scheduleReminders } from '../src/lib/notifications';
 import { setFlag } from '../src/lib/prefs';
@@ -103,7 +103,7 @@ export default function Onboarding() {
             придёт «думаю о тебе».
           </Txt>
           <View style={styles.preview}>
-            <Chibi kind={kind} emotion="joy" value={70} pose="wave" size={140} />
+            <Chibi look={LOOKS[kind]} emotion="joy" value={70} pose="wave" size={140} />
           </View>
           <View style={styles.kinds}>
             {CHIBI_KINDS.map((k) => {
@@ -118,7 +118,7 @@ export default function Onboarding() {
                   accessibilityState={{ checked: selected }}
                   accessibilityLabel={CHIBI_LABELS[k]}
                 >
-                  <Chibi kind={k} emotion="calm" value={30} pose="idle" size={64} />
+                  <Chibi look={LOOKS[k]} emotion="calm" value={30} pose="idle" size={64} still />
                   <Txt weight="heavy" size={12} center>
                     {CHIBI_LABELS[k]}
                   </Txt>

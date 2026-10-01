@@ -1,4 +1,5 @@
 # Собирает веб-версию и публикует её на GitHub Pages при каждом изменении в ветке main.
+# В ветке v0.2 только проверяет: типы и сборка, без публикации.
 # Нужно один раз: Settings → Pages → Source: GitHub Actions,
 # и Settings → Secrets and variables → Actions → Variables:
 #   EXPO_PUBLIC_SUPABASE_URL и EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY (или закоммитьте файл .env).
@@ -6,7 +7,7 @@ name: Веб-версия
 
 on:
   push:
-    branches: [main]
+    branches: [main, v0.2]
   workflow_dispatch:
 
 permissions:
@@ -15,7 +16,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -56,17 +57,22 @@ jobs:
             fs.writeFileSync('app.json', JSON.stringify(cfg, null, 2));
           "
 
+      - name: Проверка типов (с ошибкой сайт не обновится)
+        run: npx tsc --noEmit
+
       - name: Сборка
         run: |
           npx expo export --platform web
           cp dist/index.html dist/404.html
 
       - uses: actions/upload-pages-artifact@v3
+        if: github.ref == 'refs/heads/main'
         with:
           path: dist
 
   deploy:
     needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:
       name: github-pages

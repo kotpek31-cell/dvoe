@@ -2,8 +2,24 @@
 
 export type ChibiKind = 'boy' | 'girl' | 'nb';
 
-// Внешность чибика. В 0.1 — только вид; причёски, глаза, рост и т. д. добавятся позже.
-export type ChibiLook = { kind: ChibiKind };
+// Внешность чибика (profiles.chibi). 0.1.1 пишет только kind; с 0.2 — образ из вещей (v: 2),
+// разбирает его lookOf в src/lib/chibi.ts.
+export type ChibiSlot = { id: string; c?: string };
+export type ChibiLook = {
+  kind?: ChibiKind;
+  v?: number;
+  skin?: number;
+  hair?: ChibiSlot | null;
+  eyes?: ChibiSlot | null;
+  hat?: ChibiSlot | null;
+  face?: ChibiSlot | null;
+  top?: ChibiSlot | null;
+  bottom?: ChibiSlot | null;
+  shoes?: ChibiSlot | null;
+  back?: ChibiSlot | null;
+  hand?: ChibiSlot | null;
+  ability?: string;
+};
 
 export type Profile = {
   id: string;

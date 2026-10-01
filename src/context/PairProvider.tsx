@@ -4,6 +4,7 @@ import * as Haptics from 'expo-haptics';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 import { fetchPair, fetchProfiles } from '../lib/api';
+import { syncCatalog } from '../lib/catalog';
 import { errorMessage } from '../lib/env';
 import { supabase } from '../lib/supabase';
 import { refreshWidgets } from '../lib/widgets';
@@ -51,6 +52,7 @@ export function PairProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     if (!userId) return;
+    syncCatalog().catch(() => undefined); // вещи из каталога: новые появятся без обновления приложения
     try {
       const [list, currentPair] = await Promise.all([fetchProfiles(), fetchPair()]);
       setProfiles(list);

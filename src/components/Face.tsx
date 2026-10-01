@@ -1,9 +1,12 @@
 // Лицо эмоции (react-native-svg). Геометрию считает src/lib/face.ts — тот же движок, что в макете.
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useId, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Svg, { Circle, Ellipse, G, Path } from 'react-native-svg';
-import { FACE_PATHS, FACE_SPOTS, faceModel, INK, type FaceKey } from '../lib/face';
-import { useReducedMotion } from '../lib/motion';
+import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, Stop } from 'react-native-svg';
+import { FACE_PATHS, FACE_SPOTS, faceModel, INK, type FaceKey, type FaceModel } from '../lib/face';
+import { CLOTH, SKIN } from '../lib/palette';
+
+// Стили глаз чибика (вещи категории «Глаза»): рисует движок лица, а не каталог
+export type EyeStyle = 'classic' | 'lashes' | 'sparkle' | 'sleepy' | 'azure';
 
 type Props = {
   emotion: FaceKey;
@@ -12,7 +15,12 @@ type Props = {
   bare?: boolean;
   eyes?: number;
   look?: number;
-  blink?: boolean; // иногда моргать
+  blink?: boolean; // иногда моргать (и при «Уменьшить движение» — это единственное, что остаётся)
+  closed?: boolean; // глаза закрыты всё время
+  eyeStyle?: EyeStyle;
+  eyeColor?: string; // цвет радужки; уголь — обычные тёмные глаза
+  skin?: string; // для сонных век
+  blushMin?: number; // у чибика щёчки розовые всегда
 };
 
 // Холст чуть больше лица, чтобы слёзы, пламя и «Zzz» не обрезались
@@ -20,12 +28,120 @@ const PAD_X = 10;
 const PAD_TOP = 14;
 const BOX = 120;
 
-function FaceView({ emotion, value, size, bare, eyes, look, blink }: Props) {
-  const reduce = useReducedMotion();
-  const [closed, setClosed] = useState(false);
+// Глаза выбранного стиля и цвета (по рисунку макета, tools/art/chibi.ts)
+function StyledEyes({ f, style, color, skin, gid }: { f: FaceModel; style: EyeStyle; color?: string; skin: string; gid: string }) {
+  const g = f.geo;
+  const open = g.h > 3;
+  const sides = [
+    [-1, g.cxL],
+    [1, g.cxR],
+  ] as const;
+  if (style === 'azure') {
+    return (
+      <G opacity={f.eyesOp}>
+        <Defs>
+          <LinearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+            {open
+              ? [
+                  <Stop key="a" offset="0" stopColor="#3B4A66" />,
+                  <Stop key="b" offset="0.55" stopColor="#6E86A8" />,
+                  <Stop key="c" offset="1" stopColor="#CFDCEB" />,
+                ]
+              : [<Stop key="a" offset="0" stopColor="#C9F1FF" />, <Stop key="c" offset="1" stopColor="#3A7BFF" />]}
+          </LinearGradient>
+        </Defs>
+        <Path d={f.eyeL} fill={`url(#${gid})`} stroke={INK} strokeWidth={2} strokeLinejoin="round" />
+        <Path d={f.eyeR} fill={`url(#${gid})`} stroke={INK} strokeWidth={2} strokeLinejoin="round" />
+        {open
+          ? sides.map(([sd, cx]) => {
+              const xo = cx + sd * g.w;
+              const xi = cx - sd * g.w;
+              return (
+                <G key={sd}>
+                  <Ellipse cx={cx} cy={g.topMid + g.h * 0.48} rx={g.w * 0.46} ry={g.h * 0.38} fill="#121033" />
+                  <Circle cx={cx - g.w * 0.34} cy={g.topMid + g.h * 0.3} r={Math.max(1.8, g.w * 0.32)} fill="#FFFFFF" />
+                  <Circle cx={cx + g.w * 0.32} cy={g.topMid + g.h * 0.72} r={g.w * 0.15} fill="#FFFFFF" opacity={0.9} />
+                  <Path
+                    d={`M${xo} ${g.ey} C${xo} ${g.ey + g.eto} ${xi} ${g.ey + g.eti} ${xi} ${g.ey}`}
+                    fill="none"
+                    stroke={INK}
+                    strokeWidth={3}
+                    strokeLinecap="round"
+                  />
+                  <Path d={`M${xo - sd * 0.5} ${g.ey - 2} l${sd * 3.4} -2.6`} fill="none" stroke={INK} strokeWidth={2} strokeLinecap="round" />
+                </G>
+              );
+            })
+          : null}
+      </G>
+    );
+  }
+  const ink = !color || color.toUpperCase() === CLOTH.coal[1].toUpperCase();
+  const fill = ink ? INK : color;
+  const big = style === 'sparkle' ? 1.4 : 1;
+  const lid = g.topMid + g.h * 0.42;
+  return (
+    <G opacity={f.eyesOp}>
+      <Path d={f.eyeL} fill={fill} stroke={INK} strokeWidth={2} strokeLinejoin="round" />
+      <Path d={f.eyeR} fill={fill} stroke={INK} strokeWidth={2} strokeLinejoin="round" />
+      {!ink && open
+        ? sides.map(([sd, cx]) => (
+            <Ellipse key={sd} cx={cx} cy={g.topMid + g.h * 0.56} rx={g.w * 0.48} ry={g.h * 0.34} fill={INK} />
+          ))
+        : null}
+      <Circle cx={f.hl.lx} cy={f.hl.y} r={f.hl.r * big} fill="#FFFFFF" opacity={f.hl.op} />
+      <Circle cx={f.hl.rx} cy={f.hl.y} r={f.hl.r * big} fill="#FFFFFF" opacity={f.hl.op} />
+      {style === 'sparkle' ? (
+        <G opacity={f.hl.op}>
+          <Circle cx={f.s2.lx} cy={f.s2.y} r={1.5} fill="#FFFFFF" />
+          <Circle cx={f.s2.rx} cy={f.s2.y} r={1.5} fill="#FFFFFF" />
+        </G>
+      ) : f.s2.op > 0 ? (
+        <G opacity={f.s2.op}>
+          <Circle cx={f.s2.lx} cy={f.s2.y} r={f.s2.r} fill="#FFFFFF" />
+          <Circle cx={f.s2.rx} cy={f.s2.y} r={f.s2.r} fill="#FFFFFF" />
+        </G>
+      ) : null}
+      {style === 'lashes'
+        ? sides.map(([sd, cx]) => {
+            const xo = cx + sd * g.w;
+            return (
+              <Path
+                key={sd}
+                d={`M${xo - sd * 1.2} ${g.topMid + g.h * 0.15} l${sd * 3.2} -3.2 M${xo - sd * 3.6} ${g.topMid - 0.4} l${sd * 2} -3.4`}
+                fill="none"
+                stroke={INK}
+                strokeWidth={1.8}
+                strokeLinecap="round"
+              />
+            );
+          })
+        : null}
+      {style === 'sleepy' && open
+        ? sides.map(([sd, cx]) => (
+            <G key={sd}>
+              <Path d={`M${cx - g.w - 2} ${g.topMid - 3} H${cx + g.w + 2} V${lid} H${cx - g.w - 2} Z`} fill={skin} />
+              <Path
+                d={`M${cx - g.w - 0.6} ${lid} Q${cx} ${lid + 1.4} ${cx + g.w + 0.6} ${lid}`}
+                fill="none"
+                stroke={INK}
+                strokeWidth={2.2}
+                strokeLinecap="round"
+              />
+            </G>
+          ))
+        : null}
+    </G>
+  );
+}
+
+function FaceView({ emotion, value, size, bare, eyes, look, blink, closed: alwaysClosed, eyeStyle, eyeColor, skin, blushMin = 0 }: Props) {
+  const [blinking, setClosed] = useState(false);
+  const closed = blinking || Boolean(alwaysClosed);
+  const gid = `eye${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
 
   useEffect(() => {
-    if (!blink || reduce) return;
+    if (!blink || alwaysClosed) return;
     let open: ReturnType<typeof setTimeout> | undefined;
     let shut: ReturnType<typeof setTimeout> | undefined;
     const schedule = () => {
@@ -42,7 +158,7 @@ function FaceView({ emotion, value, size, bare, eyes, look, blink }: Props) {
       if (open) clearTimeout(open);
       if (shut) clearTimeout(shut);
     };
-  }, [blink, reduce]);
+  }, [blink, alwaysClosed]);
 
   const f = useMemo(() => faceModel(emotion, value, { bare, eyes, look, blink: closed }), [emotion, value, bare, eyes, look, closed]);
   const k = size / 100;
@@ -75,15 +191,17 @@ function FaceView({ emotion, value, size, bare, eyes, look, blink }: Props) {
           </G>
         ) : null}
         <G transform={`rotate(${f.rot} 50 56)`}>
-          <Ellipse cx={f.cheekL} cy={f.cheekY} rx={7.5} ry={4.4} fill="#FF4F86" opacity={f.blushOp} />
-          <Ellipse cx={f.cheekR} cy={f.cheekY} rx={7.5} ry={4.4} fill="#FF4F86" opacity={f.blushOp} />
+          <Ellipse cx={f.cheekL} cy={f.cheekY} rx={7.5} ry={4.4} fill="#FF4F86" opacity={Math.max(f.blushOp, blushMin)} />
+          <Ellipse cx={f.cheekR} cy={f.cheekY} rx={7.5} ry={4.4} fill="#FF4F86" opacity={Math.max(f.blushOp, blushMin)} />
           {f.bagsOp > 0 ? (
             <G opacity={f.bagsOp}>
               <Path d={f.bagL} fill="none" stroke="#5E4A73" strokeWidth={1.4} strokeLinecap="round" />
               <Path d={f.bagR} fill="none" stroke="#5E4A73" strokeWidth={1.4} strokeLinecap="round" />
             </G>
           ) : null}
-          {f.eyesOp > 0 ? (
+          {f.eyesOp > 0 && eyeStyle ? (
+            <StyledEyes f={f} style={eyeStyle} color={eyeColor} skin={skin ?? SKIN[1]} gid={gid} />
+          ) : f.eyesOp > 0 ? (
             <G opacity={f.eyesOp}>
               <Path d={f.eyeL} fill={INK} stroke={INK} strokeWidth={2} strokeLinejoin="round" />
               <Path d={f.eyeR} fill={INK} stroke={INK} strokeWidth={2} strokeLinejoin="round" />

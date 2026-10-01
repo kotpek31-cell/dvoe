@@ -12,7 +12,7 @@ import { IconButton, Pill, Pressy, Txt } from '../../src/components/ui';
 import { Walker } from '../../src/components/Walker';
 import { usePair, useTableVersion } from '../../src/context/PairProvider';
 import { fetchMoods, fetchStreaks, sendNudge } from '../../src/lib/api';
-import { chibiKindOf } from '../../src/lib/chibi';
+import { lookOf } from '../../src/lib/chibi';
 import { formatTime, plural, toDayKey } from '../../src/lib/dates';
 import { entryMix, mixDominant } from '../../src/lib/emotions';
 import { errorMessage } from '../../src/lib/env';
@@ -104,8 +104,8 @@ export default function HomeScreen() {
   const moods = data?.moods ?? [];
   const myFace = currentFace(moods, me.id);
   const partnerFace = currentFace(moods, partner?.id);
-  const myKind = chibiKindOf(me);
-  const partnerKind = chibiKindOf(partner);
+  const myLook = lookOf(me);
+  const partnerLook = lookOf(partner);
   const partnerSleeps = Boolean(partner?.sleeping_since);
   const meSleeps = Boolean(me.sleeping_since);
   const streak = data?.streaks.find((s) => s.user_id === me.id)?.streak ?? 0;
@@ -175,7 +175,7 @@ export default function HomeScreen() {
           scaleTo={0.97}
           accessibilityLabel={isMe ? 'Это ты, ты спишь. Нажми, чтобы открыть сон' : `${partnerName} спит. Нажми — увидит «думаю о тебе» утром`}
         >
-          <Chibi kind={isMe ? myKind : partnerKind} emotion="calm" value={0} pose="sleep" size={spot.w} />
+          <Chibi look={isMe ? myLook : partnerLook} emotion="calm" value={0} pose="sleep" size={spot.w} />
         </Pressy>
         <Snore x={spot.w * 0.02} y={spot.h * 0.12} scale={tf.s} />
         {!isMe ? <HeartsBurst trigger={heartsP} x={spot.w / 2} y={spot.h * 0.45} scale={tf.s} /> : null}
@@ -201,7 +201,7 @@ export default function HomeScreen() {
 
       {partner && !partnerSleeps ? (
         <Walker
-          kind={partnerKind}
+          look={partnerLook}
           emotion={pFace.emotion}
           value={pFace.value}
           size={size}
@@ -233,7 +233,7 @@ export default function HomeScreen() {
 
       {!meSleeps ? (
         <Walker
-          kind={myKind}
+          look={myLook}
           emotion={mFace.emotion}
           value={mFace.value}
           size={size}

@@ -138,6 +138,8 @@ export type FaceModel = {
   eyesOp: number;
   eyeL: string;
   eyeR: string;
+  // Геометрия глаз для стилей чибика (после моргания): центры, полуширина, верх и высота
+  geo: { cxL: number; cxR: number; ey: number; w: number; topMid: number; h: number; eto: number; eti: number };
   hl: { lx: number; rx: number; y: number; r: number; op: number };
   s2: { lx: number; rx: number; y: number; r: number; op: number };
   heartEyes: { op: number; lx: number; rx: number; y: number; scale: number };
@@ -301,6 +303,7 @@ export function faceModel(key: FaceKey, value: number, opts: FaceOptions = {}): 
     eyesOp: r2(1 - hE),
     eyeL: eyePath(cxL, ey, p, -1, k),
     eyeR: eyePath(cxR, ey, p, 1, k),
+    geo: { cxL: r2(cxL), cxR: r2(cxR), ey, w: r2(p.ew * k), topMid: r2(topMid), h: r2(h), eto: r2(p.eto * k), eti: r2(p.eti * k) },
     hl: { lx: r2(cxL - p.ew * k * 0.3), rx: r2(cxR - p.ew * k * 0.3), y: r2(topMid + h * 0.3), r: r2(hlR), op: r2(hlOp) },
     s2: {
       lx: r2(cxL + p.ew * k * 0.36),

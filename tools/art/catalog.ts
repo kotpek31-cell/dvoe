@@ -1,4 +1,5 @@
-// Собирает supabase/catalog.sql — стартовый каталог вещей и способностей для таблицы public.items.
+// Собирает supabase/catalog.sql — стартовый каталог вещей и способностей для таблицы public.items,
+// и src/lib/catalogStarter.ts — тот же каталог внутри приложения (чибики рисуются и без интернета).
 // Запуск из корня репозитория: node tools/art/catalog.ts
 // Рисунок вещи — слои SVG с токенами цвета ('@c', '@skin', операции через '|', см. mix в chibi.ts).
 // Слои, зависящие от стороны (штанины, обувь), сохраняются отдельно: legL/legR, shoeL/shoeR.
@@ -86,3 +87,17 @@ select 'Каталог «Двое»: ${rows.length} вещей' as "Готово
 
 writeFileSync(new URL('../../supabase/catalog.sql', import.meta.url), sql);
 console.log('catalog.sql:', rows.length, 'items,', Math.round(sql.length / 1024), 'KB');
+
+const starter = `// Стартовый каталог вещей внутри приложения. ФАЙЛ СОБИРАЕТСЯ СКРИПТОМ:
+// node tools/art/catalog.ts — руками не править. Тот же каталог лежит в базе (supabase/catalog.sql);
+// приложение берёт отсюда, пока не скачает свежий из базы.
+import type { ItemRow } from './catalog';
+
+export const STARTER_ITEMS: ItemRow[] = ${JSON.stringify(
+  rows.map((r) => ({ ...r, rarity: 0 })),
+  null,
+  1,
+)};
+`;
+writeFileSync(new URL('../../src/lib/catalogStarter.ts', import.meta.url), starter);
+console.log('catalogStarter.ts:', Math.round(starter.length / 1024), 'KB');

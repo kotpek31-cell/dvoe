@@ -477,7 +477,7 @@ const styles = StyleSheet.create({
     padding: S.lg,
     gap: S.md,
   },
-  cardTint: { ...StyleSheet.absoluteFillObject, borderRadius: R.xl - 1 },
+  cardTint: { ...StyleSheet.absoluteFill, borderRadius: R.xl - 1 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: S.sm },
   row: { flexDirection: 'row', alignItems: 'center' },
   groupLabel: { flexDirection: 'row', alignItems: 'center', gap: S.sm, marginTop: 4 },

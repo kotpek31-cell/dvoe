@@ -8,7 +8,7 @@ import { Icon } from '../../src/components/Icon';
 import { Button, Card, Empty, ErrorBox, IconButton, Input, Pressy, Row, Screen, Segmented, showError, Txt } from '../../src/components/ui';
 import { usePair, useTableVersion } from '../../src/context/PairProvider';
 import { addWish, deleteWish, fetchMoods, fetchWishes, setWishDone, updateMyProfile } from '../../src/lib/api';
-import { CHIBI_KINDS, CHIBI_LABELS, chibiKindOf } from '../../src/lib/chibi';
+import { CHIBI_KINDS, CHIBI_LABELS, chibiKindOf, lookOf, LOOKS } from '../../src/lib/chibi';
 import { dayKeyOf, formatDayShort, relativeDay, todayKey } from '../../src/lib/dates';
 import { confirmAction } from '../../src/lib/dialogs';
 import { entryMix, mixDominant } from '../../src/lib/emotions';
@@ -132,7 +132,7 @@ export default function ProfileScreen() {
       {person ? (
         <Card style={styles.hero}>
           <View>
-            <Chibi kind={chibiKindOf(person)} emotion={top?.key ?? 'calm'} value={top?.value ?? 30} pose="idle" size={110} />
+            <Chibi look={lookOf(person)} emotion={top?.key ?? 'calm'} value={top?.value ?? 30} pose="idle" size={110} />
             <HeartsBurst trigger={hearts} x={55} y={50} scale={0.8} />
           </View>
           <View style={styles.heroText}>
@@ -167,7 +167,7 @@ export default function ProfileScreen() {
                   accessibilityState={{ checked: selected }}
                   accessibilityLabel={CHIBI_LABELS[kind]}
                 >
-                  <Chibi kind={kind} emotion="joy" value={35} pose="idle" size={72} />
+                  <Chibi look={LOOKS[kind]} emotion="joy" value={35} pose="idle" size={72} still />
                   <Txt weight="heavy" size={12} center>
                     {CHIBI_LABELS[kind]}
                   </Txt>

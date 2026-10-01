@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Chibi } from '../src/components/Chibi';
+import { LOOKS } from '../src/lib/chibi';
 import { Button, Input, Screen, Segmented, showError, Txt } from '../src/components/ui';
 import { translateError } from '../src/lib/api';
 import { supabase } from '../src/lib/supabase';
@@ -56,8 +57,8 @@ export default function SignIn() {
   return (
     <Screen background>
       <View style={styles.duo}>
-        <Chibi kind="boy" emotion="joy" value={55} pose="idle" size={96} look={3} />
-        <Chibi kind="girl" emotion="love" value={45} pose="idle" size={96} look={-3} />
+        <Chibi look={LOOKS.boy} emotion="joy" value={55} pose="idle" size={96} gaze={3} />
+        <Chibi look={LOOKS.girl} emotion="love" value={45} pose="idle" size={96} gaze={-3} />
       </View>
       <Txt weight="display" size={36} center>
         Двое

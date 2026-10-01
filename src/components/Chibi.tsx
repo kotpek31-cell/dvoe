@@ -1,232 +1,443 @@
-// Чибик: слои SVG (волосы сзади, ноги, тело, руки, голова, лицо, чёлка).
-// Ноги, руки и покачивание анимируются трансформациями слоёв на native driver —
-// это дёшево даже на слабых телефонах. Лицо — тот же движок эмоций, что на ползунках.
-import { memo, useEffect, useMemo, useRef, type ReactNode } from 'react';
+// Чибик 2.0: основа (кожа, руки, ноги, голова) + надетые вещи из каталога, слоями SVG.
+// Сзади вперёд: спина, волосы сзади, ноги, тело, руки с предметом, голова, лицо, волосы спереди, шляпа, нимб.
+// Анимируется не больше 9 слоёв трансформациями на native driver — дёшево даже на слабых телефонах.
+// Стоящий чибик раз в 8–15 с сам что-то делает: оглядывается, потягивается или подпрыгивает.
+import { memo, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Ellipse, G, Path, Rect } from 'react-native-svg';
-import { CHIBI, CHIBI_PARTS as P, darken } from '../lib/chibi';
-import type { FaceKey } from '../lib/face';
+import { renderLayer, type Paint } from '../lib/art';
+import { useCatalog } from '../lib/catalog';
+import { dress, type Look, type WearCat, type Worn } from '../lib/chibi';
+import { INK, mixColor, type FaceKey } from '../lib/face';
 import { useScreenFocused } from '../lib/focus';
 import { nativeDriver, useReducedMotion } from '../lib/motion';
-import type { ChibiKind } from '../types';
-import { Face } from './Face';
+import { CLOTH } from '../lib/palette';
+import { Face, type EyeStyle } from './Face';
 
-export type ChibiPose = 'idle' | 'walk' | 'wave' | 'sleep';
-
-const INK = '#2B2035';
-const VB = '0 0 120 170';
+export type ChibiPose = 'idle' | 'walk' | 'run' | 'wave' | 'hug' | 'cheer' | 'jump' | 'fallen' | 'sleep';
 
 type Props = {
-  kind: ChibiKind;
+  look: Look;
   emotion: FaceKey;
   value: number;
   pose: ChibiPose;
-  size: number; // ширина, высота = size × 170/120
-  look?: number;
+  size: number; // ширина, высота = size × 170/120 (крылья, нимб и шарик выходят за рамку)
+  gaze?: number; // куда смотрят глаза (сдвиг по горизонтали)
   flip?: boolean;
+  mog?: boolean; // тени-скулы для сцены «Мог»
+  eyesClosed?: boolean;
+  still?: boolean; // без анимаций: плитки, превью
 };
 
-function Layer({ w, h, children }: { w: number; h: number; children: ReactNode }) {
+// Холст слоя чуть больше рамки 120×170; у крыльев, нимба и предметов в руках — большой,
+// чтобы ничего не обрезалось. Большой холст дороже по памяти, поэтому только там, где нужен.
+const CANVAS = {
+  small: { x: -12, y: -14, w: 144, h: 188 },
+  big: { x: -30, y: -40, w: 200, h: 224 },
+};
+const SW = 2.2;
+
+// Порядок вещей внутри одного слоя рисунка
+const ORDER: WearCat[] = ['back', 'hair', 'hat', 'face', 'top', 'bottom', 'shoes', 'hand'];
+const EYE_STYLES = new Set<EyeStyle>(['classic', 'lashes', 'sparkle', 'sleepy', 'azure']);
+
+const PARTS = {
+  legL: { x: 47, y: 124 },
+  legR: { x: 62, y: 124 },
+  shoulderL: { x: 39, y: 103 },
+  shoulderR: { x: 81, y: 103 },
+  pillow: { x: 6, y: 20, w: 108, h: 74 },
+  blanket: 'M10 102 C10 97 22 95 60 95 C98 95 110 97 110 102 L113 154 C113 163 107 167 99 167 L21 167 C13 167 7 163 7 154 Z',
+  blanketFold: 'M10 102 C10 97 22 95 60 95 C98 95 110 97 110 102 L110.5 113 C98 109.5 22 109.5 9.5 113 Z',
+  blanketMarks: 'M30 128 l3 3 l3 -3 M60 140 l3 3 l3 -3 M84 124 l3 3 l3 -3 M44 152 l3 3 l3 -3 M88 150 l3 3 l3 -3',
+  mogJaw: 'M21 76 C28 93 43 101 60 103.4 C77 101 92 93 99 76 C93 90 79 98.5 60 100 C41 98.5 27 90 21 76 Z',
+  mogCheeks: 'M25 68 C29 77 35 82 43 84 C35 80 30 75 27 67 Z M95 68 C91 77 85 82 77 84 C85 80 90 75 93 67 Z',
+} as const;
+
+function Layer({ k, big = false, children }: { k: number; big?: boolean; children: ReactNode }) {
+  const c = big ? CANVAS.big : CANVAS.small;
   return (
-    <Svg width={w} height={h} viewBox={VB} style={StyleSheet.absoluteFill}>
+    <Svg width={c.w * k} height={c.h * k} viewBox={`${c.x} ${c.y} ${c.w} ${c.h}`} style={[styles.layer, { left: c.x * k, top: c.y * k }]}>
       {children}
     </Svg>
   );
 }
 
-function ChibiView({ kind, emotion, value, pose, size, look, flip = false }: Props) {
+// Слой, который поворачивается или сдвигается целиком
+function Moving({ transform, children }: { transform: object[]; children: ReactNode }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { transform: transform as any }]}>{children}</Animated.View>;
+}
+
+const deg = (n: Animated.AnimatedInterpolation<number> | Animated.AnimatedAddition<number> | Animated.Value) =>
+  n.interpolate({ inputRange: [-360, 360], outputRange: ['-360deg', '360deg'] });
+
+function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog = false, eyesClosed = false, still = false }: Props) {
   const reduce = useReducedMotion();
   const visible = useScreenFocused();
-  const def = CHIBI[kind] ?? CHIBI.nb;
+  const catalog = useCatalog();
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
+  const k = size / 120;
   const w = size;
   const h = Math.round((size * 170) / 120);
-  const k = size / 120;
   const sleep = pose === 'sleep';
+  const fallen = pose === 'fallen';
 
-  const walk = useRef(new Animated.Value(0)).current;
+  const dressed = useMemo(() => dress(look, catalog), [look, catalog]);
+  const worn = dressed.worn;
+  const top = worn.top;
+  const hover = !sleep && ORDER.some((c) => worn[c]?.item.meta.hover);
+  const halo = Boolean(worn.hat?.item.art.layers?.over);
+  const eyeStyle: EyeStyle = EYE_STYLES.has(worn.eyes?.item.meta.style as EyeStyle) ? (worn.eyes!.item.meta.style as EyeStyle) : 'classic';
+
+  // ---------- рисунок слоёв (пересобирается только при смене образа) ----------
+  const art = useMemo(() => {
+    const skin = dressed.skin;
+    const hidden = new Set<WearCat>();
+    if (top?.item.meta.coversBottom) hidden.add('bottom');
+    if (sleep) ['back', 'face', 'hand'].forEach((c) => hidden.add(c as WearCat));
+    const items = ORDER.map((c) => (hidden.has(c) ? undefined : worn[c])).filter(Boolean) as Worn[];
+    const paint = (it: Worn): Paint => ({ c: it.color, skin, ids: `${uid}${it.item.id.replace('.', '')}${it.color.slice(1)}` });
+    const layer = (name: string) => items.flatMap((it) => renderLayer(it.item.art.layers?.[name], paint(it), `${it.item.id}.${name}`));
+    const has = (name: string) => items.some((it) => it.item.art.layers?.[name]);
+
+    const leg = (side: 'L' | 'R') => {
+      const L = side === 'L' ? PARTS.legL : PARTS.legR;
+      return (
+        <>
+          {has(`leg${side}`) ? layer(`leg${side}`) : <Rect x={L.x} y={L.y} width={11} height={24} rx={5} fill={skin} stroke={INK} strokeWidth={SW} />}
+          {layer(`shoe${side}`)}
+        </>
+      );
+    };
+
+    const sleeveKey = top?.item.meta.sleeveColor;
+    const sleeveCol = sleeveKey && CLOTH[sleeveKey] ? CLOTH[sleeveKey][1] : top?.color ?? skin;
+    const short = top?.item.meta.sleeve === 'short';
+    const cuff = typeof top?.item.meta.cuff === 'string' ? top.item.meta.cuff : null;
+    const arm = (side: 'L' | 'R') => {
+      const x = side === 'L' ? 33.5 : 75.5;
+      const hx = side === 'L' ? 39 : 81;
+      return (
+        <G transform={side === 'L' ? 'rotate(16 39 103)' : 'rotate(-16 81 103)'}>
+          <Rect x={x} y={100} width={11} height={24} rx={5.5} fill={skin} stroke={INK} strokeWidth={SW} />
+          {short ? (
+            <Rect x={x} y={100} width={11} height={11.5} rx={5} fill={sleeveCol} stroke={INK} strokeWidth={SW} />
+          ) : (
+            <Rect x={x} y={100} width={11} height={24} rx={5.5} fill={sleeveCol} stroke={INK} strokeWidth={SW} />
+          )}
+          {cuff && !short ? <Rect x={x - 0.4} y={117.5} width={11.8} height={5.5} rx={2.6} fill={cuff} stroke={INK} strokeWidth={1.6} /> : null}
+          {layer(side === 'L' ? 'handL' : 'handR')}
+          <Circle cx={hx} cy={126} r={5.2} fill={skin} stroke={INK} strokeWidth={2} />
+        </G>
+      );
+    };
+
+    const head = (
+      <>
+        <Circle cx={18} cy={70} r={6.5} fill={skin} stroke={INK} strokeWidth={SW} />
+        <Circle cx={102} cy={70} r={6.5} fill={skin} stroke={INK} strokeWidth={SW} />
+        <Path d="M15.6 70.5 a2.6 2.6 0 0 1 3.4 -2.6 M104.4 70.5 a2.6 2.6 0 0 0 -3.4 -2.6" fill="none" stroke={mixColor(skin, INK, 0.2)} strokeWidth={1.4} strokeLinecap="round" />
+        <Ellipse cx={60} cy={64} rx={43} ry={40} fill={skin} stroke={INK} strokeWidth={SW} />
+      </>
+    );
+
+    return {
+      handL: has('handL'),
+      handR: has('handR'),
+      back: has('back') ? layer('back') : null,
+      hairBack: has('hairBack') ? layer('hairBack') : null,
+      legL: leg('L'),
+      legR: leg('R'),
+      body: (
+        <>
+          {layer('under')}
+          {layer('body')}
+          {layer('front')}
+          {/* тень под головой */}
+          <Ellipse cx={60} cy={104.5} rx={21} ry={4.2} fill={INK} opacity={0.16} />
+        </>
+      ),
+      armL: arm('L'),
+      armR: arm('R'),
+      head,
+      front: (
+        <>
+          {layer('mask')}
+          {mog ? (
+            <>
+              <Path d={PARTS.mogJaw} fill={INK} opacity={0.28} />
+              <Path d={PARTS.mogCheeks} fill={INK} opacity={0.38} />
+              <Path d="M30 88 L43 98 M90 88 L77 98" fill="none" stroke={INK} strokeWidth={1.6} strokeLinecap="round" opacity={0.55} />
+            </>
+          ) : null}
+          {layer('hairFront')}
+          {sleep ? null : layer('hat')}
+        </>
+      ),
+      over: has('over') ? layer('over') : null,
+    };
+  }, [dressed, worn, top, sleep, mog, uid]);
+
+  // ---------- анимации ----------
+  const cycle = useRef(new Animated.Value(0)).current; // шаг: 0→1 по кругу
   const breath = useRef(new Animated.Value(0)).current;
+  const flap = useRef(new Animated.Value(0)).current; // крылья, нимб, парение
   const wave = useRef(new Animated.Value(0)).current;
+  const hop = useRef(new Animated.Value(0)).current; // прыжок
+  const stretch = useRef(new Animated.Value(0)).current; // потягивается
+  const [glance, setGlance] = useState(0); // оглядывается
+
+  const animate = !still && !reduce && visible && !fallen;
+  const moving = pose === 'walk' || pose === 'run';
+  const floaty = hover || halo;
 
   useEffect(() => {
-    walk.setValue(0);
-    breath.setValue(0);
-    wave.setValue(0);
-    if (reduce || !visible) return;
-    const anims: Animated.CompositeAnimation[] = [];
-    if (pose === 'walk') {
-      anims.push(Animated.loop(Animated.timing(walk, { toValue: 1, duration: 560, easing: Easing.linear, useNativeDriver: nativeDriver })));
-    } else {
-      const half = pose === 'sleep' ? 2000 : 1600;
-      anims.push(
+    [cycle, breath, flap, wave, hop, stretch].forEach((v) => v.setValue(0));
+    if (!animate) return;
+    const timing = (v: Animated.Value, toValue: number, duration: number, easing = Easing.linear) =>
+      Animated.timing(v, { toValue, duration, easing, useNativeDriver: nativeDriver });
+    const swing = (v: Animated.Value, half: number, easing: (t: number) => number) =>
+      Animated.loop(Animated.sequence([timing(v, 1, half, easing), timing(v, 0, half, easing)]));
+    const loops: Animated.CompositeAnimation[] = [];
+    if (moving) loops.push(Animated.loop(timing(cycle, 1, pose === 'run' ? 380 : 560)));
+    else loops.push(swing(breath, sleep ? 2000 : 1600, Easing.inOut(Easing.sin)));
+    if (pose === 'wave') loops.push(swing(wave, 420, Easing.inOut(Easing.quad)));
+    if (pose === 'jump') {
+      loops.push(
         Animated.loop(
-          Animated.sequence([
-            Animated.timing(breath, { toValue: 1, duration: half, easing: Easing.inOut(Easing.sin), useNativeDriver: nativeDriver }),
-            Animated.timing(breath, { toValue: 0, duration: half, easing: Easing.inOut(Easing.sin), useNativeDriver: nativeDriver }),
-          ]),
+          Animated.sequence([timing(hop, 1, 260, Easing.out(Easing.quad)), timing(hop, 0, 300, Easing.in(Easing.quad)), Animated.delay(320)]),
         ),
       );
     }
-    if (pose === 'wave') {
-      anims.push(
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(wave, { toValue: 1, duration: 420, easing: Easing.inOut(Easing.quad), useNativeDriver: nativeDriver }),
-            Animated.timing(wave, { toValue: 0, duration: 420, easing: Easing.inOut(Easing.quad), useNativeDriver: nativeDriver }),
-          ]),
-        ),
-      );
-    }
-    anims.forEach((a) => a.start());
-    return () => anims.forEach((a) => a.stop());
-  }, [pose, reduce, visible, walk, breath, wave]);
+    if (floaty && !sleep) loops.push(Animated.loop(timing(flap, 1, 1400)));
+    loops.forEach((a) => a.start());
+    return () => loops.forEach((a) => a.stop());
+  }, [animate, pose, moving, sleep, floaty, cycle, breath, flap, wave, hop, stretch]);
 
-  const a = useMemo(
-    () => ({
-      stepL: walk.interpolate({ inputRange: [0, 0.25, 0.5, 1], outputRange: [0, -4 * k, 0, 0] }),
-      stepR: walk.interpolate({ inputRange: [0, 0.5, 0.75, 1], outputRange: [0, 0, -4 * k, 0] }),
-      swingL: walk.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['9deg', '-9deg', '9deg'] }),
-      swingR: walk.interpolate({ inputRange: [0, 0.5, 1], outputRange: ['-9deg', '9deg', '-9deg'] }),
-      bobY: Animated.add(
-        walk.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, -2.5 * k, 0, -2.5 * k, 0] }),
-        breath.interpolate({ inputRange: [0, 1], outputRange: [0, -1.2 * k] }),
-      ),
-      bobRot: walk.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: ['0deg', '-2.5deg', '0deg', '2.5deg', '0deg'] }),
-      waveRot: wave.interpolate({ inputRange: [0, 1], outputRange: ['-100deg', '-128deg'] }),
-    }),
-    [walk, breath, wave, k],
+  // Сам по себе: раз в 8–15 секунд оглядывается, потягивается или подпрыгивает
+  useEffect(() => {
+    if (!animate || pose !== 'idle') return;
+    let alive = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const later = (fn: () => void, ms: number) => {
+      timer = setTimeout(() => alive && fn(), ms);
+    };
+    const schedule = () => later(act, 8000 + Math.random() * 7000);
+    const act = () => {
+      const r = Math.random();
+      const done = ({ finished }: { finished: boolean }) => {
+        if (alive && finished) schedule();
+      };
+      const t = (v: Animated.Value, to: number, ms: number, easing: (x: number) => number) =>
+        Animated.timing(v, { toValue: to, duration: ms, easing, useNativeDriver: nativeDriver });
+      if (r < 0.4) {
+        setGlance(-4);
+        later(() => {
+          setGlance(4);
+          later(() => {
+            setGlance(0);
+            schedule();
+          }, 800);
+        }, 800);
+      } else if (r < 0.7) {
+        Animated.sequence([t(stretch, 1, 520, Easing.out(Easing.quad)), Animated.delay(380), t(stretch, 0, 480, Easing.inOut(Easing.quad))]).start(done);
+      } else {
+        Animated.sequence([t(hop, 1, 220, Easing.out(Easing.quad)), t(hop, 0, 260, Easing.in(Easing.quad))]).start(done);
+      }
+    };
+    schedule();
+    return () => {
+      alive = false;
+      if (timer) clearTimeout(timer);
+      stretch.stopAnimation();
+      hop.stopAnimation();
+      stretch.setValue(0);
+      hop.setValue(0);
+      setGlance(0);
+    };
+  }, [animate, pose, stretch, hop]);
+
+  const t = useMemo(() => {
+    const run = pose === 'run';
+    const c = (n: number) => new Animated.Value(n);
+    const add = (...xs: (Animated.Value | Animated.AnimatedInterpolation<number> | Animated.AnimatedAddition<number>)[]) =>
+      xs.reduce((a, b) => Animated.add(a, b) as Animated.AnimatedAddition<number>);
+    // поворот слоя вокруг точки рисунка (px, py): центр слоя — точка (60, 85)
+    const around = (px: number, py: number, rest: object[]) => [
+      { translateX: (px - 60) * k },
+      { translateY: (py - 85) * k },
+      ...rest,
+      { translateX: -(px - 60) * k },
+      { translateY: -(py - 85) * k },
+    ];
+
+    // корпус: покачивание при ходьбе, дыхание, прыжок, парение
+    const bob = moving
+      ? cycle.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [0, -(run ? 3.5 : 2.5) * k, 0, -(run ? 3.5 : 2.5) * k, 0] })
+      : breath.interpolate({ inputRange: [0, 1], outputRange: [0, -1.2 * k] });
+    const lift = hover ? flap.interpolate({ inputRange: [0, 0.5, 1], outputRange: [-9 * k, -11.5 * k, -9 * k] }) : c(0);
+    const rootY = add(bob, hop.interpolate({ inputRange: [0, 1], outputRange: [0, -14 * k] }), lift);
+    const sway = moving
+      ? cycle.interpolate({
+          inputRange: [0, 0.25, 0.5, 0.75, 1],
+          outputRange: run ? ['8deg', '6deg', '8deg', '10deg', '8deg'] : ['0deg', '-2.5deg', '0deg', '2.5deg', '0deg'],
+        })
+      : '0deg';
+    const tall = stretch.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
+    const root = fallen
+      ? [{ translateX: 47 * k }, { translateY: -40 * k }, ...around(60, 156, [{ rotate: '-90deg' }])]
+      : [{ translateY: rootY }, ...around(60, 150, [{ rotate: sway }, { scaleY: tall }])];
+
+    // ноги
+    const step = (phase: 0 | 0.5) =>
+      moving
+        ? cycle.interpolate({
+            inputRange: phase === 0 ? [0, 0.25, 0.5, 1] : [0, 0.5, 0.75, 1],
+            outputRange: phase === 0 ? [0, -(run ? 6 : 4) * k, 0, 0] : [0, 0, -(run ? 6 : 4) * k, 0],
+          })
+        : c(0);
+
+    // руки: поза + размах при ходьбе + взмах + потягивание + прыжок
+    const baseL = pose === 'hug' ? 70 : pose === 'cheer' ? 140 : 0;
+    const baseR = pose === 'hug' ? -70 : pose === 'cheer' ? -140 : pose === 'wave' && !animate ? -114 : 0;
+    const amp = run ? 32 : 9;
+    const swingL = moving ? cycle.interpolate({ inputRange: [0, 0.5, 1], outputRange: [amp, -amp, amp] }) : c(0);
+    const swingR = moving ? cycle.interpolate({ inputRange: [0, 0.5, 1], outputRange: [-amp, amp, -amp] }) : c(0);
+    const waveR = pose === 'wave' && animate ? wave.interpolate({ inputRange: [0, 1], outputRange: [-100, -128] }) : c(0);
+    const armL = add(c(baseL), swingL, stretch.interpolate({ inputRange: [0, 1], outputRange: [0, 150] }), hop.interpolate({ inputRange: [0, 1], outputRange: [0, 40] }));
+    const armR = add(c(baseR), swingR, waveR, stretch.interpolate({ inputRange: [0, 1], outputRange: [0, -150] }), hop.interpolate({ inputRange: [0, 1], outputRange: [0, -40] }));
+
+    // волосы сзади слегка качаются
+    const hair = moving
+      ? cycle.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: run ? ['0deg', '2.6deg', '0deg', '-2.6deg', '0deg'] : ['0deg', '1.8deg', '0deg', '-1.8deg', '0deg'] })
+      : breath.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '0.8deg'] });
+
+    // тень: уменьшается, когда чибик в воздухе
+    const shadow = Animated.multiply(
+      hop.interpolate({ inputRange: [0, 1], outputRange: [1, 0.7] }),
+      hover ? flap.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 0.9, 1] }) : c(1),
+    );
+
+    return {
+      root,
+      legL: [{ translateY: step(0) }],
+      legR: [{ translateY: step(0.5) }],
+      armL: around(PARTS.shoulderL.x, PARTS.shoulderL.y, [{ rotate: deg(armL) }]),
+      armR: around(PARTS.shoulderR.x, PARTS.shoulderR.y, [{ rotate: deg(armR) }]),
+      hair: around(60, 40, [{ rotate: hair }]),
+      wings: around(60, 104, [{ scaleX: flap.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [1, 0.86, 1, 0.86, 1] }) }]),
+      halo: [
+        { translateY: flap.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -1.8 * k, 0] }) },
+        ...around(60, 0, [{ rotate: flap.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: ['0deg', '3deg', '0deg', '-3deg', '0deg'] }) }]),
+      ],
+      shadow: around(60, 163, [{ scale: shadow }]),
+      sleep: [{ translateY: breath.interpolate({ inputRange: [0, 1], outputRange: [0, -1.2 * k] }) }],
+    };
+  }, [k, pose, moving, fallen, hover, animate, cycle, breath, flap, wave, hop, stretch]);
+
+  const face = (
+    <View style={{ position: 'absolute', left: 12.5 * k, top: 24.5 * k }}>
+      <Face
+        emotion={sleep ? 'sleep' : emotion}
+        value={sleep ? 100 : value}
+        size={95 * k}
+        bare
+        eyes={eyeStyle === 'azure' ? 1.5 : 1.3}
+        look={(gaze ?? (moving ? 2.5 : 0)) + glance}
+        blink={!sleep && !eyesClosed && !still && visible}
+        closed={eyesClosed}
+        eyeStyle={eyeStyle}
+        eyeColor={worn.eyes?.color}
+        skin={dressed.skin}
+        blushMin={0.18}
+      />
+    </View>
   );
 
-  // Поворот слоя вокруг точки (px, py) рисунка: сдвиг к точке, поворот, сдвиг обратно
-  const dxL = (P.shoulderL.x - 60) * k;
-  const dxR = (P.shoulderR.x - 60) * k;
-  const dy = (P.shoulderL.y - 85) * k;
-  const feet = (P.shadow.cy - 85) * k;
-  const pocket = darken(def.top, 0.14);
+  // Спит под пледом: шляпа, предмет в руке, спина и бандана прячутся; волосы и нимб остаются
+  if (sleep) {
+    return (
+      <View pointerEvents="none" style={{ width: w, height: h, transform: [{ rotate: '-90deg' }, { scaleX: flip ? -1 : 1 }] }}>
+        <Moving transform={t.sleep}>
+          <Layer k={k}>
+            <Rect x={PARTS.pillow.x} y={PARTS.pillow.y} width={PARTS.pillow.w} height={PARTS.pillow.h} rx={26} fill="#F3EEFF" stroke={INK} strokeWidth={SW} />
+            {art.hairBack}
+            {art.head}
+          </Layer>
+          {face}
+          <Layer k={k}>
+            <Path d={PARTS.blanket} fill="#8C7BF5" stroke={INK} strokeWidth={SW} strokeLinejoin="round" />
+            <Path d={PARTS.blanketFold} fill="#C3B9FF" stroke={INK} strokeWidth={2} strokeLinejoin="round" />
+            <Path d={PARTS.blanketMarks} fill="none" stroke="#E6E0FF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
+            {art.front}
+            {art.over}
+          </Layer>
+        </Moving>
+      </View>
+    );
+  }
 
   return (
-    <View
-      pointerEvents="none"
-      style={{ width: w, height: h, transform: [{ rotate: sleep ? '-90deg' : '0deg' }, { scaleX: flip ? -1 : 1 }] }}
-    >
-      {!sleep ? (
-        <Layer w={w} h={h}>
-          <Ellipse cx={P.shadow.cx} cy={P.shadow.cy} rx={P.shadow.rx} ry={P.shadow.ry} fill="#1B1426" opacity={0.22} />
+    <View pointerEvents="none" style={{ width: w, height: h, transform: [{ scaleX: flip ? -1 : 1 }] }}>
+      <Moving transform={t.shadow}>
+        <Layer k={k}>
+          <Ellipse cx={60} cy={163} rx={hover ? 20 : 27} ry={hover ? 3.6 : 4.5} fill="#1B1426" opacity={hover ? 0.16 : 0.22} />
         </Layer>
-      ) : null}
-      <Animated.View
-        style={[
-          StyleSheet.absoluteFill,
-          { transform: [{ translateY: a.bobY }, { translateY: feet }, { rotate: a.bobRot }, { translateY: -feet }] },
-        ]}
-      >
-        <Layer w={w} h={h}>
-          {sleep ? <Rect x={6} y={20} width={108} height={74} rx={26} fill="#F3EEFF" stroke={INK} strokeWidth={2.2} /> : null}
-          {def.back ? <Path d={def.back} fill={def.hair} stroke={INK} strokeWidth={2.2} strokeLinejoin="round" /> : null}
-        </Layer>
-        {!sleep ? (
-          <>
-            <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateY: a.stepL }] }]}>
-              <Layer w={w} h={h}>
-                <Rect x={P.legL.x} y={P.legL.y} width={P.legL.w} height={P.legL.h} rx={5} fill={def.legs} stroke={INK} strokeWidth={2.2} />
-                <Path d={P.shoeL} fill={def.shoes} stroke={INK} strokeWidth={2.2} />
+      </Moving>
+      <Moving transform={t.root}>
+        {art.back ? (
+          hover ? (
+            <Moving transform={t.wings}>
+              <Layer k={k} big>
+                {art.back}
               </Layer>
-            </Animated.View>
-            <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateY: a.stepR }] }]}>
-              <Layer w={w} h={h}>
-                <Rect x={P.legR.x} y={P.legR.y} width={P.legR.w} height={P.legR.h} rx={5} fill={def.legs} stroke={INK} strokeWidth={2.2} />
-                <Path d={P.shoeR} fill={def.shoes} stroke={INK} strokeWidth={2.2} />
-              </Layer>
-            </Animated.View>
-          </>
+            </Moving>
+          ) : (
+            <Layer k={k} big>
+              {art.back}
+            </Layer>
+          )
         ) : null}
-        <Layer w={w} h={h}>
-          <Path d={def.body} fill={def.top} stroke={INK} strokeWidth={2.2} strokeLinejoin="round" />
-          {def.hoodie ? (
-            <G>
-              <Path d={P.pocket} fill={pocket} stroke={INK} strokeWidth={1.4} strokeLinejoin="round" />
-              <Path d={P.strings} fill="none" stroke="#FFFFFF" strokeWidth={1.6} strokeLinecap="round" opacity={0.9} />
-            </G>
-          ) : null}
-          {def.dress ? (
-            <G>
-              <Path d={P.hem} fill="none" stroke="#FFFFFF" strokeWidth={2.2} strokeLinecap="round" opacity={0.85} />
-              <Path d={P.collar} fill="#FFFFFF" stroke={INK} strokeWidth={1.4} strokeLinejoin="round" />
-            </G>
-          ) : null}
-        </Layer>
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            { transform: [{ translateX: dxL }, { translateY: dy }, { rotate: a.swingL }, { translateX: -dxL }, { translateY: -dy }] },
-          ]}
-        >
-          <Layer w={w} h={h}>
-            <G transform="rotate(16 39 103)">
-              <Rect x={33.5} y={100} width={11} height={24} rx={5.5} fill={def.top} stroke={INK} strokeWidth={2.2} />
-              <Circle cx={39} cy={126} r={5.2} fill={def.skin} stroke={INK} strokeWidth={2} />
-            </G>
+        {art.hairBack ? (
+          <Moving transform={t.hair}>
+            <Layer k={k}>{art.hairBack}</Layer>
+          </Moving>
+        ) : null}
+        <Moving transform={t.legL}>
+          <Layer k={k}>{art.legL}</Layer>
+        </Moving>
+        <Moving transform={t.legR}>
+          <Layer k={k}>{art.legR}</Layer>
+        </Moving>
+        <Layer k={k}>{art.body}</Layer>
+        <Moving transform={t.armL}>
+          <Layer k={k} big={art.handL}>
+            {art.armL}
           </Layer>
-        </Animated.View>
-        <Animated.View
-          style={[
-            StyleSheet.absoluteFill,
-            {
-              transform: [
-                { translateX: dxR },
-                { translateY: dy },
-                { rotate: pose === 'wave' ? a.waveRot : a.swingR },
-                { translateX: -dxR },
-                { translateY: -dy },
-              ],
-            },
-          ]}
-        >
-          <Layer w={w} h={h}>
-            <G transform="rotate(-16 81 103)">
-              <Rect x={75.5} y={100} width={11} height={24} rx={5.5} fill={def.top} stroke={INK} strokeWidth={2.2} />
-              <Circle cx={81} cy={126} r={5.2} fill={def.skin} stroke={INK} strokeWidth={2} />
-            </G>
+        </Moving>
+        <Moving transform={t.armR}>
+          <Layer k={k} big={art.handR}>
+            {art.armR}
           </Layer>
-        </Animated.View>
-        <Layer w={w} h={h}>
-          <Circle cx={18} cy={70} r={6.5} fill={def.skin} stroke={INK} strokeWidth={2.2} />
-          <Circle cx={102} cy={70} r={6.5} fill={def.skin} stroke={INK} strokeWidth={2.2} />
-          <Ellipse cx={60} cy={64} rx={43} ry={40} fill={def.skin} stroke={INK} strokeWidth={2.2} />
-        </Layer>
-        <View style={{ position: 'absolute', left: 12.5 * k, top: 24.5 * k }}>
-          <Face
-            emotion={sleep ? 'sleep' : emotion}
-            value={sleep ? 100 : value}
-            size={95 * k}
-            bare
-            eyes={1.3}
-            look={look ?? (pose === 'walk' ? 2.5 : 0)}
-            blink={!sleep}
-          />
-        </View>
-        <Layer w={w} h={h}>
-          {sleep ? (
-            <G>
-              <Path d={P.blanket} fill="#8C7BF5" stroke={INK} strokeWidth={2.2} strokeLinejoin="round" />
-              <Path d={P.blanketFold} fill="#C3B9FF" stroke={INK} strokeWidth={2} strokeLinejoin="round" />
-              <Path d={P.blanketMarks} fill="none" stroke="#E6E0FF" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" />
-            </G>
-          ) : null}
-          <Path d={def.front} fill={def.hair} stroke={INK} strokeWidth={2.2} strokeLinejoin="round" />
-          {def.extra ? <Path d={def.extra} fill={def.hair} stroke={INK} strokeWidth={2.2} strokeLinejoin="round" /> : null}
-          {def.sideL ? <Path d={def.sideL} fill={def.hair} stroke={INK} strokeWidth={2.2} strokeLinejoin="round" /> : null}
-          {def.sideR ? <Path d={def.sideR} fill={def.hair} stroke={INK} strokeWidth={2.2} strokeLinejoin="round" /> : null}
-          <Path d={def.shine} fill="none" stroke="#FFFFFF" strokeWidth={2.6} strokeLinecap="round" opacity={0.3} />
-          {def.bow ? (
-            <G transform="translate(87 23) rotate(18) scale(1.15)">
-              <Path d={P.bowLoops} fill="#FF6B8A" stroke={INK} strokeWidth={1.8} strokeLinejoin="round" />
-              <Circle cx={0} cy={-0.5} r={3} fill="#FF8FA8" stroke={INK} strokeWidth={1.6} />
-            </G>
-          ) : null}
-        </Layer>
-      </Animated.View>
+        </Moving>
+        <Layer k={k}>{art.head}</Layer>
+        {face}
+        <Layer k={k}>{art.front}</Layer>
+        {art.over ? (
+          <Moving transform={t.halo}>
+            <Layer k={k} big>
+              {art.over}
+            </Layer>
+          </Moving>
+        ) : null}
+      </Moving>
     </View>
   );
 }
 
 export const Chibi = memo(ChibiView);
+
+const styles = StyleSheet.create({
+  layer: { position: 'absolute' },
+});

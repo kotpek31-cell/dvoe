@@ -6,7 +6,7 @@ import { Button, Card, Input, Screen, showError, Txt } from '../src/components/u
 import { useAuth } from '../src/context/AuthProvider';
 import { usePair } from '../src/context/PairProvider';
 import { createPair, joinPair } from '../src/lib/api';
-import { chibiKindOf } from '../src/lib/chibi';
+import { lookOf } from '../src/lib/chibi';
 import { C, S } from '../src/theme';
 
 export default function PairScreen() {
@@ -53,8 +53,8 @@ export default function PairScreen() {
         {partner ? (
           <Card style={styles.center}>
             <View style={styles.duo}>
-              <Chibi kind={chibiKindOf(me)} emotion="joy" value={60} pose="idle" size={90} />
-              <Chibi kind={chibiKindOf(partner)} emotion="love" value={70} pose="wave" size={90} />
+              <Chibi look={lookOf(me)} emotion="joy" value={60} pose="idle" size={90} />
+              <Chibi look={lookOf(partner)} emotion="love" value={70} pose="wave" size={90} />
             </View>
             <Txt weight="display" size={20} center>
               Вы в паре с {partner.display_name}
