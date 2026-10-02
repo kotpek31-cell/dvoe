@@ -1,26 +1,28 @@
-// Локация пары: луг (Meadow) или одна из нарисованных в src/lib/locations.ts.
+// Локация пары: одно из мест, нарисованных в src/lib/locations.ts (луг — тоже там).
 // Статичный рисунок разбирается один раз на время суток; поверх — лёгкие живые детали на двух-трёх циклах:
 // сияние переливается и падает снег, мерцает гирлянда, летают голуби и чайки, крутится луч маяка.
 // 0.2.1: искры костра и светлячки, снегопад, пар от чашек, звёзды и падающая звезда, лепестки сакуры,
 // дождь и круги на лужах, облака над горами, свечение кристаллов и капли в пещере.
 // 0.2.2: ночью в пещере кристаллы по очереди вспыхивают цветами грибов — подсказка к порядку (приходит с сервера).
+// 3.0: рисунок — в мягком стиле с объёмом (artStyle.ts); небо живое везде: ночью мерцают звёзды и изредка падает
+// звезда, над лугом плывут облака; на лугу — бабочки, светлячки, пыльца в солнечном свете.
 import { memo, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { saw, tri } from '../../lib/anim';
-import { artNodes, renderArt } from '../../lib/art';
+import { renderArt } from '../../lib/art';
+import { styledNodes } from '../../lib/artStyle';
 import { cafeCups, CAMPFIRE, crystalsOf, GARLAND, locationParts, locationSvg, rainPuddles, type LocationId, type Variant } from '../../lib/locations';
 import { nativeDriver, useReducedMotion } from '../../lib/motion';
 import { MUSH_HEX, useMushroomHint } from '../../lib/mushrooms';
 import { sceneTransform, type DayTime } from '../../lib/scene';
-import { Meadow } from './Meadow';
 
 // part: в комнате небо рисуется одно на экран ('sky'), а земля с живыми деталями — плитками по всей площадке ('land')
 export type LocationPart = 'all' | 'sky' | 'land';
 // variant — плитка комнаты (0 — главная; 1 — середина комнаты; 2, 3 — боковые плитки со своими вещами)
 type Props = { id: LocationId; width: number; height: number; time: DayTime; active: boolean; part?: LocationPart; variant?: Variant };
 
-const PAINT = { c: '#888888', skin: '#FFDCC4', ids: 'loc' };
+const PAINT = { c: '#888888', skin: '#FFDCC4' };
 const BIRD = 'M0 0 q6 -6 12 0 q6 -6 12 0';
 const CLOUD = 'M14 42 C3 42 1 29 12 27 C12 14 29 10 37 19 C41 6 64 4 70 17 C78 8 95 12 95 25 C108 23 116 34 107 42 Z';
 // Кристалл пещеры (как в locations.ts) — для подсказки грибов он вспыхивает цветом
@@ -32,22 +34,151 @@ const rnd = (i: number, k: number) => {
   return v - Math.floor(v);
 };
 
-function DrawnLocation({ id, width, height, time, active, part = 'all', variant = 0 }: Props & { id: Exclude<LocationId, 'meadow'> }) {
+// Огонёк (светлячок, пыльца, искра): мягкое свечение и яркая середина, в квадрате 16×16
+function spot(color: string, core = 2.6, halo = 0.7) {
+  const id = `sp${color.slice(1)}`;
+  return (
+    <>
+      <Defs>
+        <RadialGradient id={id}>
+          <Stop offset="0" stopColor={color} stopOpacity={halo} />
+          <Stop offset="1" stopColor={color} stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Circle cx={8} cy={8} r={8} fill={`url(#${id})`} />
+      <Circle cx={8} cy={8} r={core} fill={color} />
+    </>
+  );
+}
+
+// Яркие звёзды рисунка (locations.ts, BRIGHT) — над ними мерцает свечение
+const TWINKLE = [[58, 96, 1], [334, 214, 0.8], [212, 58, 0.7], [118, 300, 0.6], [270, 330, 0.5], [30, 220, 0.5], [366, 60, 0.6]];
+// Под открытым небом (в кафе и пещере неба нет, над городом под дождём — тучи, у Луны свои звёзды)
+const OPEN_SKY = new Set<LocationId>(['meadow', 'aurora', 'roof', 'beach', 'forest', 'snow', 'sakura', 'mountains']);
+
+// Живое небо: мерцание звёзд и падающая звезда ночью, облака над лугом
+function SkyLife({ id, width, height, time, active, side }: { id: LocationId; width: number; height: number; time: DayTime; active: boolean; side: boolean }) {
+  const reduce = useReducedMotion();
+  const tf = useMemo(() => sceneTransform(width, height), [width, height]);
+  const s = tf.s;
+  const blink = useRef(new Animated.Value(0)).current; // 3,2 с: мерцание
+  const shoot = useRef(new Animated.Value(0)).current; // 11 с: падающая звезда
+  const clock = useRef(new Animated.Value(0)).current; // 100 с: облака
+  const night = time === 'night' && OPEN_SKY.has(id);
+  const clouds = id === 'meadow';
+  const live = active && !reduce;
+
+  useEffect(() => {
+    if (!live || (!night && !clouds)) return;
+    const loop = (v: Animated.Value, duration: number) => Animated.loop(Animated.timing(v, { toValue: 1, duration, easing: Easing.linear, useNativeDriver: nativeDriver }));
+    const loops = [...(night ? [loop(blink, 3200), loop(shoot, 11000)] : []), ...(clouds ? [loop(clock, 100000)] : [])];
+    loops.forEach((l) => l.start());
+    return () => loops.forEach((l) => l.stop());
+  }, [live, night, clouds, blink, shoot, clock]);
+
+  const cloudFill = time === 'day' ? '#FFFFFF' : time === 'evening' ? '#FFC7D6' : '#56608F';
+  const cloudOp = time === 'day' ? 0.95 : time === 'evening' ? 0.6 : 0.35;
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {night
+        ? TWINKLE.map(([x, y, k], i) => (
+            <Animated.View
+              key={`tw${i}`}
+              style={{
+                position: 'absolute',
+                left: tf.x(x - 14 * k),
+                top: tf.y(y - 14 * k),
+                opacity: live ? tri(blink, (i * 0.31) % 1, 0.05, 0.95) : 0.5,
+                transform: [{ scale: live ? tri(blink, (i * 0.31) % 1, 0.6, 1.15) : 1 }],
+              }}
+            >
+              <Svg width={28 * k * s} height={28 * k * s} viewBox="-14 -14 28 28">
+                <Defs>
+                  <RadialGradient id={`twg${i}`}>
+                    <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.9} />
+                    <Stop offset="1" stopColor="#BFD0FF" stopOpacity={0} />
+                  </RadialGradient>
+                </Defs>
+                <Circle cx={0} cy={0} r={14} fill={`url(#twg${i})`} />
+                <Path d="M0 -9 C0.6 -2 2 -0.6 9 0 C2 0.6 0.6 2 0 9 C-0.6 2 -2 0.6 -9 0 C-2 -0.6 -0.6 -2 0 -9 Z" fill="#FFFFFF" />
+              </Svg>
+            </Animated.View>
+          ))
+        : null}
+      {night && live && !side ? (
+        <Animated.View
+          style={{
+            position: 'absolute',
+            left: tf.x(300),
+            top: tf.y(70),
+            opacity: shoot.interpolate({ inputRange: [0, 0.02, 0.09, 0.12, 1], outputRange: [0, 1, 1, 0, 0] }),
+            transform: [
+              { translateX: shoot.interpolate({ inputRange: [0, 0.12, 1], outputRange: [0, -230 * s, -230 * s] }) },
+              { translateY: shoot.interpolate({ inputRange: [0, 0.12, 1], outputRange: [0, 120 * s, 120 * s] }) },
+              { rotate: '-27deg' },
+            ],
+          }}
+        >
+          <Svg width={64 * s} height={20 * s} viewBox="0 0 64 20">
+            <Defs>
+              <LinearGradient id="shootTail" x1="0" y1="0" x2="1" y2="0">
+                <Stop offset="0" stopColor="#FFFFFF" stopOpacity={0.9} />
+                <Stop offset="1" stopColor="#FFFFFF" stopOpacity={0} />
+              </LinearGradient>
+            </Defs>
+            <Path d="M8 8.6 L62 9.6 L62 10.4 L8 11.4 Z" fill="url(#shootTail)" />
+            <Circle cx={8} cy={10} r={3} fill="#FFFFFF" />
+          </Svg>
+        </Animated.View>
+      ) : null}
+      {clouds
+        ? [
+            { y: 92, w: 124, offset: 0.1 },
+            { y: 186, w: 88, offset: 0.55 },
+            { y: 262, w: 150, offset: 0.8 },
+          ].map((c, i) => (
+            <Animated.View
+              key={`mc${i}`}
+              style={{ position: 'absolute', left: 0, top: tf.y(c.y), opacity: cloudOp, transform: [{ translateX: live ? saw(clock, c.offset, -170 * s, width + 40 * s) : tf.x(30 + i * 120) }] }}
+            >
+              <Svg width={c.w * s} height={(c.w * s * 50) / 124} viewBox="0 0 124 50">
+                <Defs>
+                  <LinearGradient id={`mcg${i}`} x1="0" y1="0" x2="0" y2="1">
+                    <Stop offset="0" stopColor={cloudFill} />
+                    <Stop offset="1" stopColor={time === 'day' ? '#DCE9FA' : cloudFill} />
+                  </LinearGradient>
+                </Defs>
+                <Path d={CLOUD} fill={cloudFill} opacity={0.5} transform="translate(34 -6) scale(0.62)" />
+                <Path d={CLOUD} fill={`url(#mcg${i})`} />
+              </Svg>
+            </Animated.View>
+          ))
+        : null}
+    </View>
+  );
+}
+
+function DrawnLocation({ id, width, height, time, active, part = 'all', variant = 0 }: Props) {
   const art = useMemo(() => {
     const svg = part === 'all' ? locationSvg(id, time) : locationParts(id, time, variant)[part];
-    return renderArt(artNodes(svg), PAINT, `${id}${time}${part}${variant}`);
+    // 3.0: мягкий контур и объём (artStyle.ts). id градиентов — свои у каждой локации, времени и плитки
+    const key = `${id}${time}${part}${variant}`;
+    return renderArt(styledNodes(svg, 'scene'), { ...PAINT, ids: key }, key);
   }, [id, time, part, variant]);
   if (part === 'sky') {
     return (
-      <Svg width={width} height={height} viewBox="0 0 390 844" preserveAspectRatio="xMidYMax slice" style={StyleSheet.absoluteFill} pointerEvents="none">
-        {art}
-      </Svg>
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Svg width={width} height={height} viewBox="0 0 390 844" preserveAspectRatio="xMidYMax slice" style={StyleSheet.absoluteFill} pointerEvents="none">
+          {art}
+        </Svg>
+        <SkyLife id={id} width={width} height={height} time={time} active={active} side={false} />
+      </View>
     );
   }
-  return <LiveLocation id={id} width={width} height={height} time={time} active={active} art={art} variant={variant} />;
+  return <LiveLocation id={id} width={width} height={height} time={time} active={active} art={art} variant={variant} part={part} />;
 }
 
-function LiveLocation({ id, width, height, time, active, art, variant = 0 }: Props & { id: Exclude<LocationId, 'meadow'>; art: ReactNode }) {
+function LiveLocation({ id, width, height, time, active, art, variant = 0, part = 'all' }: Props & { art: ReactNode }) {
   const v = variant;
   const side = v >= 2; // боковая плитка комнаты: своих костра, маяка, чашек нет; птицы и облака — только в середине
   const seed = side ? v * 17 : 0; // частицы на боковых плитках — по другой раскладке
@@ -58,6 +189,7 @@ function LiveLocation({ id, width, height, time, active, art, variant = 0 }: Pro
   const slow = useRef(new Animated.Value(0)).current; // 30 с: птицы, снег, сияние
   const blink = useRef(new Animated.Value(0)).current; // 2,4 с: мерцание
   const spin = useRef(new Animated.Value(0)).current; // 8 с: луч маяка
+  const flap = useRef(new Animated.Value(0)).current; // 0,22 с: крылья бабочек (луг днём)
 
   const live = active && !reduce;
 
@@ -80,9 +212,18 @@ function LiveLocation({ id, width, height, time, active, art, variant = 0 }: Pro
       Animated.loop(Animated.timing(blink, { toValue: 1, duration: 2400, easing: Easing.linear, useNativeDriver: nativeDriver })),
       Animated.loop(Animated.timing(spin, { toValue: 1, duration: 8000, easing: Easing.linear, useNativeDriver: nativeDriver })),
     ];
+    if (id === 'meadow' && time === 'day')
+      loops.push(
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(flap, { toValue: 1, duration: 220, easing: Easing.inOut(Easing.quad), useNativeDriver: nativeDriver }),
+            Animated.timing(flap, { toValue: 0, duration: 220, easing: Easing.inOut(Easing.quad), useNativeDriver: nativeDriver }),
+          ]),
+        ),
+      );
     loops.forEach((l) => l.start());
     return () => loops.forEach((l) => l.stop());
-  }, [live, slow, blink, spin]);
+  }, [live, slow, blink, spin, flap, id, time]);
 
   const abs = (x: number, y: number) => ({ position: 'absolute' as const, left: tf.x(x), top: tf.y(y) });
 
@@ -124,6 +265,72 @@ function LiveLocation({ id, width, height, time, active, art, variant = 0 }: Pro
     </Animated.View>
   );
   const extra: ReactNode[] = [];
+  if (id === 'meadow') {
+    // фонарик у пледа дышит светом
+    if (time !== 'day' && !side)
+      extra.push(
+        bit('lamp', 166, 580, 82, 82, { opacity: live ? tri(blink, 0, 0.35, 0.9) : 0.7 },
+          <>
+            <Defs>
+              <RadialGradient id="mlamp">
+                <Stop offset="0" stopColor="#FFE7A3" stopOpacity={0.55} />
+                <Stop offset="1" stopColor="#FFD680" stopOpacity={0} />
+              </RadialGradient>
+            </Defs>
+            <Circle cx={41} cy={41} r={41} fill="url(#mlamp)" />
+          </>),
+      );
+    // бабочки днём
+    if (time === 'day' && !side)
+      [
+        { xs: [30, 150, 250, 120, 30], ys: [430, 380, 450, 500, 430], c1: '#FFD166', c2: '#FFB347', off: 0 },
+        { xs: [330, 220, 300, 330, 330], ys: [560, 600, 520, 560, 560], c1: '#FF9EBB', c2: '#FF7FA6', off: 0.4 },
+      ].forEach((b, i) => {
+        const t = saw(slow, b.off, 0, 1);
+        extra.push(
+          <Animated.View
+            key={`bf${i}`}
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              transform: live
+                ? [
+                    { translateX: t.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: b.xs.map(tf.x) }) },
+                    { translateY: t.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: b.ys.map(tf.y) }) },
+                  ]
+                : [{ translateX: tf.x(b.xs[1]) }, { translateY: tf.y(b.ys[1]) }],
+            }}
+          >
+            <Animated.View style={{ transform: [{ scaleX: live ? flap.interpolate({ inputRange: [0, 1], outputRange: [1, 0.3] }) : 1 }] }}>
+              <Svg width={26 * s} height={22 * s} viewBox="0 0 26 22">
+                <Path d="M13 11 C8 1 1 2 2 8 C3 13 8 13 13 11 Z M13 11 C9 16 4 20 4 16 C4 13 8 12 13 11 Z" fill={b.c1} stroke="#B56A3A" strokeWidth={0.9} />
+                <Path d="M13 11 C18 1 25 2 24 8 C23 13 18 13 13 11 Z M13 11 C17 16 22 20 22 16 C22 13 18 12 13 11 Z" fill={b.c2} stroke="#B56A3A" strokeWidth={0.9} />
+                <Path d="M13 6 V17" stroke="#473A5C" strokeWidth={1.6} strokeLinecap="round" />
+              </Svg>
+            </Animated.View>
+          </Animated.View>,
+        );
+      });
+    // пыльца в солнечном свете днём, светлячки вечером и ночью
+    const n = time === 'night' ? 10 : 7;
+    for (let i = 0; i < n; i++) {
+      const fx = 20 + ((i * 97 + v * 53) % 350);
+      const fy = time === 'night' ? 470 + ((i * 61 + v * 29) % 250) : 520 + ((i * 53 + v * 31) % 220);
+      const off = i / n;
+      const color = time === 'night' ? '#FFF2A6' : time === 'evening' ? '#FFE0EC' : '#FFFFFF';
+      extra.push(
+        bit(`mf${i}`, fx - 8, fy - 8, 16, 16, {
+          opacity: live ? tri(blink, (i * 0.37) % 1, time === 'day' ? 0.05 : 0.15, time === 'day' ? 0.55 : 1) : 0.6,
+          transform: [
+            { translateX: live ? tri(slow, off, -12 * s, 16 * s) : 0 },
+            { translateY: live ? (time === 'night' ? tri(slow, off + 0.3, 0, -24 * s) : saw(slow, off, 0, -170 * s)) : 0 },
+          ],
+        },
+          spot(color, time === 'day' ? 1.3 : 2.6, time === 'day' ? 0.35 : 0.7)),
+      );
+    }
+  }
   if (id === 'forest' && !side) {
     const { x, y } = CAMPFIRE;
     extra.push(
@@ -143,10 +350,10 @@ function LiveLocation({ id, width, height, time, active, art, variant = 0 }: Pro
   if (id === 'forest' && time !== 'day')
     for (let i = 0; i < 9; i++)
       extra.push(
-        bit(`ff${i}`, 20 + rnd(i + seed, 3) * 350, 430 + rnd(i + seed, 4) * 300, 10, 10, {
+        bit(`ff${i}`, 20 + rnd(i + seed, 3) * 350, 430 + rnd(i + seed, 4) * 300, 16, 16, {
           opacity: live ? tri(blink, rnd(i + seed, 5), 0.1, 1) : 0.6,
           transform: [{ translateX: live ? tri(slow, rnd(i + seed, 6), -20 * s, 20 * s) : 0 }, { translateY: live ? tri(slow, rnd(i + seed, 7) + 0.3, -14 * s, 14 * s) : 0 }],
-        }, <><Circle cx={5} cy={5} r={5} fill="#E8FF8A" opacity={0.35} /><Circle cx={5} cy={5} r={2} fill="#F4FFB8" /></>),
+        }, spot('#E8FF8A', 2.4)),
       );
   if (id === 'cafe')
     cafeCups(v).forEach((c, ci) =>
@@ -292,6 +499,7 @@ function LiveLocation({ id, width, height, time, active, art, variant = 0 }: Pro
       <Svg width={width} height={height} viewBox="0 0 390 844" preserveAspectRatio="xMidYMax slice" style={StyleSheet.absoluteFill}>
         {art}
       </Svg>
+      {part === 'all' ? <SkyLife id={id} width={width} height={height} time={time} active={active} side={side} /> : null}
 
       {auroraBands.map((b, i) => (
         <Animated.View
@@ -416,9 +624,4 @@ function LiveLocation({ id, width, height, time, active, art, variant = 0 }: Pro
   );
 }
 
-function LocationView(props: Props) {
-  if (props.id === 'meadow') return <Meadow width={props.width} height={props.height} time={props.time} active={props.active} part={props.part} variant={props.variant} />;
-  return <DrawnLocation {...props} id={props.id} />;
-}
-
-export const Location = memo(LocationView);
+export const Location = memo(DrawnLocation);

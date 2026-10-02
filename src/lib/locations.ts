@@ -1,4 +1,4 @@
-// Локации 0.2: статичная часть рисунка — SVG-строки в координатах сцены 390×844 (как луг),
+// Локации: статичная часть рисунка — SVG-строки в координатах сцены 390×844,
 // по палитре на день, вечер и ночь. Живые детали (сияние, снег, гирлянда, чайки, луч маяка) — в Location.tsx.
 // Все локации устроены одинаково: полоса, где ходят чибики (y ≈ 520–560), плед для спящих (214–378 × 618–700).
 // Новая локация = новая функция здесь + запись в public.locations; главную переделывать не нужно.
@@ -48,6 +48,20 @@ const pth = (d: string, fill: string, o: A = {}) => el('path', { d, fill, ...o }
 const line = (d: string, color: string, w: number, o: A = {}) =>
   el('path', { d, fill: 'none', stroke: color, 'stroke-width': w, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', ...o });
 
+// Мягкое свечение: круг с радиальным градиентом к прозрачному краю
+let glowN = 0;
+const stop = (offset: number, color: string, op?: number) => el('stop', op === undefined ? { offset, 'stop-color': color } : { offset, 'stop-color': color, 'stop-opacity': op });
+const glow = (x: number, y: number, r: number, color: string, op: number) => {
+  if (op <= 0) return '';
+  const id = `lg${++glowN}`;
+  return el('defs', {}, el('radialGradient', { id }, stop(0, color, +(op * 0.7).toFixed(2)) + stop(0.45, color, +(op * 0.3).toFixed(2)) + stop(1, color, 0))) + circ(x, y, r, `url(#${id})`);
+};
+// Шар с объёмом: светлое пятно сверху-слева, к краю темнее
+const orb = (x: number, y: number, r: number, light: string, mid: string, edge: string, o: A = {}) => {
+  const id = `ob${++glowN}`;
+  return el('defs', {}, el('radialGradient', { id, cx: 0.36, cy: 0.32, r: 0.78 }, stop(0, light) + stop(0.55, mid) + stop(1, edge))) + circ(x, y, r, `url(#${id})`, o);
+};
+
 function sky(id: string, stops: string[], marks = [0, 0.34, 0.57]): string {
   const grad = el(
     'linearGradient',
@@ -66,16 +80,66 @@ function seeded(seed: number) {
 }
 const rs = seeded(11);
 const STARS = Array.from({ length: 30 }, () => ({ x: +(8 + rs() * 374).toFixed(1), y: +(24 + rs() * 380).toFixed(1), r: rs() < 0.25 ? 1.6 : 1.05 }));
-const stars = (op: number) => (op > 0 ? g(STARS.map((s) => circ(s.x, s.y, s.r, '#FFFFFF')).join(''), { opacity: op }) : '');
-const moon = (x: number, y: number) =>
-  circ(x, y, 64, '#DCE3FF', { opacity: 0.12 }) + circ(x, y, 30, '#F6F1D8') + circ(x - 10, y - 8, 6, '#E6DFC2') + circ(x + 9, y + 10, 4.2, '#E6DFC2');
-const sun = (x: number, y: number, r: number, color: string, glow: string) => circ(x, y, r * 2, glow, { opacity: 0.35 }) + circ(x, y, r, color);
+// 3.0: ночью — ещё звёздная пыль, полоса млечного пути и несколько ярких звёзд-искр
+const rd = seeded(47);
+const DUST = Array.from({ length: 54 }, () => ({ x: +(rd() * 390).toFixed(1), y: +(rd() * 430).toFixed(1), r: +(0.45 + rd() * 0.45).toFixed(2), o: +(0.3 + rd() * 0.5).toFixed(2) }));
+const SPARK = 'M0 -6 C0.5 -1.3 1.3 -0.5 6 0 C1.3 0.5 0.5 1.3 0 6 C-0.5 1.3 -1.3 0.5 -6 0 C-1.3 -0.5 -0.5 -1.3 0 -6 Z';
+const BRIGHT = [[58, 96, 1], [334, 214, 0.8], [212, 58, 0.7], [118, 300, 0.6]];
+const stars = (op: number) => {
+  if (op <= 0) return '';
+  let s = STARS.map((st, i) => circ(st.x, st.y, st.r, i % 7 === 0 ? '#FFE9B8' : i % 5 === 0 ? '#CFE0FF' : '#FFFFFF')).join('');
+  if (op >= 0.6) {
+    s =
+      g(glow(0, 0, 100, '#B9C8FF', 0.34), { transform: 'translate(150 190) rotate(-27) scale(3.1 0.6)' }) +
+      DUST.map((d) => circ(d.x, d.y, d.r, '#FFFFFF', { opacity: d.o })).join('') +
+      s +
+      BRIGHT.map(([x, y, k]) => glow(x, y, 9 * k, '#FFFFFF', 0.7) + pth(SPARK, '#FFFFFF', { transform: `translate(${x} ${y}) scale(${k})` })).join('');
+  }
+  return g(s, { opacity: op });
+};
+const moon = (x: number, y: number, r = 30) =>
+  glow(x, y, r * 3.6, '#B9C6FF', 0.5) +
+  glow(x, y, r * 1.8, '#FFF8DC', 0.55) +
+  orb(x, y, r, '#FFFEF4', '#F4EDCC', '#D3C9A2') +
+  circ(x - r * 0.33, y - r * 0.27, r * 0.2, '#D9D0AA', { opacity: 0.8 }) +
+  circ(x + r * 0.3, y + r * 0.33, r * 0.14, '#D9D0AA', { opacity: 0.8 }) +
+  circ(x + r * 0.23, y - r * 0.43, r * 0.09, '#D9D0AA', { opacity: 0.7 }) +
+  circ(x - r * 0.12, y + r * 0.42, r * 0.1, '#D9D0AA', { opacity: 0.6 });
+const sun = (x: number, y: number, r: number, color: string, halo: string) =>
+  glow(x, y, r * 4.4, halo, 0.8) + glow(x, y, r * 2.2, '#FFFFFF', 0.55) + orb(x, y, r, '#FFFFFF', color, color);
+// Закатное солнце у горизонта: большое тёплое зарево и диск
+const dusk = (x: number, y: number, r: number, color = '#FF9466') =>
+  glow(x, y, r * 3.6, '#FFB48C', 0.85) + glow(x, y, r * 1.9, '#FFE2B8', 0.7) + orb(x, y, r, '#FFE9C4', color, color);
 const CLOUD = 'M14 42 C3 42 1 29 12 27 C12 14 29 10 37 19 C41 6 64 4 70 17 C78 8 95 12 95 25 C108 23 116 34 107 42 Z';
+// Облако: дальний клуб, сам клуб и мягкая тень снизу
 const cloud = (x: number, y: number, w: number, fill: string, op: number) =>
-  pth(CLOUD, fill, { transform: `translate(${x} ${y}) scale(${(w / 110).toFixed(3)})`, opacity: op });
+  g(
+    pth(CLOUD, fill, { transform: 'translate(34 -9) scale(0.62)', opacity: 0.55 }) +
+      pth(CLOUD, fill) +
+      pth('M12 39 C32 43.5 84 43.5 108 39 C108 41.5 103 42 96 42 H16 C12 42 11 41 12 39 Z', '#7F90BC', { opacity: 0.22 }),
+    { transform: `translate(${x} ${y}) scale(${(w / 110).toFixed(3)})`, opacity: op },
+  );
+const BLANKET = 'M214 626 L360 618 L378 690 L200 700 Z';
+// Плед: тень на земле, клетка и светлая кайма
 const blanket = (fill: string, lines: string) =>
-  pth('M214 626 L360 618 L378 690 L200 700 Z', fill) +
-  line('M250 624 L240 698 M288 622 L284 696 M326 620 L330 693 M209 650 L366 641 M204 675 L372 666', lines, 6, { opacity: 0.5, 'stroke-linecap': 'butt' });
+  pth('M208 636 L366 627 L386 696 L196 707 Z', INK, { opacity: 0.16 }) +
+  pth(BLANKET, fill) +
+  line('M250 624 L240 698 M288 622 L284 696 M326 620 L330 693 M209 650 L366 641 M204 675 L372 666', lines, 6, { opacity: 0.5, 'stroke-linecap': 'butt' }) +
+  pth(BLANKET, 'none', { stroke: lines, 'stroke-width': 2.2, 'stroke-linejoin': 'round', opacity: 0.55 }) +
+  pth('M360 618 L378 690 L370 690.5 L353 618.5 Z', '#FFFFFF', { opacity: 0.16 });
+// Глубина: дымка у горизонта и затемнение к низу экрана. Одинаковы по всей ширине — плитки комнаты сходятся.
+const depth = (time: DayTime, haze = true) => {
+  const n = ++glowN;
+  const tint = time === 'day' ? '#FFFFFF' : time === 'evening' ? '#FFC9A8' : '#8496E6';
+  const hazeOp = time === 'day' ? 0.24 : time === 'evening' ? 0.2 : 0.15;
+  const dark = time === 'day' ? 0.14 : time === 'evening' ? 0.28 : 0.36;
+  const lin = (id: string, stops: string) => el('linearGradient', { id, x1: 0, y1: 0, x2: 0, y2: 1 }, stops);
+  return (
+    el('defs', {}, lin(`dh${n}`, stop(0, tint, 0) + stop(0.42, tint, hazeOp) + stop(1, tint, 0)) + lin(`dv${n}`, stop(0, '#0B0820', 0) + stop(1, '#0B0820', dark))) +
+    (haze ? rect(-60, 396, 510, 190, `url(#dh${n})`) : '') +
+    rect(-60, 600, 510, 320, `url(#dv${n})`)
+  );
+};
 // Гряда гор по точкам: края плитки (x = 0 и 390) у всех вариантов на той же высоте — швы сходятся.
 // Снежные шапки — на вершинах, по склонам.
 const ridge = (pts: number[][], bottom: number, fill: string, snow: string) => {
@@ -98,7 +162,129 @@ const ridge = (pts: number[][], bottom: number, fill: string, snow: string) => {
   );
 };
 const lantern = (op: number) =>
-  op > 0 ? g(rect(199, 612, 15, 19, '#FFE7A3', { rx: 4, stroke: INK, 'stroke-width': 1.6 }) + line('M202 612 Q206.5 603 211 612', INK, 1.6), { opacity: op }) : '';
+  op > 0 ? g(glow(206.5, 622, 54, '#FFD680', 0.8) + rect(199, 612, 15, 19, '#FFE7A3', { rx: 4, stroke: INK, 'stroke-width': 1.6 }) + line('M202 612 Q206.5 603 211 612', INK, 1.6) + circ(206.5, 622, 3.4, '#FFFBE6'), { opacity: op }) : '';
+
+// ---------- Луг у озера ----------
+// 3.0: луг нарисован так же, как остальные места (раньше — отдельный компонент Meadow.tsx):
+// горы в дымке, отражения в озере, камыш и кувшинки, деревья с объёмом, трава, корзинка у пледа.
+const MEADOW = {
+  day: {
+    sky: ['#6FB7F5', '#A9D8FF', '#FFE6EF'], stars: 0, far: '#C3DDEA', hill1: '#A5DCCB', hill2: '#7FCBB6', lake: '#8FD6F0', lakeEdge: '#6CC3E4', shimmer: '#FFFFFF',
+    refl: '#FFF4C2', reflX: 292, reflOp: 0.55, meadow: '#8CD48B', meadow2: '#79C87C', trail: '#F4E1B8', near: '#63B872', trunk: '#8A5A44', leaf1: '#4FAF72', leaf2: '#8FDDA6',
+    leaf3: '#3E9A62', bush: '#5CBB78', reed: '#5E9A5A', blanket: '#FF8FA8', lines: '#FFFFFF', lantern: 0, flowers: 1, fruit: '#FF6B6B',
+  },
+  evening: {
+    sky: ['#2F2A6E', '#A15BA6', '#FFB48C'], stars: 0.35, far: '#9B74B4', hill1: '#7D5AA6', hill2: '#634C94', lake: '#D18BB0', lakeEdge: '#B574A0', shimmer: '#FFD9C2',
+    refl: '#FFC29A', reflX: 92, reflOp: 0.85, meadow: '#56817A', meadow2: '#4B746E', trail: '#CDA891', near: '#3D6461', trunk: '#5B3E45', leaf1: '#336E61', leaf2: '#5A9A82',
+    leaf3: '#2B5E54', bush: '#3E7064', reed: '#3E6458', blanket: '#E77E97', lines: '#FFE3EA', lantern: 0.75, flowers: 0.85, fruit: '#D9566E',
+  },
+  night: {
+    sky: ['#070B24', '#141C4A', '#2C3772'], stars: 1, far: '#222C62', hill1: '#1D2758', hill2: '#18214A', lake: '#28376F', lakeEdge: '#1F2C5C', shimmer: '#C9D6FF',
+    refl: '#F6F1D8', reflX: 300, reflOp: 0.6, meadow: '#1E3B49', meadow2: '#1B3441', trail: '#3A4862', near: '#15303B', trunk: '#2B2B40', leaf1: '#183C47', leaf2: '#2B5E66',
+    leaf3: '#12313B', bush: '#1B414A', reed: '#1C3C44', blanket: '#8D6BB8', lines: '#D9CCFF', lantern: 1, flowers: 0.5, fruit: '#7A3E5E',
+  },
+};
+const FLOWERS: [number, number, string, number][] = [
+  [22, 578, '#FF8FB1', 16], [70, 598, '#FFD166', 13], [124, 572, '#FFFFFF', 13], [276, 580, '#C9B6FF', 16], [300, 604, '#FF8FB1', 13],
+  [16, 652, '#FFFFFF', 13], [104, 664, '#FF8FB1', 16], [60, 712, '#C9B6FF', 13], [128, 726, '#FFD166', 13], [252, 726, '#FFFFFF', 16],
+  [340, 716, '#FFD166', 13], [372, 628, '#FFFFFF', 13], [8, 734, '#FFD166', 16], [312, 740, '#FF8FB1', 13],
+];
+const flowerHead = (x: number, y: number, color: string, size: number) =>
+  g(
+    [[10, 4.6], [15.2, 8.4], [13.2, 14.4], [6.8, 14.4], [4.8, 8.4]].map(([cx, cy]) => circ(cx, cy, 3.6, color)).join('') + circ(10, 10, 2.9, '#FFB347') + circ(9.2, 9.2, 1, '#FFE2A8'),
+    { transform: `translate(${x} ${y}) scale(${(size / 20).toFixed(2)})` },
+  );
+const tuft = (x: number, y: number, color: string, k = 1) => line(`M${x} ${y} l${3 * k} ${-11 * k} l${3 * k} ${9 * k} l${4 * k} ${-13 * k} l${3 * k} ${15 * k}`, color, 2.2);
+
+function meadow(time: DayTime, v: Variant = 0): string {
+  const p = MEADOW[time];
+  const side = sideV(v);
+  // сдвиги деревьев и куста по вариантам (препятствия комнаты — roomWorld.ts — стоят под теми же местами)
+  const bigDx = [0, -16, -72, -236][v];
+  const smallDx = [0, 0, 90, 196][v];
+  const smallDy = smallDx ? (v === 3 ? 6 : -4) : 0;
+  const bushDx = [0, 0, 134, 292][v];
+  let s = sky(`sky-meadow-${time}`, p.sky) + stars(p.stars);
+  if (time === 'day') s += sun(292, 150, 34, '#FFE38A', '#FFF4C2') + pth('M292 150 L130 470 L196 470 Z M292 150 L20 400 L60 440 Z M292 150 L236 470 L270 470 Z', '#FFFFFF', { opacity: 0.07 });
+  if (time === 'evening') s += dusk(92, 424, 48);
+  if (time === 'night') s += moon(300, 136);
+  s += LAND; // дальше — земля (в комнате тянется по всей площадке)
+  // далёкие горы в дымке, холмы
+  s += pth('M-60 452 L16 396 L66 424 L128 370 L196 420 L252 380 L318 428 L372 394 L450 442 L450 520 L-60 520 Z', p.far, { opacity: 0.8 });
+  s += pth('M128 370 L146 386 L134 388 L126 380 L116 388 Z M252 380 L268 394 L256 396 L250 390 L240 396 Z', '#FFFFFF', { opacity: time === 'night' ? 0.25 : 0.6 });
+  s += pth('M-60 446 C40 412 92 400 140 424 C176 396 236 376 290 402 C330 384 364 390 450 404 L450 520 L-60 520 Z', p.hill1);
+  s += pth('M-60 474 C60 448 120 446 180 466 C240 442 320 440 450 462 L450 520 L-60 520 Z', p.hill2);
+  // дерево: тень, ствол, крона в три тона, блики и яблоки
+  const tree = (x: number, y: number, k: number, fruit: boolean) =>
+    g(
+      el('ellipse', { cx: 2, cy: 58, rx: 40, ry: 7, fill: INK, opacity: 0.14 }) +
+        pth('M-7 59 C-5 42 -7 24 -4 4 L5 4 C7 24 5 42 8 59 Z', p.trunk) +
+        line('M-1 52 C-2 38 0 24 1 12', '#FFFFFF', 1.6, { opacity: 0.14 }) +
+        pth('M-4 20 C-12 14 -18 8 -22 0 M4 26 C12 18 18 12 22 4', 'none', { stroke: p.trunk, 'stroke-width': 4, 'stroke-linecap': 'round' }) +
+        [[-28, -4, 25, p.leaf3], [28, -6, 24, p.leaf3], [0, -28, 38, p.leaf1], [-22, -30, 20, p.leaf1], [22, -34, 19, p.leaf1], [0, -54, 22, p.leaf1]]
+          .map(([cx, cy, r, c]) => circ(cx as number, cy as number, r as number, c as string))
+          .join('') +
+        [[-12, -44, 14, 0.7], [14, -20, 7, 0.55], [-30, -14, 8, 0.5], [6, -62, 9, 0.6]].map(([cx, cy, r, o]) => circ(cx, cy, r, p.leaf2, { opacity: o })).join('') +
+        (fruit ? [[-16, -12], [12, -40], [26, -10], [-4, -30]].map(([cx, cy]) => circ(cx, cy, 3.6, p.fruit) + circ(cx - 1, cy - 1.2, 1.1, '#FFFFFF', { opacity: 0.6 })).join('') : ''),
+      { transform: `translate(${x} ${y}) scale(${k})` },
+    );
+  s += tree(58 + smallDx, 466 + smallDy, 0.56, false);
+  // озеро: вода, кромка, отражения холмов и светила, блики, кувшинки
+  s += pth('M-60 490 C70 480 150 478 230 484 C300 488 350 484 450 492 L450 544 C330 552 250 550 170 548 C90 546 30 550 -60 552 Z', p.lake);
+  s += pth('M-60 490 C70 480 150 478 230 484 C300 488 350 484 450 492 L450 498 C340 492 290 496 230 492 C150 486 70 488 -60 498 Z', p.lakeEdge);
+  s += pth('M-60 498 C40 506 100 510 150 502 C190 512 250 516 300 506 C350 512 400 510 450 502 L450 498 C340 492 290 496 230 492 C150 486 70 488 -60 498 Z', p.hill2, { opacity: 0.28 });
+  if (!side) s += g(glow(0, 0, 44, p.refl, p.reflOp), { transform: `translate(${p.reflX} 516) scale(1 0.42)` }) + line(`M${p.reflX - 14} 506 h28 M${p.reflX - 22} 516 h44 M${p.reflX - 12} 526 h24 M${p.reflX - 18} 536 h36`, p.refl, 2.2, { opacity: p.reflOp * 0.8 });
+  s += line('M52 512 h26 M146 524 h40 M254 508 h22 M300 530 h30 M100 536 h18 M196 538 h26 M352 520 h20', p.shimmer, 2.2, { opacity: 0.55 });
+  s += [[128, 516], [226, 528], [338, 536]]
+    .map(([x, y], i) => el('ellipse', { cx: x, cy: y, rx: 9, ry: 3.4, fill: p.leaf1 }) + line(`M${x} ${y} l4 -2.6`, p.lake, 1.4) + (i !== 1 ? circ(x - 3, y - 2.6, 2.6, time === 'night' ? '#C9B6FF' : '#FFC1D6') + circ(x - 3, y - 2.6, 1, '#FFE38A') : ''))
+    .join('');
+  // луг и тропинка
+  s += pth('M-60 540 C80 528 160 526 240 532 C300 537 350 534 450 528 L450 900 L-60 900 Z', p.meadow);
+  s += [[10, 544, 20], [30, 546, 26], [372, 540, 24], [386, 542, 18]]
+    .map(([x, y, h]) => line(`M${x} ${y} q-2 ${-h * 0.6} 1 ${-h}`, p.reed, 1.8) + el('ellipse', { cx: x + 1, cy: y - h - 4, rx: 2.2, ry: 5.4, fill: p.trunk }))
+    .join('');
+  s += pth('M-60 612 C100 590 260 594 450 614 L450 900 L-60 900 Z', p.meadow2);
+  if (!side) {
+    s += pth('M188 540 C176 562 206 580 196 606 C184 636 150 652 160 700 C168 740 140 790 150 900 L236 900 C222 790 246 744 232 702 C222 664 256 640 262 608 C268 580 232 562 226 540 Z', p.trail, { opacity: 0.85 });
+    s += [[180, 596, 5], [244, 628, 4], [152, 690, 5.4], [242, 716, 4.4], [146, 782, 5], [236, 800, 5.6]]
+      .map(([x, y, r]) => el('ellipse', { cx: x, cy: y, rx: r * 1.5, ry: r, fill: '#B9B2CC', opacity: time === 'night' ? 0.45 : 0.8 }))
+      .join('');
+  }
+  s += tree(346 + bigDx, 540, 1, time !== 'night');
+  // куст, грибы под ним
+  s += g(circ(18, 602, 17, p.bush) + circ(42, 608, 14, p.leaf3) + circ(12, 594, 7, p.leaf2, { opacity: 0.6 }) + circ(34, 600, 5, p.leaf2, { opacity: 0.45 }), bushDx ? { transform: `translate(${bushDx} 0)` } : {});
+  s += g(
+    pth('M-2 0 V-7 H2 V0 Z', '#F4EBDD') + pth('M-7 -6 C-7 -14 7 -14 7 -6 Z', '#E5566B') + circ(-2.6, -9, 1.2, '#FFFFFF') + circ(2.4, -10.4, 1, '#FFFFFF') +
+      pth('M8 1 V-4 H11 V1 Z', '#F4EBDD') + pth('M5 -3.4 C5 -9 14 -9 14 -3.4 Z', '#E5566B'),
+    { transform: `translate(${58 + bushDx} 622)`, opacity: time === 'night' ? 0.6 : 1 },
+  );
+  // трава пучками и цветы
+  const blades = time === 'day' ? p.leaf3 : p.leaf2;
+  s += g(
+    [[40, 566, 0.7], [96, 588, 0.8], [330, 574, 0.7], [20, 628, 0.9], [118, 640, 0.8], [84, 690, 0.9], [36, 772, 1], [330, 776, 1], [140, 610, 0.7], [270, 742, 0.9]]
+      .map(([x, y, k]) => tuft(x, y, blades, k))
+      .join(''),
+    { opacity: 0.55 },
+  );
+  s += g(FLOWERS.map(([x, y, c, size]) => flowerHead(x, y, c, size)).join(''), { opacity: p.flowers });
+  if (!side) {
+    s += blanket(p.blanket, p.lines);
+    // корзинка для пикника у края пледа
+    s += g(
+      pth('M-13 0 C-13 -17 13 -17 13 0', 'none', { stroke: '#8A5A44', 'stroke-width': 3, 'stroke-linecap': 'round' }) +
+        pth('M-16 -2 H16 L13 14 C13 16 11 17 9 17 H-9 C-11 17 -13 16 -13 14 Z', '#C98A5E', { stroke: INK, 'stroke-width': 1.6, 'stroke-linejoin': 'round' }) +
+        line('M-14 4 H14 M-13 10 H13 M-7 -1 V16 M0 -1 V17 M7 -1 V16', '#9C6B4E', 1.3, { opacity: 0.8 }) +
+        pth('M-16 -2 H16 L14 3 C8 6 -8 6 -14 3 Z', '#FFFFFF', { stroke: INK, 'stroke-width': 1.2 }) +
+        line('M-9 0 L-7 3 M-1 0.5 L1 3.6 M7 0 L9 3', '#FF6B8A', 1.6),
+      { transform: 'translate(186 700)', opacity: time === 'night' ? 0.8 : 1 },
+    );
+  }
+  if (!side) s += lantern(p.lantern);
+  s += pth('M-60 748 C90 736 220 738 450 752 L450 900 L-60 900 Z', p.near);
+  s += tuft(18, 750, p.leaf3, 1) + tuft(120, 742, p.leaf3, 0.85) + tuft(292, 746, p.leaf3, 0.95) + tuft(366, 752, p.leaf3, 0.85);
+  s += depth(time);
+  return s;
+}
 
 // ---------- Северное сияние ----------
 const AURORA = {
@@ -120,7 +306,7 @@ function aurora(time: DayTime, v: Variant = 0): string {
   const p = AURORA[time];
   let s = sky(`sky-aurora-${time}`, p.sky, [0, 0.4, 0.62]) + stars(p.stars);
   if (time === 'day') s += sun(92, 362, 30, '#FFE7B0', '#FFF6DE') + cloud(210, 120, 110, '#FFFFFF', 0.85) + cloud(40, 210, 80, '#FFFFFF', 0.7);
-  if (time === 'evening') s += sun(300, 436, 34, '#FFB08A', '#FFD3BE');
+  if (time === 'evening') s += dusk(300, 436, 34, '#FFB08A');
   if (time === 'night') s += circ(320, 92, 14, '#F6F1D8', { opacity: 0.9 });
   s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   if (!sideV(v)) {
@@ -183,6 +369,7 @@ function aurora(time: DayTime, v: Variant = 0): string {
   s += pth('M-60 748 C90 736 220 738 450 752 L450 900 L-60 900 Z', p.near);
   const r2 = seeded(5 + (sideV(v) ? v * 7 : 0));
   s += g(Array.from({ length: 40 }, () => circ(+(r2() * 390).toFixed(1), +(500 + r2() * 340).toFixed(1), r2() < 0.3 ? 2 : 1.2, '#FFFFFF')).join(''), { opacity: time === 'day' ? 0.9 : 0.6 });
+  s += depth(time);
   return s;
 }
 
@@ -213,7 +400,7 @@ function roof(time: DayTime, v: Variant = 0): string {
   const p = ROOF[time];
   let s = sky(`sky-roof-${time}`, p.sky, [0, 0.32, 0.55]) + stars(p.stars);
   if (time === 'day') s += sun(300, 150, 34, '#FFE38A', '#FFF4C2') + cloud(30, 100, 120, '#FFFFFF', 0.95) + cloud(220, 230, 90, '#FFFFFF', 0.9);
-  if (time === 'evening') s += circ(300, 400, 90, '#FFC29A', { opacity: 0.35 }) + circ(300, 410, 46, '#FF9466');
+  if (time === 'evening') s += dusk(300, 410, 46);
   if (time === 'night') s += moon(300, 120);
   s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   const r = seeded(sideV(v) ? 3 + v * 11 : 3);
@@ -265,6 +452,7 @@ function roof(time: DayTime, v: Variant = 0): string {
     rect(x, 560, 26, 22, '#C97C5D', { stroke: INK, 'stroke-width': 1.8, rx: 3 }) + circ(x + 13, 552, 15, '#5CBB78', { stroke: INK, 'stroke-width': 1.8 }) + circ(x + 6, 548, 7, '#7FD8A0');
   s += pick(v, pot(16) + pot(350), pot(30) + pot(334), pot(150) + pot(292), pot(60) + pot(196));
   if (!sideV(v)) s += blanket(p.blanket, p.lines);
+  s += depth(time);
   return s;
 }
 
@@ -290,7 +478,7 @@ function beach(time: DayTime, v: Variant = 0): string {
   if (time === 'day') {
     s += sun(92, 160, 34, '#FFE38A', '#FFF4C2') + cloud(200, 110, 120, '#FFFFFF', 0.95) + cloud(30, 250, 90, '#FFFFFF', 0.9);
   }
-  if (time === 'evening') s += circ(190, 420, 100, '#FFC29A', { opacity: 0.35 }) + circ(190, 424, 48, '#FF9466');
+  if (time === 'evening') s += dusk(190, 424, 48);
   if (time === 'night') s += moon(92, 150);
   s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   s += pth('M-60 420 H450 V540 H-60 Z', p.sea);
@@ -347,6 +535,7 @@ function beach(time: DayTime, v: Variant = 0): string {
   else if (v === 3) s += castle(110, 650) + star(250, 610) + pebble(320, 760) + shell(190, 790);
   else s += umbrella(0, p.umbrella) + star(150, 700) + shell(320, 740) + pebble(60, 760);
   if (!sideV(v)) s += blanket(p.blanket, p.lines);
+  s += depth(time);
   return s;
 }
 
@@ -364,17 +553,6 @@ const pine2 = (x: number, y: number, k: number, fill: string, snow = '') =>
       rect(-3.5, 76, 7, 10, '#4A3438'),
     { transform: `translate(${x} ${y}) scale(${k})` },
   );
-// Мягкое свечение: круг с радиальным градиентом к прозрачному краю
-let glowN = 0;
-const glow = (x: number, y: number, r: number, color: string, op: number) => {
-  if (op <= 0) return '';
-  const id = `lg${++glowN}`;
-  return (
-    el('defs', {}, el('radialGradient', { id }, el('stop', { offset: 0, 'stop-color': color, 'stop-opacity': (op * 0.7).toFixed(2) }) + el('stop', { offset: 0.45, 'stop-color': color, 'stop-opacity': (op * 0.3).toFixed(2) }) + el('stop', { offset: 1, 'stop-color': color, 'stop-opacity': 0 }))) +
-    circ(x, y, r, `url(#${id})`)
-  );
-};
-
 // ---------- Лес с костром ----------
 const FOREST = {
   day: { sky: ['#7EC8E8', '#BDE6E0', '#F4F2D8'], stars: 0, far: '#8CC3A4', mid: '#5EA581', pine: '#3E8A66', ground: '#86C77E', ground2: '#76B970', path: '#D9C49A', fire: 0.4, blanket: '#FF8FA8', lines: '#FFFFFF' },
@@ -387,7 +565,7 @@ function forest(time: DayTime, v: Variant = 0): string {
   const p = FOREST[time];
   let s = sky(`sky-forest-${time}`, p.sky, [0, 0.36, 0.58]) + stars(p.stars);
   if (time === 'day') s += sun(300, 140, 30, '#FFE38A', '#FFF4C2') + cloud(40, 120, 110, '#FFFFFF', 0.9);
-  if (time === 'evening') s += circ(110, 420, 90, '#FFC29A', { opacity: 0.35 }) + circ(110, 428, 44, '#FF9466');
+  if (time === 'evening') s += dusk(110, 428, 44);
   if (time === 'night') s += moon(300, 120);
   s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   s += hill(470, 60, p.far, 21, 70);
@@ -436,6 +614,7 @@ function forest(time: DayTime, v: Variant = 0): string {
     // грибы растут живыми поверх рисунка — их можно сорвать (Mushrooms.tsx, 0.2.2)
     s += blanket(p.blanket, p.lines);
   }
+  s += depth(time);
   return s;
 }
 
@@ -451,7 +630,7 @@ function snowVillage(time: DayTime, v: Variant = 0): string {
   const p = SNOW[time];
   let s = sky(`sky-snow-${time}`, p.sky, [0, 0.4, 0.62]) + stars(p.stars);
   if (time === 'day') s += sun(80, 150, 28, '#FFF0C0', '#FFFFFF') + cloud(220, 140, 120, '#FFFFFF', 0.85);
-  if (time === 'evening') s += circ(300, 440, 80, '#FFC29A', { opacity: 0.3 }) + circ(300, 446, 36, '#FFB08A');
+  if (time === 'evening') s += dusk(300, 446, 36, '#FFB08A');
   if (time === 'night') s += moon(80, 110);
   s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   s += hill(470, 50, p.hills, sideV(v) ? 8 + v * 5 : 8, 80);
@@ -514,6 +693,7 @@ function snowVillage(time: DayTime, v: Variant = 0): string {
       { transform: 'translate(250 650)' },
     );
   }
+  s += depth(time);
   return s;
 }
 
@@ -607,6 +787,7 @@ function cafe(time: DayTime, v: Variant = 0): string {
   s += line('M-60 560 H450 M-60 630 H450 M-60 710 H450 M-60 800 H450 M40 505 L20 900 M160 505 L150 900 M280 505 L290 900 M390 505 L420 900', p.floor2, 3);
   s += rect(-60, 500, 510, 10, '#3A2A26');
   if (!sideV(v)) s += blanket(p.blanket, p.lines);
+  s += depth(time, false);
   return s;
 }
 
@@ -673,6 +854,7 @@ function moonBase(time: DayTime, v: Variant = 0): string {
       { transform: 'translate(120 524)' },
     );
   }
+  s += depth(time);
   return s;
 }
 const FACE_HEART = 'M0 4.6 C-1.6 3.3 -6.6 0.3 -6.6 -2.6 C-6.6 -5.2 -4.5 -6.7 -2.7 -6.7 C-1.4 -6.7 -0.5 -6 0 -5.1 C0.5 -6 1.4 -6.7 2.7 -6.7 C4.5 -6.7 6.6 -5.2 6.6 -2.6 C6.6 0.3 1.6 3.3 0 4.6 Z';
@@ -689,7 +871,7 @@ function sakura(time: DayTime, v: Variant = 0): string {
   const p = SAKURA[time];
   let s = sky(`sky-sakura-${time}`, p.sky, [0, 0.4, 0.62]) + stars(p.stars);
   if (time === 'day') s += sun(200, 130, 30, '#FFE38A', '#FFF4C2') + cloud(250, 200, 100, '#FFFFFF', 0.9);
-  if (time === 'evening') s += circ(200, 420, 90, '#FFC29A', { opacity: 0.35 }) + circ(200, 428, 44, '#FF9466');
+  if (time === 'evening') s += dusk(200, 428, 44);
   if (time === 'night') s += moon(200, 120);
   s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   s += hill(470, 40, p.far, 41, 100);
@@ -742,6 +924,7 @@ function sakura(time: DayTime, v: Variant = 0): string {
     .map(([x, y]) => el('ellipse', { cx: x, cy: y, rx: 3.4, ry: 2.2, fill: p.bloom2, transform: `rotate(30 ${x} ${y})` }))
     .join('');
   if (!sideV(v)) s += blanket(p.blanket, p.lines);
+  s += depth(time);
   return s;
 }
 
@@ -792,6 +975,7 @@ function rainCity(time: DayTime, v: Variant = 0): string {
   // статичные капли (основной дождь живой — Location.tsx)
   const r2 = seeded(sideV(v) ? 29 + v : 29);
   s += line(Array.from({ length: 40 }, () => { const x = r2() * 390; const y = r2() * 840; return `M${x.toFixed(0)} ${y.toFixed(0)} l-3 10`; }).join(' '), '#DDE6F6', 1.4, { opacity: 0.45 });
+  s += depth(time);
   return s;
 }
 
@@ -806,7 +990,7 @@ function mountains(time: DayTime, v: Variant = 0): string {
   const p = MOUNT[time];
   let s = sky(`sky-mount-${time}`, p.sky, [0, 0.4, 0.62]) + stars(p.stars);
   if (time === 'day') s += sun(310, 120, 30, '#FFE38A', '#FFF4C2');
-  if (time === 'evening') s += circ(300, 400, 90, '#FFC29A', { opacity: 0.35 }) + circ(300, 404, 42, '#FF9466');
+  if (time === 'evening') s += dusk(300, 404, 42);
   if (time === 'night') s += moon(310, 110);
   s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   const peak = (pts: string, cap: string, fill: string) => pth(pts, fill, { stroke: INK, 'stroke-width': 2, 'stroke-linejoin': 'round' }) + pth(cap, p.snow, { stroke: INK, 'stroke-width': 1.6, 'stroke-linejoin': 'round' });
@@ -852,6 +1036,7 @@ function mountains(time: DayTime, v: Variant = 0): string {
     .map(([x, y, c]) => circ(x as number, y as number, 4, c as string, { stroke: INK, 'stroke-width': 1 }) + circ(x as number, y as number, 1.6, '#FFB347'))
     .join('');
   if (!sideV(v)) s += blanket(p.blanket, p.lines);
+  s += depth(time);
   return s;
 }
 
@@ -910,15 +1095,16 @@ function cave(time: DayTime, v: Variant = 0): string {
     );
   s += crystalsOf(v).map(crystal).join('');
   if (!sideV(v)) s += blanket(p.blanket, p.lines) + lantern(1);
+  s += depth(time, false);
   return s;
 }
 
-const BUILDERS: Record<Exclude<LocationId, 'meadow'>, (t: DayTime, v: Variant) => string> = {
-  aurora, roof, beach, forest, snow: snowVillage, cafe, moon: moonBase, sakura, rain: rainCity, mountains, cave,
+const BUILDERS: Record<LocationId, (t: DayTime, v: Variant) => string> = {
+  meadow, aurora, roof, beach, forest, snow: snowVillage, cafe, moon: moonBase, sakura, rain: rainCity, mountains, cave,
 };
 const cache = new Map<string, string>();
 
-function built(id: Exclude<LocationId, 'meadow'>, time: DayTime, v: Variant = 0): string {
+function built(id: LocationId, time: DayTime, v: Variant = 0): string {
   const key = `${id}.${time}.${v}`;
   let s = cache.get(key);
   if (!s) {
@@ -928,12 +1114,12 @@ function built(id: Exclude<LocationId, 'meadow'>, time: DayTime, v: Variant = 0)
   return s;
 }
 
-export function locationSvg(id: Exclude<LocationId, 'meadow'>, time: DayTime): string {
+export function locationSvg(id: LocationId, time: DayTime): string {
   return built(id, time).replace(LAND, '');
 }
 
 // Небо и земля по отдельности. В помещениях (кафе, пещера) неба нет — всё «земля». variant — для плиток комнаты.
-export function locationParts(id: Exclude<LocationId, 'meadow'>, time: DayTime, variant: Variant = 0): { sky: string; land: string } {
+export function locationParts(id: LocationId, time: DayTime, variant: Variant = 0): { sky: string; land: string } {
   const s = built(id, time, variant);
   const at = s.indexOf(LAND);
   return at < 0 ? { sky: '', land: s } : { sky: s.slice(0, at), land: s.slice(at + LAND.length) };
@@ -941,7 +1127,7 @@ export function locationParts(id: Exclude<LocationId, 'meadow'>, time: DayTime, 
 
 // Цвет за сценой (виден на краях при «прыжке» картинки) — низ неба
 export const LOCATION_BG: Record<LocationId, Record<DayTime, string>> = {
-  meadow: { day: '#6FB7F5', evening: '#2F2A6E', night: '#070B24' },
+  meadow: { day: MEADOW.day.sky[0], evening: MEADOW.evening.sky[0], night: MEADOW.night.sky[0] },
   aurora: { day: AURORA.day.sky[0], evening: AURORA.evening.sky[0], night: AURORA.night.sky[0] },
   roof: { day: ROOF.day.sky[0], evening: ROOF.evening.sky[0], night: ROOF.night.sky[0] },
   beach: { day: BEACH.day.sky[0], evening: BEACH.evening.sky[0], night: BEACH.night.sky[0] },

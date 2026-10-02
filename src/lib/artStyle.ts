@@ -138,9 +138,15 @@ function lighter(color: string, t: number): string | null {
   return HEX.test(color) ? mixColor(color, '#FFFFFF', t) : null;
 }
 
-// Где рисуется слой: тело — в полный размер; голова уменьшена (см. body.ts), поэтому её линии тоньше не делаем
-export type Zone = 'body' | 'head';
-const STROKE: Record<Zone, number> = { body: 0.62, head: 0.94 };
+// Где рисуется слой: тело — в полный размер; голова уменьшена (см. body.ts), поэтому её линии тоньше не делаем;
+// 'scene' — рисунок локации: свет строго сверху вниз (без наклона), чтобы плитки комнаты сходились на швах.
+export type Zone = 'body' | 'head' | 'scene';
+const STROKE: Record<Zone, number> = { body: 0.62, head: 0.94, scene: 0.7 };
+const LIGHT: Record<Zone, { hi: number; lo: number; min: number; x1: string; x2: string }> = {
+  body: { hi: 0.2, lo: 0.17, min: 7, x1: '0.12', x2: '0.88' },
+  head: { hi: 0.2, lo: 0.17, min: 7, x1: '0.12', x2: '0.88' },
+  scene: { hi: 0.1, lo: 0.15, min: 12, x1: '0.5', x2: '0.5' },
+};
 // Линии без заливки (шнурки, ниточка шарика): чуть мягче чёрного
 const SOFT_INK = '#473A5C';
 const AREA = new Set(['path', 'rect', 'circle', 'ellipse']);
@@ -161,13 +167,13 @@ export function restyle(nodes: ArtNode[], zone: Zone): ArtNode[] {
   const gradient = (fill: string): string | null => {
     const had = grads.get(fill);
     if (had) return had;
-    const hi = lighter(fill, 0.2);
-    const lo = darker(fill, 0.17);
+    const hi = lighter(fill, LIGHT[zone].hi);
+    const lo = darker(fill, LIGHT[zone].lo);
     if (!hi || !lo) return null;
     const id = `sv${grads.size}`;
     grads.set(fill, id);
     const stop = (offset: string, color: string): ArtNode => ({ tag: 'stop', attrs: { offset, 'stop-color': color }, children: [] });
-    defs.push({ tag: 'lineargradient', attrs: { id, x1: '0.12', y1: '0', x2: '0.88', y2: '1' }, children: [stop('0', hi), stop('0.5', fill), stop('1', lo)] });
+    defs.push({ tag: 'lineargradient', attrs: { id, x1: LIGHT[zone].x1, y1: '0', x2: LIGHT[zone].x2, y2: '1' }, children: [stop('0', hi), stop('0.5', fill), stop('1', lo)] });
     return id;
   };
 
@@ -184,7 +190,7 @@ export function restyle(nodes: ArtNode[], zone: Zone): ArtNode[] {
     }
     if (solid && AREA.has(node.tag) && !(attrs.d && clipped.has(attrs.d)) && parseFloat(attrs.opacity ?? '1') > 0.35) {
       const [w, h] = sizeOf(node);
-      if (w >= 7 && h >= 7) {
+      if (w >= LIGHT[zone].min && h >= LIGHT[zone].min) {
         const id = gradient(fill);
         if (id) attrs.fill = `url(#${id})`;
       }
