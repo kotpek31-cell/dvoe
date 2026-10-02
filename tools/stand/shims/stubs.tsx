@@ -46,3 +46,4 @@ export const createURL = () => '';
 export const useAudioPlayer = () => ({ play: noop, pause: noop, seekTo: noop });
 export const createAudioPlayer = () => ({ play: noop, pause: noop, seekTo: noop, remove: noop });
 export const setAudioModeAsync = ok;
+export const ExecutionEnvironment = { StoreClient: 'storeClient', Standalone: 'standalone', Bare: 'bare' };

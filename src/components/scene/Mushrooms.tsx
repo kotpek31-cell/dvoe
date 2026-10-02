@@ -2,8 +2,8 @@
 // Гриб: ночью светится, сорванный вырастает снова через 2 с, при неверном порядке вянет и встаёт обратно.
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
-import Svg, { Circle, Defs, Ellipse, G, Path, RadialGradient, Stop } from 'react-native-svg';
-import { INK } from '../../lib/face';
+import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
+import { INK, mixColor } from '../../lib/face';
 import { haptic, nativeDriver, useReducedMotion } from '../../lib/motion';
 import { emptyBasket, MUSH_HEX, MUSH_NAME, MUSH_REGROW_MS, useHunt, type MushColor } from '../../lib/mushrooms';
 import { Txt } from '../ui';
@@ -13,23 +13,31 @@ export function MushroomArt({ color, size, glow = 0 }: { color: MushColor; size:
   const hex = MUSH_HEX[color];
   const white = color === 'white';
   const gid = `mg${color}`;
+  // Стиль 3.0: контур — тёмный оттенок шляпки, объём — градиентом
+  const edge = mixColor(hex, INK, white ? 0.38 : 0.5);
   return (
     <Svg width={size} height={(size * 46) / 44} viewBox="-22 -40 44 46">
-      {glow > 0 ? (
-        <>
-          <Defs>
-            <RadialGradient id={gid} cx="0" cy="-14" r="22" gradientUnits="userSpaceOnUse">
-              <Stop offset="0" stopColor={hex} stopOpacity={glow} />
-              <Stop offset="1" stopColor={hex} stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          <Circle cx={0} cy={-14} r={22} fill={`url(#${gid})`} />
-        </>
-      ) : null}
+      <Defs>
+        <RadialGradient id={gid} cx="0" cy="-14" r="22" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor={hex} stopOpacity={glow} />
+          <Stop offset="1" stopColor={hex} stopOpacity={0} />
+        </RadialGradient>
+        <LinearGradient id={`${gid}c`} x1="-12" y1="-30" x2="10" y2="-10" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor={mixColor(hex, '#FFFFFF', 0.3)} />
+          <Stop offset="0.55" stopColor={hex} />
+          <Stop offset="1" stopColor={mixColor(hex, INK, 0.26)} />
+        </LinearGradient>
+        <LinearGradient id={`${gid}s`} x1="-6" y1="0" x2="6" y2="0" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#FFFBF2" />
+          <Stop offset="1" stopColor="#E6D4BA" />
+        </LinearGradient>
+      </Defs>
+      {glow > 0 ? <Circle cx={0} cy={-14} r={22} fill={`url(#${gid})`} /> : null}
       <Ellipse cx={0} cy={2} rx={12} ry={3.4} fill="#000000" opacity={0.22} />
-      <Path d="M-5 2 C-6 -6 -5 -12 -4 -15 L4 -15 C5 -12 6 -6 5 2 Z" fill="#FFF6E6" stroke={INK} strokeWidth={1.8} strokeLinejoin="round" />
+      <Path d="M-5 2 C-6 -6 -5 -12 -4 -15 L4 -15 C5 -12 6 -6 5 2 Z" fill={`url(#${gid}s)`} stroke="#A08A70" strokeWidth={1} strokeLinejoin="round" />
+      <Path d="M-4.4 -11 C-1.5 -9.6 1.5 -9.6 4.4 -11" stroke="#C7B193" strokeWidth={1.1} fill="none" strokeLinecap="round" />
       <G>
-        <Path d="M-17 -13 C-17 -32 17 -32 17 -13 C10 -10 -10 -10 -17 -13 Z" fill={hex} stroke={INK} strokeWidth={1.8} strokeLinejoin="round" />
+        <Path d="M-17 -13 C-17 -32 17 -32 17 -13 C10 -10 -10 -10 -17 -13 Z" fill={`url(#${gid}c)`} stroke={edge} strokeWidth={1.1} strokeLinejoin="round" />
         {white ? (
           <>
             <Circle cx={-6} cy={-20} r={2.4} fill="#D9D4E8" />
@@ -42,7 +50,7 @@ export function MushroomArt({ color, size, glow = 0 }: { color: MushColor; size:
             <Circle cx={9} cy={-16} r={1.6} fill="#FFFFFF" opacity={0.95} />
           </>
         )}
-        <Path d="M-11 -20 C-9 -25 -5 -27 -1 -28" fill="none" stroke="#FFFFFF" strokeWidth={1.6} strokeLinecap="round" opacity={0.35} />
+        <Path d="M-11 -20 C-9 -25 -5 -27 -1 -28" fill="none" stroke="#FFFFFF" strokeWidth={1.6} strokeLinecap="round" opacity={0.4} />
       </G>
     </Svg>
   );
@@ -190,9 +198,15 @@ export function Basket({ top, width }: { top: number; width: number }) {
         style={styles.basket}
       >
         <Svg width={34} height={30} viewBox="0 0 34 30" style={styles.handle}>
-          <Path d="M5 22 C5 8 27 6 29 20" fill="none" stroke="#C98A4B" strokeWidth={3} strokeLinecap="round" />
-          <Path d="M2 18 H32 L28 29 H6 Z" fill="#C98A4B" stroke={INK} strokeWidth={1.6} strokeLinejoin="round" />
-          <Path d="M6 23 H28" stroke="#8E5A30" strokeWidth={1.4} />
+          <Defs>
+            <LinearGradient id="mbsk" x1="0" y1="18" x2="0" y2="29" gradientUnits="userSpaceOnUse">
+              <Stop offset="0" stopColor="#DDA263" />
+              <Stop offset="1" stopColor="#A86A38" />
+            </LinearGradient>
+          </Defs>
+          <Path d="M5 22 C5 8 27 6 29 20" fill="none" stroke="#B87A42" strokeWidth={3} strokeLinecap="round" />
+          <Path d="M2 18 H32 L28 29 H6 Z" fill="url(#mbsk)" stroke="#6E4322" strokeWidth={1} strokeLinejoin="round" />
+          <Path d="M6 23 H28 M11 18.5 L10 28.5 M17 18.5 V28.5 M23 18.5 L24 28.5" stroke="#8E5A30" strokeWidth={1.1} opacity={0.8} />
         </Svg>
         {[0, 1, 2, 3, 4].map((i) => {
           const c = basket[i];
