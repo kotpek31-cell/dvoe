@@ -1,7 +1,7 @@
 // Стенд: упрощённая замена react-native для запуска компонентов в браузере без сборки Expo.
 // Только то, что нужно для картинки и анимаций: View/Text/Pressable, StyleSheet, Animated, Easing.
 // Это НЕ часть приложения — в сборку не попадает (см. tools/stand/README.md).
-import React, { createElement, forwardRef, useEffect, useRef, useState } from 'react';
+import { createElement, forwardRef, useEffect, useRef, useState, type MouseEvent, type MutableRefObject, type ReactNode } from 'react';
 
 type AnyStyle = Record<string, unknown>;
 
@@ -156,7 +156,7 @@ function bezier(x1: number, y1: number, x2: number, y2: number) {
 }
 export const Easing = E;
 
-function timing(value: Value, cfg: { toValue: number | Node; duration?: number; easing?: (t: number) => number; delay?: number }): Anim {
+function timing(value: Value, cfg: { toValue: number | Node; duration?: number; easing?: (t: number) => number; delay?: number; useNativeDriver?: boolean; isInteraction?: boolean }): Anim {
   let entry: { tick: (now: number) => boolean } | null = null;
   let done: EndCb | undefined;
   let initial: number | null = null;
@@ -206,7 +206,7 @@ function timing(value: Value, cfg: { toValue: number | Node; duration?: number; 
   };
 }
 
-function spring(value: Value, cfg: { toValue: number; speed?: number; bounciness?: number; friction?: number; tension?: number; damping?: number; stiffness?: number; mass?: number }): Anim {
+function spring(value: Value, cfg: { toValue: number; speed?: number; bounciness?: number; friction?: number; tension?: number; damping?: number; stiffness?: number; mass?: number; useNativeDriver?: boolean; overshootClamping?: boolean }): Anim {
   let entry: { tick: (now: number) => boolean } | null = null;
   let done: EndCb | undefined;
   let initial: number | null = null;
@@ -426,7 +426,8 @@ const BASE: Record<string, string | number> = {
 };
 const TEXT_BASE: Record<string, string | number> = { ...BASE, display: 'inline', whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#000', fontSize: '14px', fontFamily: 'system-ui, sans-serif' };
 
-type Props = Record<string, unknown> & { style?: unknown; children?: React.ReactNode; pointerEvents?: string };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Props = Record<string, any> & { style?: unknown; children?: ReactNode; pointerEvents?: string };
 
 function domProps(p: Props, base: Record<string, string | number>) {
   const flat = flatten(typeof p.style === 'function' ? (p.style as (s: { pressed: boolean }) => unknown)({ pressed: false }) : p.style);
@@ -463,10 +464,10 @@ function make(tag: string, base: Record<string, string | number>, animated: bool
         dirty.delete(apply);
       };
     }, [live]);
-    const on = p.onPress || p.onLongPress ? { onClick: (e: React.MouseEvent) => (p.onPress as ((e: unknown) => void) | undefined)?.({ nativeEvent: { pageX: e.pageX, pageY: e.pageY, locationX: e.nativeEvent.offsetX, locationY: e.nativeEvent.offsetY } }) } : {};
+    const on = p.onPress || p.onLongPress ? { onClick: (e: MouseEvent) => (p.onPress as ((e: unknown) => void) | undefined)?.({ nativeEvent: { pageX: e.pageX, pageY: e.pageY, locationX: e.nativeEvent.offsetX, locationY: e.nativeEvent.offsetY } }) } : {};
     if (p.onPress || p.onLongPress) (out.style as Record<string, unknown>).cursor = 'pointer';
     const children = tag === 'span' && p.numberOfLines === 1 ? p.children : p.children;
-    return createElement(tag, { ...out, ...on, ref: (n: HTMLElement | null) => { el.current = n; if (typeof ref === 'function') ref(n); else if (ref) (ref as React.MutableRefObject<HTMLElement | null>).current = n; } }, children as React.ReactNode);
+    return createElement(tag, { ...out, ...on, ref: (n: HTMLElement | null) => { el.current = n; if (typeof ref === 'function') ref(n); else if (ref) (ref as MutableRefObject<HTMLElement | null>).current = n; } }, children as ReactNode);
   });
 }
 
@@ -479,11 +480,11 @@ export const SafeAreaView = View;
 export const KeyboardAvoidingView = View;
 export const Image = (p: Props & { source?: { uri?: string } | number }) => createElement('img', { src: typeof p.source === 'object' ? p.source?.uri : undefined, style: { ...toCss(flatten(p.style)) } });
 export const TextInput = (p: Props) => createElement('input', { style: { ...toCss(flatten(p.style)) }, defaultValue: p.value as string });
-export const ActivityIndicator = () => createElement('span', null, '…');
+export const ActivityIndicator = (_p: Props) => createElement('span', null, '…');
 export const Modal = (p: Props & { visible?: boolean }) => (p.visible ? createElement('div', { style: { position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', flexDirection: 'column' } }, p.children) : null);
-export const Switch = () => null;
-export const RefreshControl = () => null;
-export const FlatList = (p: Props & { data?: unknown[]; renderItem?: (x: { item: unknown; index: number }) => React.ReactNode }) => createElement('div', null, (p.data ?? []).map((item, index) => p.renderItem?.({ item, index })));
+export const Switch = (_p: Props) => null;
+export const RefreshControl = (_p: Props) => null;
+export const FlatList = (p: Props & { data?: unknown[]; renderItem?: (x: { item: unknown; index: number }) => ReactNode }) => createElement('div', null, (p.data ?? []).map((item, index) => p.renderItem?.({ item, index })));
 
 const abs = { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 } as const;
 export const StyleSheet = {
@@ -520,7 +521,7 @@ export const Animated = {
   divide: (a: Node | number, b: Node | number) => new Op(a, b, (x, y) => x / y),
   modulo: (a: Node, m: number) => new Op(a, m, (x, y) => ((x % y) + y) % y),
   diffClamp: (a: Node, lo: number, hi: number) => new Op(a, 0, (x) => Math.min(hi, Math.max(lo, x))),
-  event: () => () => undefined,
+  event: (..._a: unknown[]) => () => undefined,
 };
 // типы, которыми пользуется приложение
 // eslint-disable-next-line @typescript-eslint/no-namespace, @typescript-eslint/no-redeclare
@@ -533,7 +534,7 @@ export declare namespace Animated {
 
 export const Platform = { OS: 'web' as string, select: <T,>(o: { web?: T; default?: T; android?: T; ios?: T }) => o.web ?? o.default, Version: 0 };
 const win = () => ({ width: typeof window === 'undefined' ? 390 : window.innerWidth, height: typeof window === 'undefined' ? 844 : window.innerHeight, scale: 2, fontScale: 1 });
-export const Dimensions = { get: () => win(), addEventListener: () => ({ remove() {} }) };
+export const Dimensions = { get: (_w?: string) => win(), addEventListener: (..._a: unknown[]) => ({ remove() {} }) };
 export function useWindowDimensions() {
   const [d, setD] = useState(win);
   useEffect(() => {
@@ -547,20 +548,39 @@ const reduced = () => typeof window !== 'undefined' && /[?&]reduce=1/.test(windo
 export const AccessibilityInfo = {
   isReduceMotionEnabled: () => Promise.resolve(reduced()),
   isScreenReaderEnabled: () => Promise.resolve(false),
-  addEventListener: () => ({ remove() {} }),
-  announceForAccessibility: () => undefined,
+  addEventListener: (..._a: unknown[]) => ({ remove() {} }),
+  announceForAccessibility: (..._a: unknown[]) => undefined,
 };
 export const PixelRatio = { get: () => 2, roundToNearestPixel: (n: number) => Math.round(n * 2) / 2, getFontScale: () => 1 };
-export const Share = { share: () => Promise.resolve({ action: 'dismissed' }) };
-export const Linking = { openURL: () => Promise.resolve(), canOpenURL: () => Promise.resolve(true), addEventListener: () => ({ remove() {} }), getInitialURL: () => Promise.resolve(null) };
-export const Alert = { alert: () => undefined };
-export const Keyboard = { dismiss: () => undefined, addListener: () => ({ remove() {} }) };
-export const AppState = { currentState: 'active', addEventListener: () => ({ remove() {} }) };
-export const Vibration = { vibrate: () => undefined };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type Fn = (...args: any[]) => any;
+export const Share: { share: Fn } = { share: () => Promise.resolve({ action: 'dismissed' }) };
+export const Linking: Record<string, Fn> = { openURL: () => Promise.resolve(), canOpenURL: () => Promise.resolve(true), addEventListener: () => ({ remove() {} }), getInitialURL: () => Promise.resolve(null) };
+export const Alert: Record<string, Fn> = { alert: () => undefined };
+export const Keyboard: Record<string, Fn> = { dismiss: () => undefined, addListener: () => ({ remove() {} }) };
+export const AppState: { currentState: string; addEventListener: Fn } = { currentState: 'active', addEventListener: () => ({ remove() {} }) };
+export const Vibration: Record<string, Fn> = { vibrate: () => undefined };
 export const I18nManager = { isRTL: false };
 export const LayoutAnimation = { configureNext: () => undefined, Presets: {} };
-export const PanResponder = { create: () => ({ panHandlers: {} }) };
+export const PanResponder: Record<string, Fn> = { create: () => ({ panHandlers: {} }) };
 export const NativeModules = {};
 export const useColorScheme = () => 'dark';
 export const Appearance = { getColorScheme: () => 'dark', addChangeListener: () => ({ remove() {} }) };
 export default { View, Text, StyleSheet, Animated, Easing, Platform };
+
+// типы, которые приложение берёт из react-native (на стенде — без подробностей)
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export type ViewStyle = Record<string, any>;
+export type TextStyle = Record<string, any>;
+export type ImageStyle = Record<string, any>;
+export type StyleProp<T> = T | any;
+export type ViewProps = Record<string, any>;
+export type TextProps = Record<string, any>;
+export type PressableProps = Record<string, any>;
+export type LayoutChangeEvent = any;
+export type GestureResponderEvent = any;
+export type PanResponderGestureState = any;
+export type NativeSyntheticEvent<T> = { nativeEvent: T };
+export type AppStateStatus = string;
+export type ColorValue = string;
+export type DimensionValue = number | string;

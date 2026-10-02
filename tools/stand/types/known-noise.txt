@@ -1,0 +1,36 @@
+app/_layout.tsx: error TS2694: Namespace '"expo-notifications"' has no exported member 'NotificationResponse'.
+app/wardrobe.tsx: error TS2347: Untyped function calls may not accept type arguments.
+modules/screen-sleep/index.ts: error TS2307: Cannot find module 'expo' or its corresponding type declarations.
+src/components/EmotionSlider.tsx: error TS2749: 'View' refers to a value, but is being used as a type here. Did you mean 'typeof View'?
+src/components/Joystick.tsx: error TS2339: Property 'getTranslateTransform' does not exist on type 'ValueXY'.
+src/components/Joystick.tsx: error TS2339: Property 'setValue' does not exist on type 'ValueXY'.
+src/components/Joystick.tsx: error TS2339: Property 'stopAnimation' does not exist on type 'ValueXY'.
+src/components/Joystick.tsx: error TS2345: Argument of type 'ValueXY' is not assignable to parameter of type 'Value'.
+src/components/Joystick.tsx: error TS2554: Expected 0 arguments, but got 1.
+src/components/TabBar.tsx: error TS2307: Cannot find module 'expo-router/js-tabs' or its corresponding type declarations.
+src/components/WhatsNew.tsx: error TS2614: Module '"react-native"' has no exported member 'NativeScrollEvent'. Did you mean to use 'import NativeScrollEvent from "react-native"' instead?
+src/components/WhatsNew.tsx: error TS2749: 'ScrollView' refers to a value, but is being used as a type here. Did you mean 'typeof ScrollView'?
+src/components/room/RoomActor.tsx: error TS2724: '"/home/claude/dvoe/tools/stand/shims/react-native".Animated' has no exported member named 'AnimatedDivision'. Did you mean 'AnimatedAddition'?
+src/components/ui.tsx: error TS2503: Cannot find namespace 'React'.
+src/components/ui.tsx: error TS2503: Cannot find namespace 'React'.
+src/components/ui.tsx: error TS2503: Cannot find namespace 'React'.
+src/components/ui.tsx: error TS2503: Cannot find namespace 'React'.
+src/components/ui.tsx: error TS2503: Cannot find namespace 'React'.
+src/components/ui.tsx: error TS2503: Cannot find namespace 'React'.
+src/components/ui.tsx: error TS2503: Cannot find namespace 'React'.
+src/components/ui.tsx: error TS2503: Cannot find namespace 'React'.
+src/components/ui.tsx: error TS2614: Module '"react-native"' has no exported member 'TextInputProps'. Did you mean to use 'import TextInputProps from "react-native"' instead?
+src/context/AbilityProvider.tsx: error TS2503: Cannot find namespace 'React'.
+src/context/AuthProvider.tsx: error TS2503: Cannot find namespace 'React'.
+src/context/AuthProvider.tsx: error TS2709: Cannot use namespace 'Session' as a type.
+src/context/AuthProvider.tsx: error TS2709: Cannot use namespace 'Session' as a type.
+src/context/PairProvider.tsx: error TS2503: Cannot find namespace 'React'.
+src/lib/hooks.ts: error TS2614: Module '"react"' has no exported member 'DependencyList'. Did you mean to use 'import DependencyList from "react"' instead?
+src/lib/roomLink.ts: error TS18046: 'metas' is of type 'unknown'.
+src/lib/roomLink.ts: error TS18046: 'metas' is of type 'unknown'.
+src/lib/roomLink.ts: error TS2347: Untyped function calls may not accept type arguments.
+src/lib/roomLink.ts: error TS2709: Cannot use namespace 'RealtimeChannel' as a type.
+src/lib/roomLink.ts: error TS2709: Cannot use namespace 'RealtimeChannel' as a type.
+src/lib/sound.ts: error TS2709: Cannot use namespace 'AudioPlayer' as a type.
+src/lib/sound.ts: error TS2709: Cannot use namespace 'AudioPlayer' as a type.
+src/lib/sound.ts: error TS2709: Cannot use namespace 'AudioPlayer' as a type.
