@@ -127,6 +127,24 @@ const blanket = (fill: string, lines: string) =>
   line('M250 624 L240 698 M288 622 L284 696 M326 620 L330 693 M209 650 L366 641 M204 675 L372 666', lines, 6, { opacity: 0.5, 'stroke-linecap': 'butt' }) +
   pth(BLANKET, 'none', { stroke: lines, 'stroke-width': 2.2, 'stroke-linejoin': 'round', opacity: 0.55 }) +
   pth('M360 618 L378 690 L370 690.5 L353 618.5 Z', '#FFFFFF', { opacity: 0.16 });
+// Овальное свечение на земле или воде (пятно света, отражение)
+const pool = (x: number, y: number, rx: number, ry: number, color: string, op: number) =>
+  op > 0 ? g(glow(0, 0, 100, color, op), { transform: `translate(${x} ${y}) scale(${(rx / 100).toFixed(3)} ${(ry / 100).toFixed(3)})` }) : '';
+// Дымок из трубы: три тающих клуба
+const smoke = (x: number, y: number, op: number) =>
+  circ(x, y, 5, '#FFFFFF', { opacity: +(0.5 * op).toFixed(2) }) + circ(x + 6, y - 13, 7, '#FFFFFF', { opacity: +(0.34 * op).toFixed(2) }) + circ(x + 15, y - 29, 9.5, '#FFFFFF', { opacity: +(0.2 * op).toFixed(2) });
+// Следы на снегу или песке от (x0, y0) к (x1, y1)
+const steps = (x0: number, y0: number, x1: number, y1: number, n: number, color: string, op: number) =>
+  g(
+    Array.from({ length: n }, (_, i) => {
+      const t = i / (n - 1);
+      const x = x0 + (x1 - x0) * t + (i % 2 ? 4 : -4);
+      const y = y0 + (y1 - y0) * t + Math.sin(t * 3.14) * 10;
+      return el('ellipse', { cx: +x.toFixed(1), cy: +y.toFixed(1), rx: 3, ry: 1.8, fill: color });
+    }).join(''),
+    { opacity: op },
+  );
+
 // Глубина: дымка у горизонта и затемнение к низу экрана. Одинаковы по всей ширине — плитки комнаты сходятся.
 const depth = (time: DayTime, haze = true) => {
   const n = ++glowN;
@@ -308,7 +326,10 @@ function aurora(time: DayTime, v: Variant = 0): string {
   if (time === 'day') s += sun(92, 362, 30, '#FFE7B0', '#FFF6DE') + cloud(210, 120, 110, '#FFFFFF', 0.85) + cloud(40, 210, 80, '#FFFFFF', 0.7);
   if (time === 'evening') s += dusk(300, 436, 34, '#FFB08A');
   if (time === 'night') s += circ(320, 92, 14, '#F6F1D8', { opacity: 0.9 });
+  if (time === 'night') s += glow(120, 250, 190, '#5EF2C0', 0.22) + glow(300, 190, 170, '#8FA2FF', 0.2);
   s += LAND; // дальше — земля (в комнате тянется по всей площадке)
+  // дальняя гряда в дымке
+  s += pth('M-60 420 L20 346 L96 388 L176 316 L250 376 L330 328 L390 372 L450 340 L450 520 L-60 520 Z', p.front, { opacity: 0.45 });
   if (!sideV(v)) {
     s += pth('M-60 430 L30 356 L80 392 L150 330 L230 400 L290 352 L360 404 L450 360 L450 520 L-60 520 Z', p.back);
     s += pth('M30 356 L48 371 L40 372 L30 366 L20 373 Z M150 330 L172 349 L160 352 L150 344 L138 352 L128 350 Z M290 352 L308 367 L298 369 L290 362 L280 368 Z', '#F2F5FF', { opacity: 0.9 });
@@ -362,8 +383,17 @@ function aurora(time: DayTime, v: Variant = 0): string {
         line('M80 484 V500 M72 492 H88 M112 484 V500 M104 492 H120', INK, 1.2) +
         rect(118, 440, 8, 18, '#5A4050', { stroke: INK, 'stroke-width': 1.6 }),
     );
+    s += smoke(122, 432, time === 'day' ? 1 : 0.7);
   }
   s += pth('M-60 520 C60 506 160 504 260 512 C330 517 380 512 450 506 L450 900 L-60 900 Z', p.snow);
+  // замёрзшее озерцо: лёд с бликами, ночью в нём отсвет сияния
+  s += el('ellipse', { cx: 230, cy: 560, rx: 118, ry: 15, fill: time === 'day' ? '#CFE6FA' : time === 'evening' ? '#B9A6D8' : '#5E74B8' });
+  s += line('M150 556 h34 M214 564 h46 M286 556 h28 M178 566 h18', '#FFFFFF', 2, { opacity: time === 'night' ? 0.3 : 0.7 });
+  if (time === 'night') s += pool(206, 560, 70, 9, '#5EF2C0', 0.6) + pool(276, 562, 50, 7, '#8FA2FF', 0.5);
+  if (!sideV(v)) {
+    s += pool(96, 530, 62, 13, '#FFC266', p.winGlow * 2.2);
+    s += steps(140, 526, 226, 606, 9, time === 'day' ? '#8FA6D8' : '#2E3A6E', 0.3);
+  }
   s += pth('M-60 610 C100 592 260 596 450 612 L450 900 L-60 900 Z', p.snow2);
   if (!sideV(v)) s += blanket(p.blanket, p.lines) + lantern(p.lantern);
   s += pth('M-60 748 C90 736 220 738 450 752 L450 900 L-60 900 Z', p.near);
@@ -427,6 +457,10 @@ function roof(time: DayTime, v: Variant = 0): string {
     for (let wy = y + 12; wy < 500; wy += 18) for (let wx = x + 8; wx < x + w - 8; wx += 14) if (r() < p.winChance + 0.05) win2 += rect(wx, wy, 6, 8, p.nearWin);
   });
   s += near + g(win2, { opacity: p.nearWinOp });
+  // зарево города над крышами и неоновое сердечко на доме
+  if (time !== 'day') s += pool(195, 470, 300, 90, time === 'evening' ? '#FFB48C' : '#7F8CFF', time === 'evening' ? 0.5 : 0.4);
+  if (time !== 'day' && !sideV(v))
+    s += glow(142, 392, 26, '#FF6B8A', 0.9) + g(pth(FACE_HEART, 'none', { stroke: '#FF9EBB', 'stroke-width': 1.5, 'stroke-linejoin': 'round' }) + pth(FACE_HEART, 'none', { stroke: '#FFFFFF', 'stroke-width': 0.5, opacity: 0.8 }), { transform: 'translate(142 393) scale(1.7)' });
   s += rect(-60, 506, 510, 400, p.roof);
   s += line('M-60 560 H450 M-60 620 H450 M-60 690 H450 M-60 770 H450', p.roofLine, 2);
   s += rect(-60, 500, 510, 14, p.edge, { stroke: INK, 'stroke-width': 2 });
@@ -445,12 +479,26 @@ function roof(time: DayTime, v: Variant = 0): string {
   if (v === 2) s += antenna(196) + vent(84);
   else if (v === 3) s += vent(250) + antenna(120);
   else s += antenna(44) + tank(292);
+  // кот на краю крыши смотрит на город
+  if (!sideV(v)) {
+    const cat = time === 'day' ? '#4A4258' : '#221B32';
+    s += g(
+      pth('M14 0 C26 -2 30 -14 24 -22 C22 -25 25 -27 27 -24', 'none', { stroke: cat, 'stroke-width': 4, 'stroke-linecap': 'round' }) +
+        pth('M-11 0 C-13 -16 -8 -26 0 -26 C9 -26 14 -16 12 0 Z', cat) +
+        circ(0, -31, 8.6, cat) +
+        pth('M-8 -35 L-7 -44 L-1 -38 Z M8 -35 L7 -44 L1 -38 Z', cat) +
+        (time === 'day' ? '' : circ(-3, -32, 1.3, '#FFE38A') + circ(3, -32, 1.3, '#FFE38A')),
+      { transform: 'translate(168 500)' },
+    );
+  }
   // гирлянда: провод и лампочки (светятся вечером и ночью — свечение в Location.tsx); в комнате — над всей крышей
   s += line('M-10 430 C80 470 200 474 400 430', INK, 1.4);
   s += GARLAND.map((b) => circ(b.x, b.y, 4, p.bulbs ? b.color : '#D9D4E8', { stroke: INK, 'stroke-width': 1.2 })).join('');
   const pot = (x: number) =>
     rect(x, 560, 26, 22, '#C97C5D', { stroke: INK, 'stroke-width': 1.8, rx: 3 }) + circ(x + 13, 552, 15, '#5CBB78', { stroke: INK, 'stroke-width': 1.8 }) + circ(x + 6, 548, 7, '#7FD8A0');
   s += pick(v, pot(16) + pot(350), pot(30) + pot(334), pot(150) + pot(292), pot(60) + pot(196));
+  // отсветы гирлянды на крыше
+  if (p.bulbs) s += GARLAND.filter((_, i) => i % 2 === 0).map((b) => pool(b.x, 524, 30, 9, b.color, 0.5)).join('');
   if (!sideV(v)) s += blanket(p.blanket, p.lines);
   s += depth(time);
   return s;
@@ -483,7 +531,19 @@ function beach(time: DayTime, v: Variant = 0): string {
   s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   s += pth('M-60 420 H450 V540 H-60 Z', p.sea);
   s += pth('M-60 420 H450 V436 H-60 Z', p.seaFar);
-  if (time === 'evening' && !sideV(v)) s += pth('M150 436 H230 L250 530 H130 Z', '#FFB48C', { opacity: 0.35 });
+  s += pth('M-60 436 H450 V446 H-60 Z', '#FFFFFF', { opacity: time === 'night' ? 0.06 : 0.16 });
+  // дорожка света на воде: от солнца, заката или луны
+  if (!sideV(v)) {
+    const cx = time === 'evening' ? 190 : 92;
+    s += pool(cx, 470, time === 'evening' ? 60 : 40, 56, time === 'day' ? '#FFFFFF' : time === 'evening' ? '#FFC29A' : '#F6F1D8', time === 'day' ? 0.5 : 0.8);
+    s += line(`M${cx - 16} 444 h32 M${cx - 26} 458 h52 M${cx - 18} 474 h36 M${cx - 30} 492 h60 M${cx - 20} 510 h40`, time === 'day' ? '#FFFFFF' : time === 'evening' ? '#FFE2C2' : '#F6F1D8', 2.2, { opacity: 0.6 });
+    // парусник у горизонта (ночью — огонёк)
+    s += g(
+      pth('M-13 0 H13 L9 6 H-9 Z', time === 'night' ? '#16224E' : '#8A5A44') + pth('M0 -2 V-24 L12 -2 Z', '#FFFFFF', { opacity: time === 'night' ? 0.35 : 0.95 }) + pth('M-2 -2 V-18 L-10 -2 Z', '#FFE3EA', { opacity: time === 'night' ? 0.3 : 0.9 }) +
+        (time === 'night' ? glow(0, -4, 9, '#FFE38A', 1) : ''),
+      { transform: 'translate(248 430) scale(0.8)' },
+    );
+  }
   s += line(
     sideV(v)
       ? 'M30 462 q10 -6 20 0 q10 6 20 0 M150 452 q10 -6 20 0 q10 6 20 0 M270 470 q10 -6 20 0 q10 6 20 0 M90 506 q10 -6 20 0 q10 6 20 0 M230 496 q10 -6 20 0 q10 6 20 0 M340 512 q10 -6 20 0'
@@ -510,7 +570,23 @@ function beach(time: DayTime, v: Variant = 0): string {
     s += rocks.map(([x, y, r]) => pth(`M${x - r} ${y + 6} C${x - r} ${y - r * 0.7} ${x + r} ${y - r * 0.8} ${x + r} ${y + 6} Z`, p.rock, { stroke: INK, 'stroke-width': 1.8 })).join('');
   }
   s += pth('M-60 530 C60 518 180 520 260 526 C330 531 380 528 450 522 L450 900 L-60 900 Z', p.sand);
+  // пена прибоя и мокрый песок
+  s += pth('M-60 530 C60 518 180 520 260 526 C330 531 380 528 450 522 L450 529 C380 535 330 538 260 533 C180 527 60 525 -60 537 Z', p.foam, { opacity: 0.75 });
   s += pth('M-60 546 C80 536 200 538 450 544 L450 900 L-60 900 Z', p.sand2);
+  s += pth('M-60 538 C60 527 180 529 260 535 C330 540 380 537 450 531 L450 548 C330 552 200 546 80 546 C40 546 0 548 -60 552 Z', p.sea, { opacity: 0.16 });
+  // пальма у края (в комнате — на боковых плитках её нет)
+  if (!sideV(v)) {
+    const leaf = time === 'day' ? '#4FAF72' : time === 'evening' ? '#3E6E66' : '#1E3E4A';
+    s += g(
+      pth('M-6 150 C-12 100 -6 50 12 0 L20 3 C6 52 2 102 8 150 Z', time === 'night' ? '#3A3046' : '#9C6B4E') +
+        line('M-4 126 h9 M-5 102 h9 M-4 78 h9 M0 54 h9 M5 30 h9', INK, 1.4, { opacity: 0.25 }) +
+        ['M16 2 C40 -22 74 -16 92 8 C68 -2 42 0 16 2 Z', 'M16 2 C30 -30 62 -44 88 -34 C62 -30 36 -16 16 2 Z', 'M16 2 C10 -30 -18 -46 -44 -38 C-22 -30 0 -16 16 2 Z', 'M16 2 C-8 -18 -40 -14 -56 8 C-34 0 -8 0 16 2 Z', 'M16 2 C22 -26 12 -52 -8 -64 C2 -42 8 -22 16 2 Z']
+          .map((d) => pth(d, leaf))
+          .join('') +
+        circ(12, 8, 5, '#8A5A44') + circ(21, 9, 4.4, '#7A4E3C'),
+      { transform: v === 1 ? 'translate(26 404)' : 'translate(8 404)' },
+    );
+  }
   const umbrella = (x: number, color: string) =>
     g(
       line('M64 640 L84 520', INK, 3) +
@@ -533,7 +609,18 @@ function beach(time: DayTime, v: Variant = 0): string {
     );
   if (v === 2) s += umbrella(150, time === 'day' ? '#7CC8FF' : p.umbrella) + ball(90, 640) + shell(300, 720) + star(60, 780);
   else if (v === 3) s += castle(110, 650) + star(250, 610) + pebble(320, 760) + shell(190, 790);
-  else s += umbrella(0, p.umbrella) + star(150, 700) + shell(320, 740) + pebble(60, 760);
+  else {
+    s += umbrella(0, p.umbrella) + star(150, 700) + shell(320, 740) + pebble(60, 760);
+    // крабик и цепочка следов к воде
+    s += steps(300, 600, 250, 548, 6, INK, 0.14);
+    s += g(
+      line('M-9 -2 L-16 -8 M9 -2 L16 -8 M-8 4 L-14 8 M8 4 L14 8 M-9 1 L-16 1 M9 1 L16 1', '#C2453A', 2) +
+        el('ellipse', { cx: 0, cy: 0, rx: 10, ry: 6.6, fill: '#F0624E', stroke: INK, 'stroke-width': 1.3 }) +
+        circ(-18, -11, 3.6, '#F0624E', { stroke: INK, 'stroke-width': 1.1 }) + circ(18, -11, 3.6, '#F0624E', { stroke: INK, 'stroke-width': 1.1 }) +
+        line('M-3.4 -6 V-10 M3.4 -6 V-10', INK, 1.3) + circ(-3.4, -11, 1.7, '#FFFFFF') + circ(3.4, -11, 1.7, '#FFFFFF') + circ(-3.4, -11, 0.8, INK) + circ(3.4, -11, 0.8, INK),
+      { transform: 'translate(112 742)', opacity: time === 'night' ? 0.75 : 1 },
+    );
+  }
   if (!sideV(v)) s += blanket(p.blanket, p.lines);
   s += depth(time);
   return s;
@@ -575,7 +662,12 @@ function forest(time: DayTime, v: Variant = 0): string {
     const r = seeded(31 + v);
     for (let i = 0; i < 8; i++) s += pine2(28 + i * 48 + (r() - 0.5) * 10, 376 + r() * 40, 0.78 + r() * 0.24, p.mid);
   }
+  // туман между дальними елями и поляной, лучи солнца сквозь лес
+  s += pool(195, 478, 300, 30, time === 'night' ? '#8FA2D8' : '#FFFFFF', time === 'day' ? 0.5 : 0.3);
+  if (time === 'day') s += pth('M300 140 L40 520 L120 520 Z M300 140 L170 520 L226 520 Z M300 140 L262 520 L300 520 Z', '#FFF6D6', { opacity: 0.1 });
   s += hill(520, 16, p.ground, 4, 90);
+  // ночью из чащи кто-то смотрит
+  if (time === 'night') s += [[62, 470], [318, 486]].map(([x, y]) => circ(x, y, 1.8, '#FFE38A') + circ(x + 8, y, 1.8, '#FFE38A') + glow(x + 4, y, 9, '#FFE38A', 0.5)).join('');
   if (!sideV(v)) s += pth('M150 900 C170 760 200 640 230 560 C236 540 250 528 270 522 L300 522 C276 540 262 580 258 640 C252 720 262 820 280 900 Z', p.path, { opacity: 0.8 });
   s += pick(
     v,
@@ -585,6 +677,13 @@ function forest(time: DayTime, v: Variant = 0): string {
     pine2(64, 384, 1.3, p.pine) + pine2(188, 356, 1.7, p.pine) + pine2(300, 404, 1.2, p.pine),
   );
   s += pth('M-60 600 C80 590 220 594 450 604 L450 900 L-60 900 Z', p.ground2);
+  // трава, папоротник и лесные цветы
+  const fgrass = time === 'day' ? '#4E9A62' : time === 'evening' ? '#6E9486' : '#2E5462';
+  s += g([[30, 590, 0.9], [150, 580, 0.7], [318, 590, 0.8], [372, 640, 1], [14, 700, 1], [130, 730, 0.9], [300, 760, 1]].map(([x, y, k]) => tuft(x, y, fgrass, k)).join(''), { opacity: 0.6 });
+  s += [[352, 700, 1], [24, 760, 0.9]]
+    .map(([x, y, k]) => g([-46, -24, 0, 24, 46].map((a) => pth('M0 0 C-4 -14 -3 -28 0 -38 C3 -28 4 -14 0 0 Z', fgrass, { transform: `rotate(${a})` })).join(''), { transform: `translate(${x} ${y}) scale(${k})`, opacity: 0.85 }))
+    .join('');
+  s += g([[60, 640, '#FFFFFF'], [196, 600, '#FFD966'], [330, 720, '#C9B6FF'], [100, 780, '#FF8FB1'], [262, 800, '#FFFFFF']].map(([x, y, c]) => flowerHead(x as number, y as number, c as string, 11)).join(''), { opacity: time === 'night' ? 0.45 : 0.9 });
   if (v === 2) {
     // палатка
     s += g(
@@ -605,7 +704,7 @@ function forest(time: DayTime, v: Variant = 0): string {
     // бревно-скамейка и костёр (огонь и искры живые — Location.tsx)
     s += g(rect(20, 652, 70, 18, '#9C6B4E', { rx: 9, stroke: INK, 'stroke-width': 2 }) + circ(28, 661, 7, '#D9A77E', { stroke: INK, 'stroke-width': 1.6 }) + line('M44 657 h30 M50 664 h24', '#7A5040', 1.6));
     const { x, y } = CAMPFIRE;
-    s += glow(x, y - 10, 90, '#FFB347', p.fire);
+    s += glow(x, y - 10, 90, '#FFB347', p.fire) + pool(x, y + 14, 120, 30, '#FFB347', p.fire * 0.7);
     s += [-24, -12, 0, 12, 24].map((dx, i) => circ(x + dx, y + 12 + (i % 2) * 3, 7, '#8E8AA6', { stroke: INK, 'stroke-width': 1.6 })).join('');
     s += g(rect(-24, -5, 48, 10, '#8A5A44', { rx: 5, stroke: INK, 'stroke-width': 1.8 }), { transform: `translate(${x} ${y + 4}) rotate(18)` });
     s += g(rect(-24, -5, 48, 10, '#9C6B4E', { rx: 5, stroke: INK, 'stroke-width': 1.8 }), { transform: `translate(${x} ${y + 4}) rotate(-18)` });
@@ -643,7 +742,11 @@ function snowVillage(time: DayTime, v: Variant = 0): string {
         (p.winGlow ? circ(16, 24, 18, '#FFC266', { opacity: (p.winGlow * 0.3).toFixed(2) }) + circ(w - 16, 24, 18, '#FFC266', { opacity: (p.winGlow * 0.3).toFixed(2) }) : '') +
         rect(8, 16, 16, 16, p.win, { stroke: INK, 'stroke-width': 1.6, rx: 2 }) + rect(w - 24, 16, 16, 16, p.win, { stroke: INK, 'stroke-width': 1.6, rx: 2 }) +
         line(`M16 16 V32 M8 24 H24 M${w - 16} 16 V32 M${w - 24} 24 H${w - 8}`, INK, 1.1) +
-        rect(w / 2 - 8, 26, 16, 30, '#7A5040', { stroke: INK, 'stroke-width': 1.6, rx: 3 }),
+        rect(w / 2 - 8, 26, 16, 30, '#7A5040', { stroke: INK, 'stroke-width': 1.6, rx: 3 }) +
+        circ(w / 2 + 4, 42, 1.3, '#FFD966') +
+        smoke(w - 16, -50, time === 'day' ? 1 : 0.7) +
+        // свет из окон и от двери на снегу
+        pool(w / 2, 62, w * 0.62, 9, '#FFC266', p.winGlow * 0.9),
       { transform: `translate(${x} ${y}) scale(${k})` },
     );
   s += pick(
@@ -661,12 +764,20 @@ function snowVillage(time: DayTime, v: Variant = 0): string {
     pine2(60, 424, 0.95, p.pine, '#F2F6FF') + pine2(104, 440, 0.7, p.pine, '#F2F6FF') + pine2(312, 420, 1.05, p.pine, '#F2F6FF'),
   );
   s += pth('M-60 506 C80 496 220 498 450 508 L450 900 L-60 900 Z', p.snow);
+  // гирлянда между домами (горит вечером и ночью) и тропинка следов
+  if (!sideV(v)) {
+    s += line('M96 446 C116 462 132 462 152 440 M246 440 C262 462 276 464 292 456', INK, 1.1, { opacity: 0.6 });
+    s += [[104, 452, '#FF8FB3'], [116, 457, '#FFD966'], [128, 457, '#7CC8FF'], [140, 451, '#5ED3A0'], [254, 450, '#FFAA6B'], [266, 457, '#FF8FB3'], [278, 459, '#FFD966'], [288, 456, '#7CC8FF']]
+      .map(([x, y, c]) => (p.lamp ? glow(x as number, y as number, 8, c as string, p.lamp) : '') + circ(x as number, y as number, 2.4, p.lamp ? (c as string) : '#D9D4E8'))
+      .join('');
+    s += steps(196, 512, 150, 590, 8, time === 'day' ? '#8FA6D8' : '#2E3A6E', 0.28);
+  }
   s += pth('M-60 600 C100 588 260 590 450 604 L450 900 L-60 900 Z', p.snow2);
   if (!sideV(v)) {
     // фонарь
     const L = SNOW_LAMP;
     s += line(`M${L.x} 560 V${L.y + 10}`, INK, 4) + line(`M${L.x} 560 V${L.y + 10}`, '#4A4258', 2.2);
-    s += glow(L.x, L.y, 46, '#FFE38A', p.lamp);
+    s += glow(L.x, L.y, 46, '#FFE38A', p.lamp) + pool(L.x, 562, 54, 12, '#FFE38A', p.lamp * 0.7);
     s += rect(L.x - 9, L.y - 10, 18, 20, p.lamp ? '#FFE7A3' : '#D9D4E8', { rx: 3, stroke: INK, 'stroke-width': 1.8 }) + pth(`M${L.x - 12} ${L.y - 10} L${L.x} ${L.y - 20} L${L.x + 12} ${L.y - 10} Z`, '#3A3346', { stroke: INK, 'stroke-width': 1.6 });
     // снеговик
     s += g(
@@ -712,6 +823,12 @@ export const cafeCups = (v: Variant) => (v === 0 ? CAFE_CUPS : v === 1 ? [{ x: 2
 function cafe(time: DayTime, v: Variant = 0): string {
   const p = CAFE[time];
   let s = rect(-60, -60, 510, 960, p.wall);
+  // обои: мелкий ромбик, ниже — деревянная панель
+  const dots = seeded(77);
+  s += g(
+    Array.from({ length: 13 }, (_, row) => Array.from({ length: 10 }, (_, col) => { dots(); const x = 14 + col * 40 + (row % 2) * 20; const y = 14 + row * 32; return `M${x} ${y - 4} l3.4 4 l-3.4 4 l-3.4 -4 Z`; }).join(' ')).map((d) => pth(d, '#FFFFFF')).join(''),
+    { opacity: 0.045 },
+  );
   const view = (id: string) => {
     let w = sky(`sky-${id}`, p.win, [0, 0.45, 0.75]) + stars(p.stars);
     if (time === 'day') w += sun(290, 210, 22, '#FFE38A', '#FFF4C2') + cloud(70, 190, 90, '#FFFFFF', 0.9);
@@ -759,7 +876,10 @@ function cafe(time: DayTime, v: Variant = 0): string {
   }
   // лампы
   s += CAFE_LAMPS.map((x) => line(`M${x} -60 V44`, INK, 1.6) + glow(x, 62, 60, '#FFE38A', p.light) + pth(`M${x - 18} 62 C${x - 18} 46 ${x + 18} 46 ${x + 18} 62 Z`, '#FFC266', { stroke: INK, 'stroke-width': 1.8 }) + circ(x, 64, 6, '#FFF4C2', { stroke: INK, 'stroke-width': 1.4 })).join('');
+  s += rect(-60, 432, 510, 76, p.wall2) + line('M-60 432 H450', '#FFFFFF', 1.4, { opacity: 0.1 }) + line(Array.from({ length: 12 }, (_, i) => `M${-20 + i * 39} 436 V504`).join(' '), INK, 1.2, { opacity: 0.12 });
   s += rect(-60, 420, 510, 12, p.wall2);
+  // конусы света от ламп
+  s += CAFE_LAMPS.map((x) => pth(`M${x - 17} 66 L${x + 17} 66 L${x + 78} 500 L${x - 78} 500 Z`, '#FFE38A', { opacity: +(0.03 + p.light * 0.035).toFixed(3) })).join('');
   const table = (x: number) =>
     el('ellipse', { cx: x, cy: 470, rx: 34, ry: 9, fill: '#C98A5E', stroke: INK, 'stroke-width': 2 }) + rect(x - 4, 474, 8, 30, '#7A5040', { stroke: INK, 'stroke-width': 1.6 }) + el('ellipse', { cx: x, cy: 504, rx: 16, ry: 4, fill: '#7A5040', stroke: INK, 'stroke-width': 1.6 }) +
     rect(x - 8, 452, 14, 11, '#F4F0FF', { stroke: INK, 'stroke-width': 1.4, rx: 3 }) +
@@ -786,6 +906,9 @@ function cafe(time: DayTime, v: Variant = 0): string {
   s += rect(-60, 505, 510, 400, p.floor);
   s += line('M-60 560 H450 M-60 630 H450 M-60 710 H450 M-60 800 H450 M40 505 L20 900 M160 505 L150 900 M280 505 L290 900 M390 505 L420 900', p.floor2, 3);
   s += rect(-60, 500, 510, 10, '#3A2A26');
+  // свет на полу: пятна под лампами, днём — ещё и от окна
+  s += CAFE_LAMPS.map((x) => pool(x, 600, 96, 34, '#FFE38A', 0.16 + p.light * 0.3)).join('');
+  if (time === 'day' && !sideV(v)) s += pth('M60 512 H330 L378 760 H10 Z', '#FFF6D6', { opacity: 0.1 }) + line('M195 512 L194 760 M35 636 H354', '#3A2A26', 5, { opacity: 0.1 });
   if (!sideV(v)) s += blanket(p.blanket, p.lines);
   s += depth(time, false);
   return s;
@@ -803,19 +926,28 @@ function moonBase(time: DayTime, v: Variant = 0): string {
   const r = seeded(17);
   let s = sky(`sky-moon-${time}`, p.sky, [0, 0.5, 0.75]) + stars(1);
   s += g(Array.from({ length: 30 }, () => circ(+(r() * 390).toFixed(1), +(r() * 480).toFixed(1), r() < 0.2 ? 1.5 : 0.8, '#FFFFFF')).join(''), { opacity: 0.7 });
-  if (time === 'evening') s += circ(90, 250, 140, '#FF8FB3', { opacity: 0.12 }) + circ(300, 180, 120, '#9B8CFF', { opacity: 0.14 });
+  // туманности
+  s += glow(80, 250, 170, '#FF8FB3', time === 'evening' ? 0.3 : 0.16) + glow(300, 380, 150, '#9B8CFF', time === 'evening' ? 0.3 : 0.2) + glow(200, 90, 130, '#5EC8F2', 0.12);
+  s += g(glow(0, 0, 100, '#C9B6FF', 0.3), { transform: 'translate(170 300) rotate(-32) scale(2.6 0.5)' });
   // Земля
   s += g(
-    circ(0, 0, 70, '#8FA2FF', { opacity: 0.18 }) + circ(0, 0, 46, '#4F9BE6', { stroke: INK, 'stroke-width': 2 }) +
+    glow(0, 0, 86, '#8FC8FF', 0.55) + circ(0, 0, 48.5, '#BFE2FF', { opacity: 0.5 }) + orb(0, 0, 46, '#8FD0FF', '#4F9BE6', '#2C5FB0', { stroke: INK, 'stroke-width': 2 }) +
       pth('M-30 -18 C-20 -30 -6 -26 -2 -14 C4 -4 -10 2 -16 10 C-24 6 -36 -6 -30 -18 Z M10 -36 C22 -32 34 -20 36 -6 C26 -10 16 -16 10 -36 Z M8 14 C20 8 32 14 30 26 C22 34 10 30 8 14 Z', '#5ED3A0', { stroke: INK, 'stroke-width': 1.4 }) +
-      pth('M-40 20 C-30 34 -10 44 10 42 C-8 36 -26 30 -40 20 Z', '#FFFFFF', { opacity: 0.4 }),
+      pth('M-40 20 C-30 34 -10 44 10 42 C-8 36 -26 30 -40 20 Z', '#FFFFFF', { opacity: 0.4 }) +
+      pth('M-22 -34 C-10 -40 6 -40 18 -34 C6 -36 -10 -36 -22 -34 Z M14 6 C24 2 34 4 40 10 C30 8 22 8 14 6 Z', '#FFFFFF', { opacity: 0.55 }) +
+      pth('M20 -41 A46 46 0 0 1 20 41 A60 60 0 0 0 20 -41 Z', '#0B1640', { opacity: 0.35 }),
     { transform: 'translate(290 170)', opacity: p.earth },
   );
   // планета с кольцом
   s += g(circ(0, 0, 18, '#FFAA6B', { stroke: INK, 'stroke-width': 1.6 }) + el('ellipse', { cx: 0, cy: 0, rx: 32, ry: 7, fill: 'none', stroke: '#FFD966', 'stroke-width': 3, transform: 'rotate(-18)' }), { transform: 'translate(70 300)' });
   s += LAND; // дальше — земля (в комнате тянется по всей площадке)
+  // лунные горы вдали, освещённые по гребню
+  s += pth('M-60 500 L10 452 L52 478 L110 430 L168 476 L226 446 L290 482 L344 440 L390 470 L450 446 L450 540 L-60 540 Z', p.crater, { opacity: 0.75 });
+  s += line('M10 452 L52 478 M110 430 L168 476 M226 446 L290 482 M344 440 L390 470', '#FFFFFF', 1.6, { opacity: 0.3 });
   s += hill(500, 30, p.ground2, 31, 120);
   s += pth('M-60 520 C80 506 240 508 450 520 L450 900 L-60 900 Z', p.ground);
+  // отсвет Земли на грунте
+  if (!sideV(v)) s += pool(290, 548, 120, 18, '#8FC8FF', 0.4);
   const crater = (x: number, y: number, rx: number) =>
     el('ellipse', { cx: x, cy: y, rx, ry: rx * 0.36, fill: p.crater, stroke: INK, 'stroke-width': 1.6 }) + el('ellipse', { cx: x, cy: y + rx * 0.06, rx: rx * 0.7, ry: rx * 0.22, fill: p.ground2 });
   s += pick(
@@ -831,9 +963,12 @@ function moonBase(time: DayTime, v: Variant = 0): string {
       pth('M-26 60 L-14 30 L14 30 L26 60 Z', '#E5566B', { stroke: INK, 'stroke-width': 2, 'stroke-linejoin': 'round' }) +
         pth('M-16 40 C-18 0 -8 -34 0 -50 C8 -34 18 0 16 40 Z', '#F4F0FF', { stroke: INK, 'stroke-width': 2 }) +
         pth('M-11 -20 C-6 -34 -2 -42 0 -50 C2 -42 6 -34 11 -20 Z', '#E5566B', { stroke: INK, 'stroke-width': 1.8 }) +
-        circ(0, 2, 8, '#7CC8FF', { stroke: INK, 'stroke-width': 2 }) + circ(-2.5, -0.5, 2.4, '#FFFFFF', { opacity: 0.8 }),
+        glow(0, 2, 20, '#7CC8FF', 0.8) + circ(0, 2, 8, '#7CC8FF', { stroke: INK, 'stroke-width': 2 }) + circ(-2.5, -0.5, 2.4, '#FFFFFF', { opacity: 0.8 }),
       { transform: 'translate(46 470)' },
     );
+    // следы от ракеты к пледу и камни
+    s += steps(78, 548, 206, 640, 10, INK, 0.16);
+    s += [[110, 560, 7], [236, 580, 5], [20, 676, 8], [300, 610, 6]].map(([x, y, r]) => el('ellipse', { cx: x, cy: y, rx: r, ry: r * 0.62, fill: p.ground2, stroke: INK, 'stroke-width': 1.2 }) + el('ellipse', { cx: x - r * 0.25, cy: y - r * 0.2, rx: r * 0.4, ry: r * 0.22, fill: '#FFFFFF', opacity: 0.3 })).join('');
     // флажок
     const fx = v === 1 ? 330 : 352;
     s += line(`M${fx} 520 V454`, INK, 3) + pth(`M${fx + 1} 456 L${fx + 34} 464 L${fx + 1} 474 Z`, '#FF6B8A', { stroke: INK, 'stroke-width': 1.6 }) + g(pth(FACE_HEART, '#FFFFFF'), { transform: `translate(${fx + 12} 465) scale(0.55)` });
@@ -875,10 +1010,24 @@ function sakura(time: DayTime, v: Variant = 0): string {
   if (time === 'night') s += moon(200, 120);
   s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   s += hill(470, 40, p.far, 41, 100);
+  // тории на дальнем холме
+  if (!sideV(v))
+    s += g(
+      line('M-13 0 V-30 M13 0 V-30', INK, 5.4) + line('M-13 0 V-30 M13 0 V-30', p.bridge, 3.6) +
+        pth('M-22 -34 C-10 -30 10 -30 22 -34 L22 -29 C10 -25 -10 -25 -22 -29 Z', p.bridge, { stroke: INK, 'stroke-width': 1.4, 'stroke-linejoin': 'round' }) +
+        line('M-16 -20 H16', p.bridge, 3),
+      { transform: 'translate(250 470)', opacity: 0.9 },
+    );
   s += pth('M-60 500 C80 488 220 490 450 500 L450 900 L-60 900 Z', p.grass);
   // ручей и мостик
   s += pth('M-60 560 C60 548 140 570 220 566 C300 562 360 548 450 556 L450 590 C360 584 300 598 220 600 C140 604 60 584 -60 596 Z', p.water, { stroke: INK, 'stroke-width': 1.6 });
   s += line('M30 576 h24 M150 584 h30 M300 574 h26', '#FFFFFF', 2, { opacity: 0.6 });
+  // отражение цветущих крон, карпы и лепестки на воде
+  s += pool(80, 574, 46, 10, p.bloom, 0.6) + pool(330, 572, 40, 9, p.bloom, 0.55);
+  s += [[112, 578, 1, '#FF9A4E'], [284, 584, -1, '#F4F0FF']]
+    .map(([x, y, d, c]) => g(pth('M-8 0 C-4 -4 4 -4 8 0 C4 4 -4 4 -8 0 Z M8 0 L13 -3.4 L12 0 L13 3.4 Z', c as string) + circ(-3, -0.6, 1.3, '#E5566B'), { transform: `translate(${x} ${y}) scale(${d} 1)`, opacity: time === 'night' ? 0.5 : 0.9 }))
+    .join('');
+  s += [[64, 566], [176, 592], [236, 580], [352, 562]].map(([x, y]) => el('ellipse', { cx: x, cy: y, rx: 2.8, ry: 1.7, fill: '#FFE3EC', opacity: 0.85, transform: `rotate(20 ${x} ${y})` })).join('');
   if (!sideV(v)) {
     s += pth('M150 572 C170 540 230 540 250 572', 'none', { stroke: INK, 'stroke-width': 9, 'stroke-linecap': 'round' }) + pth('M150 572 C170 540 230 540 250 572', 'none', { stroke: p.bridge, 'stroke-width': 6, 'stroke-linecap': 'round' });
     s += line('M160 562 V546 M200 548 V532 M240 562 V546 M160 546 C176 530 224 530 240 546', INK, 2.6);
@@ -894,7 +1043,12 @@ function sakura(time: DayTime, v: Variant = 0): string {
       pth('M-8 220 C-6 160 -14 110 -40 70 M-2 150 C10 110 30 90 50 70 M-4 120 C-10 90 -8 60 4 30', 'none', { stroke: INK, 'stroke-width': 14, 'stroke-linecap': 'round' }) +
         pth('M-8 220 C-6 160 -14 110 -40 70 M-2 150 C10 110 30 90 50 70 M-4 120 C-10 90 -8 60 4 30', 'none', { stroke: p.trunk, 'stroke-width': 10, 'stroke-linecap': 'round' }) +
         [[-44, 60, 34], [6, 22, 40], [52, 62, 34], [-10, 70, 36], [26, 90, 26], [-60, 96, 22]].map(([cx, cy, r]) => circ(cx, cy, r, p.bloom, { stroke: INK, 'stroke-width': 2 })).join('') +
-        [[-30, 50, 8], [14, 14, 9], [50, 54, 7], [-4, 74, 8], [-56, 92, 6]].map(([cx, cy, r]) => circ(cx, cy, r, p.bloom2)).join(''),
+        [[-30, 50, 8], [14, 14, 9], [50, 54, 7], [-4, 74, 8], [-56, 92, 6]].map(([cx, cy, r]) => circ(cx, cy, r, p.bloom2)).join('') +
+        [[-52, 46, 10], [-2, 6, 12], [44, 46, 9], [-20, 62, 9]].map(([cx, cy, r]) => circ(cx, cy, r, '#FFFFFF', { opacity: 0.22 })).join('') +
+        // бумажные фонарики на ветках — горят вечером и ночью
+        [[-26, 104, '#FFC266'], [30, 112, '#FF9EBB']]
+          .map(([lx, ly, c]) => line(`M${lx} ${(ly as number) - 14} V${(ly as number) - 6}`, INK, 1.2) + (p.lamp ? glow(lx as number, ly as number, 20, c as string, p.lamp) : '') + el('ellipse', { cx: lx, cy: ly, rx: 5.4, ry: 6.6, fill: p.lamp ? (c as string) : '#D9D4E8', stroke: INK, 'stroke-width': 1.2 }) + line(`M${(lx as number) - 3} ${(ly as number) - 6.4} h6 M${(lx as number) - 3} ${(ly as number) + 6.4} h6`, INK, 1.4))
+          .join(''),
       { transform: `translate(${x} ${y}) scale(${k})` },
     );
   s += pick(
@@ -923,6 +1077,14 @@ function sakura(time: DayTime, v: Variant = 0): string {
   s += (sideV(v) ? [[80, 640], [170, 720], [300, 660], [240, 800], [40, 760], [350, 820]] : [[40, 650], [120, 700], [330, 640], [260, 760], [60, 780], [200, 820]])
     .map(([x, y]) => el('ellipse', { cx: x, cy: y, rx: 3.4, ry: 2.2, fill: p.bloom2, transform: `rotate(30 ${x} ${y})` }))
     .join('');
+  // лепестки, нападавшие под деревья, и трава
+  s += g(
+    [[30, 530, 30], [96, 522, -20], [58, 540, 60], [120, 536, 10], [300, 540, -30], [352, 548, 40], [326, 556, 0], [374, 534, 70], [18, 700, 20], [150, 760, -40], [310, 700, 30], [370, 780, 10]]
+      .map(([x, y, a]) => el('ellipse', { cx: x, cy: y, rx: 3, ry: 1.9, fill: p.bloom, transform: `rotate(${a} ${x} ${y})` }))
+      .join(''),
+    { opacity: 0.9 },
+  );
+  s += g([[24, 640, 0.8], [150, 630, 0.7], [352, 690, 0.9], [100, 800, 1], [296, 800, 0.9]].map(([x, y, k]) => tuft(x, y, time === 'day' ? '#5EA85E' : p.far, k)).join(''), { opacity: 0.55 });
   if (!sideV(v)) s += blanket(p.blanket, p.lines);
   s += depth(time);
   return s;
@@ -954,6 +1116,7 @@ function rainCity(time: DayTime, v: Variant = 0): string {
     let b = rect(x, 500 - h, w, h, wall, { stroke: INK, 'stroke-width': 2 });
     for (let wy = 520 - h; wy < 420; wy += 30) for (let wx = x + 10; wx < x + w - 18; wx += 26) b += rect(wx, wy, 14, 18, p.win, { opacity: r() < 0.6 ? p.winOp : 0.25, rx: 2 });
     b += rect(x + 8, 440, w - 16, 58, '#2E2438', { stroke: INK, 'stroke-width': 1.8 }) + rect(x + 12, 444, w - 24, 40, p.win, { opacity: p.winOp * 0.7 });
+    b += pool(x + w / 2, 464, w * 0.5, 30, p.win, p.winOp * 0.35);
     b += pth(`M${x - 4} 420 H${x + w + 4} L${x + w} 440 H${x} Z`, awning, { stroke: INK, 'stroke-width': 1.8 });
     b += line(Array.from({ length: Math.floor(w / 16) }, (_, i) => `M${x + 8 + i * 16} 421 L${x + 6 + i * 16} 439`).join(' '), '#FFFFFF', 5, { opacity: 0.7, 'stroke-linecap': 'butt' });
     return b;
@@ -968,8 +1131,21 @@ function rainCity(time: DayTime, v: Variant = 0): string {
   );
   s += rect(-60, 498, 510, 30, p.walk, { stroke: INK, 'stroke-width': 2 });
   s += rect(-60, 528, 510, 400, p.street);
+  // мокрый асфальт: витрины и окна отражаются длинными размытыми полосами
+  const wet = seeded(sideV(v) ? 61 + v : 61);
+  s += g(
+    Array.from({ length: 13 }, (_, i) => {
+      const x = 6 + i * 30 + wet() * 10;
+      const h = 60 + wet() * 110;
+      return rect(+x.toFixed(1), 530, 12, +h.toFixed(1), p.win, { rx: 6, opacity: +(0.1 + wet() * 0.16).toFixed(2) });
+    }).join(''),
+    { opacity: p.winOp },
+  );
+  s += ['#E5566B', '#5ED3A0', '#FFC266'].map((c, i) => pool(56 + i * 140, 545, 70, 12, c, 0.28)).join('');
   s += line('M-20 690 h60 M90 690 h60 M200 690 h60 M310 690 h60', '#F4F0FF', 5, { opacity: 0.5 });
   s += rainPuddles(v).map((q) => el('ellipse', { cx: q.x, cy: q.y, rx: q.rx, ry: q.rx * 0.24, fill: p.puddle, opacity: 0.8 })).join('');
+  // свет фонарей на мокрой мостовой
+  s += rainLamps(v).map((L) => pool(L.x, 536, 62, 15, '#FFE38A', p.lamp * 0.8) + rect(L.x - 5, 540, 10, 120, '#FFE38A', { rx: 5, opacity: +(p.lamp * 0.16).toFixed(2) })).join('');
   s += rainLamps(v).map((L) => line(`M${L.x} 520 V${L.y + 10}`, INK, 4) + line(`M${L.x} 520 V${L.y + 10}`, '#4A4258', 2.2) + glow(L.x, L.y, 44, '#FFE38A', p.lamp) + rect(L.x - 8, L.y - 10, 16, 20, p.lamp > 0.5 ? '#FFE7A3' : '#D9D4E8', { rx: 3, stroke: INK, 'stroke-width': 1.8 }) + pth(`M${L.x - 11} ${L.y - 10} L${L.x} ${L.y - 19} L${L.x + 11} ${L.y - 10} Z`, '#3A3346', { stroke: INK, 'stroke-width': 1.6 })).join('');
   if (!sideV(v)) s += blanket(p.blanket, p.lines);
   // статичные капли (основной дождь живой — Location.tsx)
@@ -992,6 +1168,16 @@ function mountains(time: DayTime, v: Variant = 0): string {
   if (time === 'day') s += sun(310, 120, 30, '#FFE38A', '#FFF4C2');
   if (time === 'evening') s += dusk(300, 404, 42);
   if (time === 'night') s += moon(310, 110);
+  // воздушный шар над долиной (ночью в корзине горит огонёк)
+  s += g(
+    line('M-13 20 L-6 38 M13 20 L6 38', INK, 1.1, { opacity: 0.7 }) +
+      pth('M0 -30 C-22 -30 -28 -6 -15 12 C-10 19 -7 22 -6 24 H6 C7 22 10 19 15 12 C28 -6 22 -30 0 -30 Z', time === 'night' ? '#8A5E9E' : '#FF8FB3', { stroke: INK, 'stroke-width': 1.5 }) +
+      pth('M0 -30 C-8 -30 -11 -6 -6 24 H6 C11 -6 8 -30 0 -30 Z', time === 'night' ? '#B894C8' : '#FFD966') +
+      pth('M-15 12 C-6 16 6 16 15 12', 'none', { stroke: INK, 'stroke-width': 1, opacity: 0.4 }) +
+      (time === 'night' ? glow(0, 30, 16, '#FFC266', 1) : '') +
+      rect(-6.5, 37, 13, 9, '#9C6B4E', { rx: 2, stroke: INK, 'stroke-width': 1.3 }),
+    { transform: 'translate(92 196)', opacity: time === 'night' ? 0.85 : 1 },
+  );
   s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   const peak = (pts: string, cap: string, fill: string) => pth(pts, fill, { stroke: INK, 'stroke-width': 2, 'stroke-linejoin': 'round' }) + pth(cap, p.snow, { stroke: INK, 'stroke-width': 1.6, 'stroke-linejoin': 'round' });
   if (!sideV(v)) {
@@ -1012,9 +1198,16 @@ function mountains(time: DayTime, v: Variant = 0): string {
       540, p.mid, p.snow,
     );
   }
+  // дымка в долине и ельник у подножия
+  s += pool(195, 500, 320, 36, time === 'night' ? '#8FA2D8' : '#FFFFFF', time === 'day' ? 0.45 : 0.28);
   s += hill(520, 30, p.near, 51, 130);
+  const firs = seeded(71 + v);
+  s += Array.from({ length: 11 }, (_, i) => pine2(+(8 + i * 37 + firs() * 12).toFixed(1), +(476 + firs() * 16).toFixed(1), +(0.36 + firs() * 0.2).toFixed(2), p.near)).join('');
   s += pth('M-60 540 C80 526 220 528 450 540 L450 900 L-60 900 Z', p.meadow);
   s += pth('M-60 620 C100 606 260 610 450 624 L450 900 L-60 900 Z', p.meadow2);
+  // трава и валуны
+  s += g([[20, 600, 0.8], [100, 590, 0.7], [352, 600, 0.8], [160, 720, 0.9], [300, 780, 1], [50, 790, 1], [372, 700, 0.9]].map(([x, y, k]) => tuft(x, y, time === 'day' ? '#4E9A62' : p.near, k)).join(''), { opacity: 0.55 });
+  s += [[364, 650, 14], [16, 720, 11]].map(([x, y, r]) => pth(`M${x - r} ${y + 4} C${x - r} ${y - r * 0.9} ${x + r * 0.6} ${y - r} ${x + r} ${y + 4} Z`, '#B9B2CC', { stroke: INK, 'stroke-width': 1.4 }) + el('ellipse', { cx: x - r * 0.2, cy: y - r * 0.4, rx: r * 0.4, ry: r * 0.2, fill: '#FFFFFF', opacity: 0.4 })).join('');
   if (!sideV(v)) {
     // указатель и флажки
     s += g(line('M0 0 V60', INK, 4) + line('M0 0 V60', '#9C6B4E', 2.4) + pth('M-4 6 H36 L44 14 L36 22 H-4 Z', '#C98A5E', { stroke: INK, 'stroke-width': 1.6 }) + line('M4 14 h24', '#7A5040', 2), { transform: 'translate(40 520)' });
@@ -1075,13 +1268,39 @@ function cave(time: DayTime, v: Variant = 0): string {
   if (time === 'day') hole += sun(hx + 40, 100, 22 * hr, '#FFE38A', '#FFF4C2') + (sideV(v) ? '' : cloud(180, 90, 90, '#FFFFFF', 0.9));
   if (time === 'night') hole += stars(1) + circ(hx + 30, 90 + (sideV(v) ? 14 : 0), 12 * hr, '#F6F1D8');
   s += g(hole, { 'clip-path': `url(#${hid})` });
-  if (time === 'day') s += sideV(v) ? pth(`M${hx - 40} 160 L${hx + 40} 160 L${hx + 70} 560 L${hx - 70} 560 Z`, '#FFF6D6', { opacity: 0.08 }) : pth('M170 160 L330 160 L380 560 L120 560 Z', '#FFF6D6', { opacity: 0.12 });
+  // столб света из отверстия: днём — солнечный, ночью — лунный
+  if (time !== 'evening') {
+    const n = ++glowN;
+    const c = time === 'day' ? '#FFF6D6' : '#B9C6FF';
+    const k = (time === 'day' ? 0.3 : 0.14) * (sideV(v) ? 0.6 : 1);
+    s += el('defs', {}, el('linearGradient', { id: `shaft${n}`, x1: 0, y1: 0, x2: 0, y2: 1 }, stop(0, c, k) + stop(1, c, 0)));
+    s += sideV(v) ? pth(`M${hx - 40} 150 L${hx + 40} 150 L${hx + 74} 580 L${hx - 74} 580 Z`, `url(#shaft${n})`) : pth('M166 150 L334 150 L390 580 L110 580 Z', `url(#shaft${n})`);
+  }
   s += pth('M-60 -60 H450 V300 C400 260 380 200 360 140 C350 60 300 30 250 38 C190 30 150 70 140 140 C120 220 60 260 -60 280 Z', p.rock, { stroke: INK, 'stroke-width': 2 });
   s += pth('M-60 280 C40 300 80 360 70 460 L-60 480 Z M450 300 C360 320 330 380 340 470 L450 480 Z', p.rock3, { stroke: INK, 'stroke-width': 2 });
   // сталактиты
   s += (sideV(v) ? (v === 2 ? [[60, 220, 26], [210, 170, 22], [300, 200, 30], [350, 250, 18]] : [[50, 230, 20], [150, 190, 28], [230, 160, 18], [360, 220, 26]]) : [[30, 240, 22], [100, 200, 30], [380, 250, 26], [170, 150, 18], [330, 160, 20]]).map(([x, y, h]) => pth(`M${x - 9} ${y} L${x} ${y + h} L${x + 9} ${y} Z`, p.rock3, { stroke: INK, 'stroke-width': 1.6, 'stroke-linejoin': 'round' })).join('');
   s += pth('M-60 500 C60 488 200 486 450 500 L450 900 L-60 900 Z', p.floor);
   s += pth('M-60 620 C100 606 260 608 450 622 L450 900 L-60 900 Z', p.floor2);
+  // подземное озерцо: тёмная вода с отсветами кристаллов
+  if (!sideV(v)) {
+    s += el('ellipse', { cx: 132, cy: 706, rx: 62, ry: 15, fill: '#1E1A3C', stroke: INK, 'stroke-width': 1.4 });
+    s += pool(112, 706, 34, 8, '#FF8FC8', 0.7 * p.glow) + pool(158, 708, 30, 7, '#7CE0E6', 0.7 * p.glow);
+    s += line('M96 700 h22 M140 712 h30 M118 706 h14', '#FFFFFF', 1.6, { opacity: 0.3 });
+    if (time === 'day') s += pool(250, 590, 110, 24, '#FFF6D6', 0.5);
+  }
+  // светящиеся грибы у стен
+  s += (sideV(v) ? [[40, 560, '#7CE0E6'], [350, 600, '#B39DFF']] : [[150, 520, '#7CE0E6'], [286, 528, '#B39DFF'], [24, 640, '#7CE0E6']])
+    .map(([x, y, c]) =>
+      g(
+        glow(0, -8, 22, c as string, p.glow * 0.9) +
+          pth('M-2 0 V-8 H2 V0 Z', '#E6E0FF') + pth('M-8 -7 C-8 -16 8 -16 8 -7 Z', c as string, { stroke: INK, 'stroke-width': 1.2 }) +
+          pth('M7 2 V-4 H10 V2 Z', '#E6E0FF') + pth('M3.6 -3.4 C3.6 -9.6 13.4 -9.6 13.4 -3.4 Z', c as string, { stroke: INK, 'stroke-width': 1.1 }) +
+          circ(-3, -11, 1.2, '#FFFFFF', { opacity: 0.8 }),
+        { transform: `translate(${x} ${y})` },
+      ),
+    )
+    .join('');
   s += caveRocks(v).map(([x, y, r]) => el('ellipse', { cx: x, cy: y, rx: r, ry: r * 0.5, fill: p.rock3, stroke: INK, 'stroke-width': 1.4 })).join('');
   // кристаллы (свечение пульсирует — Location.tsx)
   const crystal = (c: { x: number; y: number; s: number; c: string }) =>
@@ -1090,7 +1309,9 @@ function cave(time: DayTime, v: Variant = 0): string {
         pth('M-14 0 L-18 -26 L-10 -40 L-4 -22 L-2 0 Z', c.c, { stroke: INK, 'stroke-width': 1.6, 'stroke-linejoin': 'round' }) +
         pth('M-4 0 L-6 -40 L2 -60 L10 -40 L8 0 Z', c.c, { stroke: INK, 'stroke-width': 1.6, 'stroke-linejoin': 'round' }) +
         pth('M8 0 L12 -22 L20 -30 L22 -14 L18 0 Z', c.c, { stroke: INK, 'stroke-width': 1.6, 'stroke-linejoin': 'round' }) +
-        pth('M2 -60 L0 -10 L-6 -40 Z M-10 -40 L-12 -12 L-18 -26 Z', '#FFFFFF', { opacity: 0.45 }),
+        pth('M2 -60 L0 -10 L-6 -40 Z M-10 -40 L-12 -12 L-18 -26 Z', '#FFFFFF', { opacity: 0.45 }) +
+        pth(SPARK, '#FFFFFF', { transform: 'translate(4 -54) scale(0.9)', opacity: 0.9 }) + pth(SPARK, '#FFFFFF', { transform: 'translate(17 -27) scale(0.5)', opacity: 0.8 }) +
+        pool(0, 2, 30, 6, c.c, p.glow * 0.7),
       { transform: `translate(${c.x} ${c.y}) scale(${c.s})` },
     );
   s += crystalsOf(v).map(crystal).join('');

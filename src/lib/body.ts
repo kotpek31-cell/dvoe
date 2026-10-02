@@ -17,7 +17,7 @@ export const headY = (y: number) => HEAD_TOP + (y - HEAD_TOP) * HS;
 export const T_HEAD = `translate(${r2(60 * (1 - HS))} ${r2(HEAD_TOP * (1 - HS))}) scale(${HS})`;
 
 // ---------- туловище (слои вещи: body, under, front, back, backFx) ----------
-const TORSO = { top: 81.5, ky: 1.05, kx: 0.96 };
+const TORSO = { top: 78.8, ky: 1.07, kx: 0.96 }; // шея короткая: туловище начинается сразу под подбородком
 export const torsoX = (x: number) => 60 + (x - 60) * TORSO.kx;
 export const torsoY = (y: number) => TORSO.top + (y - 96) * TORSO.ky;
 export const T_TORSO = `translate(${r2(60 * (1 - TORSO.kx))} ${r2(TORSO.top - 96 * TORSO.ky)}) scale(${TORSO.kx} ${TORSO.ky})`;
@@ -57,7 +57,7 @@ const tag = (name: string, attrs: Record<string, string | number | undefined>) =
 
 // Шея и тень под подбородком — поверх воротника, под головой
 export const neckArt =
-  tag('rect', { x: 54.2, y: 71, width: 11.6, height: 15, rx: 4.6, fill: '@skin|d0.08' }) +
+  tag('rect', { x: 54.4, y: 70, width: 11.2, height: 13, rx: 4.6, fill: '@skin|d0.08' }) +
   tag('ellipse', { cx: 60, cy: r2(TORSO.top + 2.2), rx: 9, ry: 2.6, fill: INK, opacity: 0.16 });
 
 // Голая нога (если «Низ» не закрывает её своей штаниной)
