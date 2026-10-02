@@ -1,7 +1,7 @@
 // Грибы, шляпа грибника, отражённый «Мог», подсказка в пещере, порядок грибов в комнате разработчиков.
 // Сначала: npx expo export --platform web --output-dir dist. Запуск: node tools/e2e/mushrooms.mjs
 import fs from 'node:fs';
-import { launch, log, openPhone, startServer, state, UA, UB } from './harness.mjs';
+import { launch, log, openPhone, startServer, state, UA, UB, MENU, menuItem } from './harness.mjs';
 
 const OUT = process.env.OUT ?? '/tmp/dvoe-shots/mush';
 fs.mkdirSync(OUT, { recursive: true });
@@ -172,7 +172,7 @@ try {
   answer = { ok: false, error: 'limit', left: 0, message: 'На сегодня попытки кончились — приходи завтра' };
   inventory = [];
   const R = await openPhone(browser, port, UA, 'Gaster', { rest: (p, uid) => (p.startsWith('/rest/v1/inventory') ? inventory : undefined) });
-  await R.page.getByText('Играть').waitFor({ timeout: 30000 });
+  await R.page.getByLabel(MENU).waitFor({ timeout: 30000 });
   await wait(2500);
   await R.page.screenshot({ path: `${OUT}/16-room-forest.png` });
   const visible = [];

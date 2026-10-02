@@ -8,7 +8,7 @@ export async function pushSnapshotToWidgets(snapshot: PartnerSnapshot): Promise<
   const { AndroidPartnerWidget } = require('../widgets/AndroidPartnerWidget') as typeof import('../widgets/AndroidPartnerWidget');
   await requestWidgetUpdate({
     widgetName: 'Partner',
-    renderWidget: () => <AndroidPartnerWidget snapshot={snapshot} />,
+    renderWidget: (info: { width: number; height: number }) => <AndroidPartnerWidget snapshot={snapshot} width={info.width} height={info.height} />,
     widgetNotFound: () => undefined,
   });
 }

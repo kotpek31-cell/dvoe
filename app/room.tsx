@@ -1375,7 +1375,7 @@ export default function RoomScreen() {
       <Confetti trigger={confetti} colors={SCENE_COLORS} width={width} />
       {forest && chpok ? <PluckWord key={chpok.n} x={chpok.x} y={chpok.y} nonce={chpok.n} /> : null}
       {forest && fly ? <FlyingShroom key={fly.n} from={fly.from} to={fly.to} color={fly.c} nonce={fly.n} size={mushSize(1)} /> : null}
-      {forest && free && !zoomed ? <Basket top={basketTop} width={width} /> : null}
+      {forest && free && !zoomed && !menuOpen ? <Basket top={basketTop} width={width} /> : null}
       {clapWord ? (
         <View pointerEvents="none" style={[styles.clapWrap, { top: height * 0.3 }]}>
           <Txt weight="display" size={34} color="#FFD45E" style={styles.clap}>

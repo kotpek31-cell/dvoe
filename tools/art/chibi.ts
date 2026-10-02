@@ -46,6 +46,30 @@ export const g = (children: string, o: A = {}) => el('g', o, children);
 let uidN = 0;
 export const uid = (p: string) => `${p}${++uidN}`;
 
+// ---------- объём головных уборов (этап фиксации 0.2) ----------
+// Внутри формы d (по её маске): блик сверху-слева и тень снизу — убор «круглый», а не плоская наклейка.
+// key — короткое имя (id градиента и маски; приложение само добавит к нему суффикс чибика и цвета).
+export function vol(key: string, d: string, top: number, bottom: number, o: { glow?: number; shade?: number } = {}): string {
+  const id = `hv${key}`;
+  return (
+    el(
+      'defs',
+      {},
+      el('clipPath', { id: `${id}c` }, el('path', { d })) +
+        el(
+          'linearGradient',
+          { id: `${id}g`, gradientUnits: 'userSpaceOnUse', x1: 44, y1: top, x2: 72, y2: bottom },
+          el('stop', { offset: 0, 'stop-color': '#FFFFFF', 'stop-opacity': o.glow ?? 0.42 }) +
+            el('stop', { offset: 0.42, 'stop-color': '#FFFFFF', 'stop-opacity': 0 }) +
+            el('stop', { offset: 0.6, 'stop-color': INK, 'stop-opacity': 0 }) +
+            el('stop', { offset: 1, 'stop-color': INK, 'stop-opacity': o.shade ?? 0.3 }),
+        ),
+    ) + g(el('rect', { x: -40, y: top - 12, width: 200, height: bottom - top + 24, fill: `url(#${id}g)` }), { 'clip-path': `url(#${id}c)` })
+  );
+}
+// Падающая тень под краем убора — на волосы и лоб (рисуется первой, под убором)
+export const drop = (d: string, dy = 3.5, op = 0.2) => el('path', { d, fill: INK, opacity: op, transform: `translate(0 ${dy})` });
+
 // ---------- постоянные детали ----------
 export const P = {
   legL: { x: 47, y: 124, w: 11, h: 24 },
@@ -157,51 +181,91 @@ export const ITEMS: Record<string, Item> = {
   'hat.beanie': {
     cat: 'hat', name: 'Бини', def: 'cherry', palette: 'cloth',
     layers: {
-      hat: ({ col }) =>
-        path('M17 50 C15 24 35 9 60 9 C85 9 105 24 103 50 Z', col) +
-        line('M40 16 V46 M60 10 V46 M80 16 V46', dark(col, 0.2), 1.4, { opacity: 0.55 }) +
-        path('M14 50 C14 45 17 43 21 43 H99 C103 43 106 45 106 50 C106 55 103 57 99 57 H21 C17 57 14 55 14 50 Z', dark(col, 0.12)) +
-        el('circle', { cx: 60, cy: 7, r: 7.5, fill: light(col, 0.35), stroke: INK, 'stroke-width': SW }),
+      hat: ({ col }) => {
+        const dome = 'M17 50 C15 24 35 9 60 9 C85 9 105 24 103 50 Z';
+        const band = 'M14 50 C14 45 17 43 21 43 H99 C103 43 106 45 106 50 C106 55 103 57 99 57 H21 C17 57 14 55 14 50 Z';
+        return (
+          drop(band, 3.5) +
+          path(dome, col) +
+          vol('beanie', dome, 9, 50) +
+          line('M40 16 V46 M60 10 V46 M80 16 V46', dark(col, 0.2), 1.4, { opacity: 0.55 }) +
+          path(band, dark(col, 0.12)) +
+          vol('beanieb', band, 43, 57, { glow: 0.3, shade: 0.34 }) +
+          line('M24 47 l2 4 l2 -4 M36 47 l2 4 l2 -4 M48 47 l2 4 l2 -4 M70 47 l2 4 l2 -4 M82 47 l2 4 l2 -4 M94 47 l2 4 l2 -4', dark(col, 0.32), 1.1, { opacity: 0.6 }) +
+          el('circle', { cx: 60, cy: 7, r: 7.5, fill: light(col, 0.35), stroke: INK, 'stroke-width': SW }) +
+          el('circle', { cx: 57.4, cy: 4.4, r: 2.6, fill: '#FFFFFF', opacity: 0.55 }) +
+          el('path', { d: 'M56 12.5 C59 13.5 63 13 66 10.5', fill: 'none', stroke: dark(col, 0.25), 'stroke-width': 1.2, opacity: 0.7 })
+        );
+      },
     },
   },
   'hat.cap': {
     cat: 'hat', name: 'Кепка', def: 'blueberry', palette: 'cloth',
     layers: {
-      hat: ({ col }) =>
-        path('M18 50 C16 25 36 11 60 11 C84 11 104 25 102 50 Z', col) +
-        path('M56 44 C70 41 98 41 114 48 C108 55 82 56 56 51 Z', dark(col, 0.15)) +
-        line('M60 12 C58 24 58 36 60 48', dark(col, 0.25), 1.4, { opacity: 0.6 }) +
-        el('circle', { cx: 60, cy: 12, r: 3.4, fill: light(col, 0.3), stroke: INK, 'stroke-width': 1.8 }),
+      hat: ({ col }) => {
+        const dome = 'M18 50 C16 25 36 11 60 11 C84 11 104 25 102 50 Z';
+        const visor = 'M56 44 C70 41 98 41 114 48 C108 55 82 56 56 51 Z';
+        return (
+          drop('M18 50 C40 53 80 53 102 50 L102 47 C80 50 40 50 18 47 Z', 2.5, 0.22) +
+          drop(visor, 4, 0.18) +
+          path(dome, col) +
+          vol('cap', dome, 11, 50) +
+          line('M38 18 C44 28 46 40 46 49 M82 18 C76 28 74 40 74 49', dark(col, 0.22), 1.1, { opacity: 0.45 }) +
+          path(visor, dark(col, 0.15)) +
+          vol('capv', visor, 41, 56, { glow: 0.28, shade: 0.4 }) +
+          line('M60 46 C74 44 96 44 109 49', dark(col, 0.32), 1, { opacity: 0.55, 'stroke-dasharray': '2.5 2.5' }) +
+          line('M60 12 C58 24 58 36 60 48', dark(col, 0.25), 1.4, { opacity: 0.6 }) +
+          el('circle', { cx: 60, cy: 12, r: 3.4, fill: light(col, 0.3), stroke: INK, 'stroke-width': 1.8 })
+        );
+      },
     },
   },
   'hat.panama': {
     cat: 'hat', name: 'Панама', def: 'lemon', palette: 'cloth',
     layers: {
-      hat: ({ col }) =>
-        path('M28 38 C28 20 42 11 60 11 C78 11 92 20 92 38 Z', col) +
-        path('M28 36 H92 V41 H28 Z', dark(col, 0.22), { 'stroke-width': 1.6 }) +
-        path('M6 44 C6 36 30 34 60 34 C90 34 114 36 114 44 C114 51 92 53 60 53 C28 53 6 51 6 44 Z', light(col, 0.12)),
+      hat: ({ col }) => {
+        const crown = 'M28 38 C28 20 42 11 60 11 C78 11 92 20 92 38 Z';
+        const brim = 'M6 44 C6 36 30 34 60 34 C90 34 114 36 114 44 C114 51 92 53 60 53 C28 53 6 51 6 44 Z';
+        return (
+          drop(brim, 4, 0.18) +
+          path(crown, col) +
+          vol('panama', crown, 11, 38) +
+          path('M28 36 H92 V41 H28 Z', dark(col, 0.22), { 'stroke-width': 1.6 }) +
+          path(brim, light(col, 0.12)) +
+          vol('panamab', brim, 34, 53, { glow: 0.34, shade: 0.32 }) +
+          line('M14 46 C40 50.5 80 50.5 106 46', dark(col, 0.25), 1.1, { opacity: 0.6, 'stroke-dasharray': '3 3' })
+        );
+      },
     },
   },
   'hat.bow': {
     cat: 'hat', name: 'Бантик', def: 'cherry', palette: 'cloth',
     layers: {
       hat: ({ col }) =>
-        g(path(P.bowLoops, col, { 'stroke-width': 1.8 }) + el('circle', { cx: 0, cy: -0.5, r: 3, fill: light(col, 0.3), stroke: INK, 'stroke-width': 1.6 }), {
-          transform: 'translate(87 23) rotate(18) scale(1.15)',
-        }),
+        g(
+          drop(P.bowLoops, 2, 0.2) +
+            path(P.bowLoops, col, { 'stroke-width': 1.8 }) +
+            vol('bow', P.bowLoops, -8, 6, { glow: 0.45, shade: 0.34 }) +
+            line('M-3 -1 C-6 -3 -8 -3 -9 -1 M3 -1 C6 -3 8 -3 9 -1', dark(col, 0.3), 1, { opacity: 0.6 }) +
+            el('circle', { cx: 0, cy: -0.5, r: 3, fill: light(col, 0.3), stroke: INK, 'stroke-width': 1.6 }),
+          { transform: 'translate(87 23) rotate(18) scale(1.15)' },
+        ),
     },
   },
   'hat.beret': {
     cat: 'hat', name: 'Берет', def: 'cherry', palette: 'cloth', code: true,
     layers: {
-      hat: ({ col }) =>
-        g(
-          path('M14 34 C18 17 42 8 64 10 C88 12 108 22 106 35 C104 42 92 44 78 42 C58 39 34 44 21 42 C15 41 13 38 14 34 Z', col) +
+      hat: ({ col }) => {
+        const d = 'M14 34 C18 17 42 8 64 10 C88 12 108 22 106 35 C104 42 92 44 78 42 C58 39 34 44 21 42 C15 41 13 38 14 34 Z';
+        return g(
+          drop(d, 3.5) +
+            path(d, col) +
+            vol('beret', d, 8, 44, { glow: 0.4, shade: 0.34 }) +
             line('M62 10 L64 2', INK, 2.6) +
             line('M24 38 C44 35 70 34 98 38', dark(col, 0.25), 1.4, { opacity: 0.6 }),
           { transform: 'rotate(-8 60 30)' },
-        ),
+        );
+      },
     },
   },
   'hat.halo': {

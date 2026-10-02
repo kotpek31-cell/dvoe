@@ -1,7 +1,7 @@
 // Уход посреди игры: игрок ушёл — выбыл, вернулся — смотрит; ведущий ушёл — игра прервана у всех.
 // node tools/e2e/room-leave.mjs
 import fs from 'node:fs';
-import { launch, log, openPhone, startServer, state } from './harness.mjs';
+import { launch, log, openPhone, startServer, state, MENU, menuItem } from './harness.mjs';
 
 const OUT = process.env.OUT ?? '/tmp/dvoe-shots';
 fs.mkdirSync(OUT, { recursive: true });
@@ -16,10 +16,10 @@ try {
   const A = await openPhone(browser, port, UA, 'Gaster');
   await wait(1500);
   const B = await openPhone(browser, port, UB, 'Соня');
-  await A.page.getByText('Играть').waitFor({ timeout: 30000 });
-  await B.page.getByText('Играть').waitFor({ timeout: 30000 });
+  await A.page.getByLabel(MENU).waitFor({ timeout: 30000 });
+  await B.page.getByLabel(MENU).waitFor({ timeout: 30000 });
   await wait(2000);
-  await A.page.getByLabel('Играть').click();
+  await menuItem(A.page, 'Играть');
   await A.page.getByText(/Реакция · раунд 1/).waitFor({ timeout: 15000 });
   console.log('play');
   await wait(1500);
@@ -43,8 +43,8 @@ try {
   await B2.page.screenshot({ path: `${OUT}/03-host-left-B.png` });
   await wait(2500);
   await B2.page.screenshot({ path: `${OUT}/04-after-B.png` });
-  const bar = await B2.page.getByLabel('Играть').count();
-  console.log('кнопка «Играть» снова есть:', bar);
+  const bar = await B2.page.getByLabel(MENU).count();
+  console.log('кнопка меню снова есть:', bar);
 } catch (e) {
   console.log('FAIL', String(e).slice(0, 400));
 } finally {

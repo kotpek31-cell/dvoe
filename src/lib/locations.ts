@@ -410,7 +410,7 @@ function forest(time: DayTime, v: Variant = 0): string {
   if (v === 2) {
     // палатка
     s += g(
-      pth('M-50 0 L0 -64 L50 0 Z', '#E5866B', { stroke: INK, 'stroke-width': 2, 'stroke-linejoin': 'round' }) +
+      pth('M-50 0 L0 -64 L50 0 Z', time === 'day' ? '#E5866B' : time === 'evening' ? '#B8676A' : '#5E4466', { stroke: INK, 'stroke-width': 2, 'stroke-linejoin': 'round' }) +
         pth('M0 -64 L-14 0 H14 Z', '#5E4A6E', { stroke: INK, 'stroke-width': 1.8, 'stroke-linejoin': 'round' }) +
         pth('M-50 0 L0 -64 L-30 0 Z', '#FFFFFF', { opacity: 0.18 }) + line('M0 -64 L0 -74 M-56 2 H56', INK, 2),
       { transform: 'translate(250 640)' },
@@ -508,8 +508,9 @@ function snowVillage(time: DayTime, v: Variant = 0): string {
   } else {
     // иглу
     s += g(
-      pth('M-46 0 A46 40 0 0 1 46 0 Z', '#F7FAFF', { stroke: INK, 'stroke-width': 2 }) + pth('M-14 0 V-12 A14 14 0 0 1 14 -12 V0 Z', '#5A4A6E', { stroke: INK, 'stroke-width': 1.8 }) +
-        line('M-42 -14 H-16 M16 -14 H42 M-30 -28 H30 M-20 -14 V-28 M20 -14 V-28 M0 -28 V-40', '#C9D3EE', 1.6),
+      pth('M-46 0 A46 40 0 0 1 46 0 Z', time === 'day' ? '#F7FAFF' : p.snow, { stroke: INK, 'stroke-width': 2 }) + pth('M-14 0 V-12 A14 14 0 0 1 14 -12 V0 Z', '#3A3156', { stroke: INK, 'stroke-width': 1.8 }) +
+        line('M-42 -14 H-16 M16 -14 H42 M-30 -28 H30 M-20 -14 V-28 M20 -14 V-28 M0 -28 V-40', p.snow2, 1.6) +
+        (p.winGlow ? circ(0, -6, 12, '#FFC266', { opacity: (p.winGlow * 0.35).toFixed(2) }) : ''),
       { transform: 'translate(250 650)' },
     );
   }

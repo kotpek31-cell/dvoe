@@ -32,6 +32,8 @@
       "package": "com.gaster.dvoe",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundImage": "./assets/adaptive-bg.png",
+        "monochromeImage": "./assets/monochrome-icon.png",
         "backgroundColor": "#0B0A14"
       }
     },

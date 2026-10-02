@@ -57,6 +57,10 @@ writeFileSync(join(OUT, 'icon.svg'), svg(background(0) + clip(hands())));
 writeFileSync(join(OUT, 'icon-rounded.svg'), svg(background(230) + clip(hands(), 230)));
 // Android, адаптивная: только передний план в безопасной зоне (фон — цвет #0B0A14 в app.json)
 writeFileSync(join(OUT, 'adaptive.svg'), svg(clip(scaled(hands(), 0.7, 40))));
+// Android, адаптивная: фон — та же аврора, что у иконки iPhone (без неё лаунчер красил фон почти чёрным)
+writeFileSync(join(OUT, 'adaptive-bg.svg'), svg(background(0)));
+// Android 13+, тематическая иконка: силуэт в безопасной зоне (лаунчер сам красит его в цвет темы)
+writeFileSync(join(OUT, 'monochrome.svg'), svg(clip(scaled(hands(true), 0.62, 40))));
 // Уведомления Android: белый силуэт на прозрачном
 writeFileSync(join(OUT, 'notification.svg'), svg(clip(scaled(hands(true), 0.8, 20))));
 console.log('ok');

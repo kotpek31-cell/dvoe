@@ -234,6 +234,13 @@ export function dropPresence(client) {
   }
 }
 
+// Комната (этап фиксации 0.2): действия — в меню под кнопкой вверху справа
+export const MENU = /^Меню: игры/;
+export async function menuItem(page, label) {
+  await page.getByLabel(MENU).click();
+  await page.getByLabel(label, { exact: true }).last().click();
+}
+
 // opts: rest(path, uid) — свой ответ REST (undefined — как обычно), path — куда открыть (по умолчанию /room), прочее — в newContext
 export async function openPhone(browser, port, uid, name, opts = {}) {
   const { rest, path: startPath = '/room', ...ctxOpts } = opts;
@@ -243,7 +250,7 @@ export async function openPhone(browser, port, uid, name, opts = {}) {
     localStorage.setItem('sb-uvlausosjxzhytzyfduz-auth-token', s);
     localStorage.setItem('dvoe.onboarded', '1');
     // «Что нового» и подсказка на главной не мешают сценариям (ключи — src/lib/prefs.ts)
-    for (const k of ['dvoe:whats-new-0.2.1', 'dvoe:whats-new-0.2.2', 'dvoe:hint-nudge']) localStorage.setItem(k, '1');
+    for (const k of ['dvoe:whats-new-0.2.1', 'dvoe:whats-new-0.2.2', 'dvoe:whats-new-0.2-fix', 'dvoe:hint-nudge']) localStorage.setItem(k, '1');
   }, [JSON.stringify(session)]);
   await ctx.route(/supabase\.co\/(rest|auth|functions|storage)\//, async (route) => {
     const req = route.request();

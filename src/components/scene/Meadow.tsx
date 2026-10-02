@@ -9,9 +9,16 @@ import { FLOWERS, PALETTES, sceneTransform, STARS, type DayTime } from '../../li
 
 const CLOUD = 'M14 42 C3 42 1 29 12 27 C12 14 29 10 37 19 C41 6 64 4 70 17 C78 8 95 12 95 25 C108 23 116 34 107 42 Z';
 
-type Props = { width: number; height: number; time: DayTime; active: boolean; part?: 'all' | 'sky' | 'land' };
+// variant — плитка комнаты: 0 — главная, 1 — середина (большое дерево чуть левее, не режется швом),
+// 2 и 3 — боковые: свои деревья и куст, без тропинки, пледа, фонарика и бабочек (не зеркальные двойники)
+type Props = { width: number; height: number; time: DayTime; active: boolean; part?: 'all' | 'sky' | 'land'; variant?: 0 | 1 | 2 | 3 };
 
-function MeadowView({ width, height, time, active, part = 'all' }: Props) {
+function MeadowView({ width, height, time, active, part = 'all', variant = 0 }: Props) {
+  const side = variant >= 2;
+  // сдвиги деревьев и куста по вариантам (большое дерево у главной — в x≈346, куст — в x≈18)
+  const bigDx = [0, -16, -72, -236][variant];
+  const smallDx = [0, 0, 90, 196][variant];
+  const bushDx = [0, 0, 134, 292][variant];
   const sky = part !== 'land'; // небо, солнце, луна, облака
   const land = part !== 'sky'; // холмы, озеро, деревья и всё живое на земле
   const p = PALETTES[time];
@@ -88,7 +95,7 @@ function MeadowView({ width, height, time, active, part = 'all' }: Props) {
           <>
         <Path d="M-60 446 C40 412 92 400 140 424 C176 396 236 376 290 402 C330 384 364 390 450 404 L450 520 L-60 520 Z" fill={p.hill1} />
         <Path d="M-60 474 C60 448 120 446 180 466 C240 442 320 440 450 462 L450 520 L-60 520 Z" fill={p.hill2} />
-        <G>
+        <G transform={smallDx ? `translate(${smallDx} ${variant === 3 ? 6 : -4})` : undefined}>
           <Rect x={54} y={466} width={8} height={28} rx={3} fill={p.trunk} />
           <Circle cx={58} cy={450} r={22} fill={p.leaf1} />
           <Circle cx={44} cy={463} r={14} fill={p.leaf3} />
@@ -98,15 +105,17 @@ function MeadowView({ width, height, time, active, part = 'all' }: Props) {
         <Path d="M-60 490 C70 480 150 478 230 484 C300 488 350 484 450 492 L450 544 C330 552 250 550 170 548 C90 546 30 550 -60 552 Z" fill={p.lake} />
         <Path d="M-60 490 C70 480 150 478 230 484 C300 488 350 484 450 492 L450 498 C340 492 290 496 230 492 C150 486 70 488 -60 498 Z" fill={p.lakeEdge} />
         <Path d="M52 512 h26 M146 524 h40 M254 508 h22 M300 530 h30 M100 536 h18" fill="none" stroke={p.shimmer} strokeWidth={2.4} strokeLinecap="round" opacity={0.6} />
-        <Ellipse cx={p.refl.x} cy={514} rx={p.refl.rx} ry={4} fill={p.refl.color} opacity={p.refl.op} />
+        {side ? null : <Ellipse cx={p.refl.x} cy={514} rx={p.refl.rx} ry={4} fill={p.refl.color} opacity={p.refl.op} />}
         <Path d="M-60 540 C80 528 160 526 240 532 C300 537 350 534 450 528 L450 900 L-60 900 Z" fill={p.meadow} />
         <Path d="M-60 612 C100 590 260 594 450 614 L450 900 L-60 900 Z" fill={p.meadow2} />
-        <Path
-          d="M188 540 C176 562 206 580 196 606 C184 636 150 652 160 700 C168 740 140 790 150 900 L236 900 C222 790 246 744 232 702 C222 664 256 640 262 608 C268 580 232 562 226 540 Z"
-          fill={p.trail}
-          opacity={0.85}
-        />
-        <G>
+        {side ? null : (
+          <Path
+            d="M188 540 C176 562 206 580 196 606 C184 636 150 652 160 700 C168 740 140 790 150 900 L236 900 C222 790 246 744 232 702 C222 664 256 640 262 608 C268 580 232 562 226 540 Z"
+            fill={p.trail}
+            opacity={0.85}
+          />
+        )}
+        <G transform={bigDx ? `translate(${bigDx} 0)` : undefined}>
           <Rect x={340} y={540} width={12} height={58} rx={5} fill={p.trunk} />
           <Circle cx={346} cy={512} r={38} fill={p.leaf1} />
           <Circle cx={318} cy={536} r={25} fill={p.leaf3} />
@@ -114,17 +123,23 @@ function MeadowView({ width, height, time, active, part = 'all' }: Props) {
           <Circle cx={334} cy={496} r={14} fill={p.leaf2} opacity={0.7} />
           <Circle cx={360} cy={520} r={7} fill={p.leaf2} opacity={0.55} />
         </G>
-        <Circle cx={18} cy={602} r={17} fill={p.bush} />
-        <Circle cx={42} cy={608} r={14} fill={p.leaf3} />
-        <Circle cx={12} cy={594} r={7} fill={p.leaf2} opacity={0.6} />
-        <Path d="M214 626 L360 618 L378 690 L200 700 Z" fill={p.blanket} />
-        <Path
-          d="M250 624 L240 698 M288 622 L284 696 M326 620 L330 693 M209 650 L366 641 M204 675 L372 666"
-          fill="none"
-          stroke={p.blanketLine}
-          strokeWidth={6}
-          opacity={0.5}
-        />
+        <G transform={bushDx ? `translate(${bushDx} 0)` : undefined}>
+          <Circle cx={18} cy={602} r={17} fill={p.bush} />
+          <Circle cx={42} cy={608} r={14} fill={p.leaf3} />
+          <Circle cx={12} cy={594} r={7} fill={p.leaf2} opacity={0.6} />
+        </G>
+        {side ? null : (
+          <>
+            <Path d="M214 626 L360 618 L378 690 L200 700 Z" fill={p.blanket} />
+            <Path
+              d="M250 624 L240 698 M288 622 L284 696 M326 620 L330 693 M209 650 L366 641 M204 675 L372 666"
+              fill="none"
+              stroke={p.blanketLine}
+              strokeWidth={6}
+              opacity={0.5}
+            />
+          </>
+        )}
         <G opacity={p.flowerOp}>
           {FLOWERS.map(([x, y, color, size], i) => (
             <G key={i} transform={`translate(${x} ${y}) scale(${size / 20})`}>
@@ -137,7 +152,7 @@ function MeadowView({ width, height, time, active, part = 'all' }: Props) {
             </G>
           ))}
         </G>
-        {p.lanternOp > 0 ? (
+        {p.lanternOp > 0 && !side ? (
           <G opacity={p.lanternOp}>
             <Rect x={199} y={612} width={15} height={19} rx={4} fill="#FFE7A3" stroke="#2B2035" strokeWidth={1.6} />
             <Path d="M202 612 Q206.5 603 211 612" fill="none" stroke="#2B2035" strokeWidth={1.6} />
@@ -177,7 +192,7 @@ function MeadowView({ width, height, time, active, part = 'all' }: Props) {
         </Animated.View>
       ))}
 
-      {land && p.lanternOp > 0 ? (
+      {land && p.lanternOp > 0 && !side ? (
         <Animated.View
           style={{
             position: 'absolute',
@@ -196,7 +211,7 @@ function MeadowView({ width, height, time, active, part = 'all' }: Props) {
         </Animated.View>
       ) : null}
 
-      {land && time === 'day'
+      {land && time === 'day' && !side
         ? [
             { xs: [30, 150, 250, 120, 30], ys: [430, 380, 450, 500, 430], c1: '#FFD166', c2: '#FFB347', off: 0 },
             { xs: [330, 220, 300, 330, 330], ys: [560, 600, 520, 560, 560], c1: '#FF9EBB', c2: '#FF7FA6', off: 0.4 },
@@ -229,8 +244,8 @@ function MeadowView({ width, height, time, active, part = 'all' }: Props) {
 
       {land && time !== 'day'
         ? Array.from({ length: time === 'night' ? 9 : 6 }, (_, i) => {
-            const x = 20 + ((i * 97) % 350);
-            const y = time === 'night' ? 470 + ((i * 61) % 250) : 540 + ((i * 53) % 200);
+            const x = 20 + ((i * 97 + variant * 53) % 350);
+            const y = time === 'night' ? 470 + ((i * 61 + variant * 29) % 250) : 540 + ((i * 53 + variant * 31) % 200);
             const off = i / 9;
             const color = time === 'night' ? '#FFF2A6' : '#FFE0EC';
             return (

@@ -9,7 +9,7 @@ import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { saw, tri } from '../../lib/anim';
 import { artNodes, renderArt } from '../../lib/art';
-import { CAFE_CUPS, CAMPFIRE, CRYSTALS, GARLAND, locationParts, locationSvg, RAIN_PUDDLES, type LocationId } from '../../lib/locations';
+import { cafeCups, CAMPFIRE, crystalsOf, GARLAND, locationParts, locationSvg, rainPuddles, type LocationId, type Variant } from '../../lib/locations';
 import { nativeDriver, useReducedMotion } from '../../lib/motion';
 import { MUSH_HEX, useMushroomHint } from '../../lib/mushrooms';
 import { sceneTransform, type DayTime } from '../../lib/scene';
@@ -17,7 +17,8 @@ import { Meadow } from './Meadow';
 
 // part: в комнате небо рисуется одно на экран ('sky'), а земля с живыми деталями — плитками по всей площадке ('land')
 export type LocationPart = 'all' | 'sky' | 'land';
-type Props = { id: LocationId; width: number; height: number; time: DayTime; active: boolean; part?: LocationPart };
+// variant — плитка комнаты (0 — главная; 1 — середина комнаты; 2, 3 — боковые плитки со своими вещами)
+type Props = { id: LocationId; width: number; height: number; time: DayTime; active: boolean; part?: LocationPart; variant?: Variant };
 
 const PAINT = { c: '#888888', skin: '#FFDCC4', ids: 'loc' };
 const BIRD = 'M0 0 q6 -6 12 0 q6 -6 12 0';
@@ -31,11 +32,11 @@ const rnd = (i: number, k: number) => {
   return v - Math.floor(v);
 };
 
-function DrawnLocation({ id, width, height, time, active, part = 'all' }: Props & { id: Exclude<LocationId, 'meadow'> }) {
+function DrawnLocation({ id, width, height, time, active, part = 'all', variant = 0 }: Props & { id: Exclude<LocationId, 'meadow'> }) {
   const art = useMemo(() => {
-    const svg = part === 'all' ? locationSvg(id, time) : locationParts(id, time)[part];
-    return renderArt(artNodes(svg), PAINT, `${id}${time}${part}`);
-  }, [id, time, part]);
+    const svg = part === 'all' ? locationSvg(id, time) : locationParts(id, time, variant)[part];
+    return renderArt(artNodes(svg), PAINT, `${id}${time}${part}${variant}`);
+  }, [id, time, part, variant]);
   if (part === 'sky') {
     return (
       <Svg width={width} height={height} viewBox="0 0 390 844" preserveAspectRatio="xMidYMax slice" style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -43,10 +44,13 @@ function DrawnLocation({ id, width, height, time, active, part = 'all' }: Props 
       </Svg>
     );
   }
-  return <LiveLocation id={id} width={width} height={height} time={time} active={active} art={art} />;
+  return <LiveLocation id={id} width={width} height={height} time={time} active={active} art={art} variant={variant} />;
 }
 
-function LiveLocation({ id, width, height, time, active, art }: Props & { id: Exclude<LocationId, 'meadow'>; art: ReactNode }) {
+function LiveLocation({ id, width, height, time, active, art, variant = 0 }: Props & { id: Exclude<LocationId, 'meadow'>; art: ReactNode }) {
+  const v = variant;
+  const side = v >= 2; // боковая плитка комнаты: своих костра, маяка, чашек нет; птицы и облака — только в середине
+  const seed = side ? v * 17 : 0; // частицы на боковых плитках — по другой раскладке
   const reduce = useReducedMotion();
   const tf = useMemo(() => sceneTransform(width, height), [width, height]);
   const s = tf.s;
@@ -58,8 +62,8 @@ function LiveLocation({ id, width, height, time, active, art }: Props & { id: Ex
   const live = active && !reduce;
 
   // Подсказка в пещере: 5 вспышек за 4,4 с, пауза, снова (вспышки — не движение, идут и при «Уменьшить движение»)
-  const hint = useMushroomHint(id === 'cave' && time === 'night' && active);
-  const showHint = Boolean(hint && id === 'cave' && time === 'night');
+  const hint = useMushroomHint(id === 'cave' && time === 'night' && active && !side);
+  const showHint = Boolean(hint && id === 'cave' && time === 'night' && !side);
   const hintV = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     if (!showHint || !active) return;
@@ -85,18 +89,23 @@ function LiveLocation({ id, width, height, time, active, art }: Props & { id: Ex
   // Сияние: две полосы переливаются и чуть плывут
   const auroraBands =
     id === 'aurora' && time === 'night'
-      ? [
-          { d: 'M-40 250 C40 170 120 260 200 190 C270 130 330 210 430 150 L430 230 C330 290 270 210 200 270 C120 340 40 250 -40 330 Z', op: [0.3, 0.6], off: 0 },
-          { d: 'M-40 170 C60 120 140 190 220 130 C290 80 350 140 430 100 L430 140 C350 180 290 130 220 180 C140 240 60 170 -40 220 Z', op: [0.15, 0.42], off: 0.5 },
-        ]
+      ? side
+        ? [
+            { d: 'M-40 230 C60 200 110 150 190 210 C260 260 320 160 430 200 L430 270 C320 230 260 330 190 280 C110 220 60 270 -40 300 Z', op: [0.28, 0.56], off: 0.2 },
+            { d: 'M-40 150 C40 110 130 160 200 120 C280 70 340 150 430 120 L430 160 C340 190 280 110 200 160 C130 200 40 150 -40 190 Z', op: [0.15, 0.4], off: 0.7 },
+          ]
+        : [
+            { d: 'M-40 250 C40 170 120 260 200 190 C270 130 330 210 430 150 L430 230 C330 290 270 210 200 270 C120 340 40 250 -40 330 Z', op: [0.3, 0.6], off: 0 },
+            { d: 'M-40 170 C60 120 140 190 220 130 C290 80 350 140 430 100 L430 140 C350 180 290 130 220 180 C140 240 60 170 -40 220 Z', op: [0.15, 0.42], off: 0.5 },
+          ]
       : [];
 
   // Снег: днём и вечером реже, ночью гуще
-  const flakes = id === 'aurora' || id === 'snow' ? Array.from({ length: id === 'snow' ? 18 : time === 'night' ? 14 : 9 }, (_, i) => ({ x: 14 + ((i * 83) % 362), off: (i * 0.137) % 1, r: i % 3 === 0 ? 2.6 : 1.8 })) : [];
+  const flakes = id === 'aurora' || id === 'snow' ? Array.from({ length: id === 'snow' ? 18 : time === 'night' ? 14 : 9 }, (_, i) => ({ x: 14 + ((i * 83 + seed * 7) % 362), off: (i * 0.137 + seed * 0.019) % 1, r: i % 3 === 0 ? 2.6 : 1.8 })) : [];
 
   // Птицы: голуби на крыше днём, чайки на пляже днём
   const birds =
-    time === 'day' && (id === 'roof' || id === 'beach' || id === 'mountains')
+    time === 'day' && !side && (id === 'roof' || id === 'beach' || id === 'mountains')
       ? [
           { y: id === 'roof' ? 300 : 230, off: 0, k: 1 },
           { y: id === 'roof' ? 330 : 260, off: 0.12, k: 0.8 },
@@ -115,7 +124,7 @@ function LiveLocation({ id, width, height, time, active, art }: Props & { id: Ex
     </Animated.View>
   );
   const extra: ReactNode[] = [];
-  if (id === 'forest') {
+  if (id === 'forest' && !side) {
     const { x, y } = CAMPFIRE;
     extra.push(
       bit('flame', x - 14, y - 34, 28, 34, { opacity: live ? tri(blink, 0, 0.55, 0.95) : 0.8, transform: [{ scaleY: live ? tri(blink, 0.3, 0.85, 1.12) : 1 }] },
@@ -130,17 +139,17 @@ function LiveLocation({ id, width, height, time, active, art }: Props & { id: Ex
         }, <Circle cx={3} cy={3} r={2} fill={i % 2 ? '#FFE38A' : '#FFB347'} />),
       );
     }
-    if (time !== 'day')
-      for (let i = 0; i < 9; i++)
-        extra.push(
-          bit(`ff${i}`, 20 + rnd(i, 3) * 350, 430 + rnd(i, 4) * 300, 10, 10, {
-            opacity: live ? tri(blink, rnd(i, 5), 0.1, 1) : 0.6,
-            transform: [{ translateX: live ? tri(slow, rnd(i, 6), -20 * s, 20 * s) : 0 }, { translateY: live ? tri(slow, rnd(i, 7) + 0.3, -14 * s, 14 * s) : 0 }],
-          }, <><Circle cx={5} cy={5} r={5} fill="#E8FF8A" opacity={0.35} /><Circle cx={5} cy={5} r={2} fill="#F4FFB8" /></>),
-        );
   }
+  if (id === 'forest' && time !== 'day')
+    for (let i = 0; i < 9; i++)
+      extra.push(
+        bit(`ff${i}`, 20 + rnd(i + seed, 3) * 350, 430 + rnd(i + seed, 4) * 300, 10, 10, {
+          opacity: live ? tri(blink, rnd(i + seed, 5), 0.1, 1) : 0.6,
+          transform: [{ translateX: live ? tri(slow, rnd(i + seed, 6), -20 * s, 20 * s) : 0 }, { translateY: live ? tri(slow, rnd(i + seed, 7) + 0.3, -14 * s, 14 * s) : 0 }],
+        }, <><Circle cx={5} cy={5} r={5} fill="#E8FF8A" opacity={0.35} /><Circle cx={5} cy={5} r={2} fill="#F4FFB8" /></>),
+      );
   if (id === 'cafe')
-    CAFE_CUPS.forEach((c, ci) =>
+    cafeCups(v).forEach((c, ci) =>
       [0, 0.5].forEach((o, j) =>
         extra.push(
           bit(`st${ci}${j}`, c.x - 6 + j * 4, c.y - 34, 12, 22, {
@@ -153,10 +162,10 @@ function LiveLocation({ id, width, height, time, active, art }: Props & { id: Ex
   if (id === 'moon') {
     for (let i = 0; i < 10; i++)
       extra.push(
-        bit(`tw${i}`, 10 + rnd(i, 8) * 370, 20 + rnd(i, 9) * 420, 10, 10, { opacity: live ? tri(blink, rnd(i, 10), 0.1, 1) : 0.7 },
+        bit(`tw${i}`, 10 + rnd(i + seed, 8) * 370, 20 + rnd(i + seed, 9) * 420, 10, 10, { opacity: live ? tri(blink, rnd(i + seed, 10), 0.1, 1) : 0.7 },
           <Path d="M5 0 C5.5 3.5 6.5 4.5 10 5 C6.5 5.5 5.5 6.5 5 10 C4.5 6.5 3.5 5.5 0 5 C3.5 4.5 4.5 3.5 5 0 Z" fill="#FFFFFF" />),
       );
-    extra.push(
+    if (!side) extra.push(
       bit('shoot', 330, 40, 60, 20, {
         opacity: live ? spin.interpolate({ inputRange: [0, 0.03, 0.14, 0.18, 1], outputRange: [0, 1, 1, 0, 0] }) : 0,
         transform: [
@@ -169,13 +178,13 @@ function LiveLocation({ id, width, height, time, active, art }: Props & { id: Ex
   }
   if (id === 'sakura')
     for (let i = 0; i < 14; i++) {
-      const off = rnd(i, 11);
+      const off = rnd(i + seed, 11);
       extra.push(
-        bit(`pt${i}`, rnd(i, 12) * 390, 0, 10, 8, {
+        bit(`pt${i}`, rnd(i + seed, 12) * 390, 0, 10, 8, {
           top: 0,
           opacity: time === 'night' ? 0.7 : 0.95,
           transform: [
-            { translateY: live ? saw(slow, off, tf.y(180), tf.y(860)) : tf.y(260 + rnd(i, 13) * 500) },
+            { translateY: live ? saw(slow, off, tf.y(180), tf.y(860)) : tf.y(260 + rnd(i + seed, 13) * 500) },
             { translateX: live ? tri(slow, off * 4, -26 * s, 26 * s) : 0 },
             { rotate: live ? tri(blink, off, -40, 40).interpolate({ inputRange: [-40, 40], outputRange: ['-40deg', '40deg'] }) : '20deg' },
           ],
@@ -184,16 +193,16 @@ function LiveLocation({ id, width, height, time, active, art }: Props & { id: Ex
     }
   if (id === 'rain') {
     for (let i = 0; i < 26; i++) {
-      const off = rnd(i, 14);
+      const off = rnd(i + seed, 14);
       extra.push(
-        bit(`rd${i}`, rnd(i, 15) * 400, 0, 6, 16, {
+        bit(`rd${i}`, rnd(i + seed, 15) * 400, 0, 6, 16, {
           top: 0,
           opacity: 0.55,
-          transform: [{ translateY: live ? saw(blink, off, tf.y(-30), tf.y(860)) : tf.y(rnd(i, 16) * 800) }],
+          transform: [{ translateY: live ? saw(blink, off, tf.y(-30), tf.y(860)) : tf.y(rnd(i + seed, 16) * 800) }],
         }, <Path d="M5 1 L1 15" stroke="#DDE6F6" strokeWidth={1.6} strokeLinecap="round" />),
       );
     }
-    RAIN_PUDDLES.forEach((q, i) =>
+    rainPuddles(v).forEach((q, i) =>
       extra.push(
         bit(`rp${i}`, q.x - q.rx * 0.6, q.y - q.rx * 0.15, q.rx * 1.2, q.rx * 0.3, {
           opacity: live ? saw(blink, i * 0.37, 0.9, 0) : 0,
@@ -202,7 +211,7 @@ function LiveLocation({ id, width, height, time, active, art }: Props & { id: Ex
       ),
     );
   }
-  if (id === 'mountains')
+  if (id === 'mountains' && !side)
     [{ y: 230, w: 120, off: 0 }, { y: 300, w: 90, off: 0.45 }, { y: 180, w: 70, off: 0.75 }].forEach((c, i) =>
       extra.push(
         <Animated.View
@@ -222,7 +231,8 @@ function LiveLocation({ id, width, height, time, active, art }: Props & { id: Ex
       ),
     );
   if (id === 'cave') {
-    CRYSTALS.forEach((c, i) =>
+    const crystals = crystalsOf(v);
+    crystals.forEach((c, i) =>
       extra.push(
         bit(`cg${i}`, c.x - 40 * c.s, c.y - 70 * c.s, 80 * c.s, 80 * c.s, { opacity: live ? tri(blink, rnd(i, 17), 0.15, 0.7) : 0.4 },
           <>
@@ -239,7 +249,7 @@ function LiveLocation({ id, width, height, time, active, art }: Props & { id: Ex
     if (showHint && hint)
       // слева направо — и по времени, и по месту порядок один
       [0, 1, 6, 2, 3].forEach((ci, i) => {
-        const c = CRYSTALS[ci];
+        const c = crystals[ci];
         const col = MUSH_HEX[hint[i]];
         const st = 0.04 + i * 0.11;
         const d = 170 * c.s;
@@ -273,8 +283,9 @@ function LiveLocation({ id, width, height, time, active, art }: Props & { id: Ex
       ),
     );
   }
-  const beam = id === 'beach' && time !== 'day';
-  const moonPath = id === 'beach' && time === 'night';
+  const beam = id === 'beach' && time !== 'day' && !side;
+  const moonPath = id === 'beach' && time === 'night' && !side;
+  const beamX = v === 1 ? 314 : 350; // в середине комнаты маяк чуть левее — не режется швом
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -370,7 +381,7 @@ function LiveLocation({ id, width, height, time, active, art }: Props & { id: Ex
       {beam ? (
         <Animated.View
           style={{
-            ...abs(350 - 150, 322 - 150),
+            ...abs(beamX - 150, 322 - 150),
             width: 300 * s,
             height: 300 * s,
             opacity: time === 'night' ? 0.55 : 0.32,
@@ -406,7 +417,7 @@ function LiveLocation({ id, width, height, time, active, art }: Props & { id: Ex
 }
 
 function LocationView(props: Props) {
-  if (props.id === 'meadow') return <Meadow width={props.width} height={props.height} time={props.time} active={props.active} part={props.part} />;
+  if (props.id === 'meadow') return <Meadow width={props.width} height={props.height} time={props.time} active={props.active} part={props.part} variant={props.variant} />;
   return <DrawnLocation {...props} id={props.id} />;
 }
 

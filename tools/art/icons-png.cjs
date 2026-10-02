@@ -14,10 +14,15 @@ const jobs = [
   ['icon.svg', 'public/icon-192.png', 192, false],
   ['icon.svg', 'public/icon-512.png', 512, false],
   ['icon.svg', 'public/apple-touch-icon.png', 180, false],
+  ['adaptive-bg.svg', 'assets/adaptive-bg.png', 1024, false],
+  ['monochrome.svg', 'assets/monochrome-icon.png', 1024, true],
 ];
+// node tools/art/icons-png.cjs adaptive-bg monochrome — только эти (остальные PNG не трогаем)
+const only = process.argv.slice(2);
 (async () => {
   const b = await pw.chromium.launch();
   for (const [src, out, size, transparent] of jobs) {
+    if (only.length && !only.some((o) => src.startsWith(o))) continue;
     const p = await b.newPage({ viewport: { width: size, height: size } });
     const svg = fs.readFileSync(path.join(dir, src), 'utf8').replace(/width="1024" height="1024"/, `width="${size}" height="${size}"`);
     await p.setContent(`<html><body style="margin:0;background:transparent">${svg}</body></html>`);
