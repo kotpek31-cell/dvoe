@@ -17,6 +17,7 @@ import { Location } from '../../src/components/scene/Location';
 import { Basket, BASKET_W, basketSlot, FlyingShroom, MushroomPatch, PluckWord } from '../../src/components/scene/Mushrooms';
 import { LocationSheet } from '../../src/components/LocationSheet';
 import { IconButton, Pill, Pressy, Txt } from '../../src/components/ui';
+import { Joystick } from '../../src/components/Joystick';
 import { Walker } from '../../src/components/Walker';
 import { useAbility } from '../../src/context/AbilityProvider';
 import { usePair, useTableVersion } from '../../src/context/PairProvider';
@@ -75,6 +76,9 @@ export default function HomeScreen() {
   const [meAct, setMeAct] = useState<'wave' | 'jump' | 'love' | null>(null);
   const [picker, setPicker] = useState(false);
   const [goMe, setGoMe] = useState<{ x: number; y?: number; id: number } | null>(null);
+  const [steer, setSteer] = useState<{ ang: number; run: boolean; n: number } | null>(null); // джойстик
+  const steerAt = useRef(0);
+  const [stick, setStick] = useState(true);
   const [goPartner, setGoPartner] = useState<{ x: number; y?: number; id: number } | null>(null);
   const [meet, setMeet] = useState<'go' | 'five' | 'wave' | null>(null);
   const [sparks, setSparks] = useState(0);
@@ -122,6 +126,10 @@ export default function HomeScreen() {
     if (timers.current[key]) clearTimeout(timers.current[key]);
     timers.current[key] = setTimeout(fn, ms);
   };
+
+  useEffect(() => {
+    if (focused) getFlag('joystick').then((off) => setStick(!off)).catch(() => undefined);
+  }, [focused]);
 
   useEffect(() => {
     const tick = setInterval(() => setNow(new Date()), 30_000);
@@ -252,6 +260,23 @@ export default function HomeScreen() {
   const faceFor = (face: FaceState, act: 'wave' | 'jump' | 'love' | null) =>
     act === 'wave' || act === 'jump' ? { emotion: 'joy' as FaceKey, value: 80 } : act === 'love' ? { emotion: 'love' as FaceKey, value: 72 } : face;
 
+  // Джойстик: новый отрезок, когда сменилось направление или скорость (или раз в ~1 с — чтобы цель была впереди)
+  const onSteer = (ang: number, power: number) => {
+    if (meSleeps) return;
+    const run = power > 0.62;
+    const now = Date.now();
+    if (steer && steer.run === run && now - steerAt.current < 1100) {
+      let d = Math.abs(ang - steer.ang) % (Math.PI * 2);
+      if (d > Math.PI) d = Math.PI * 2 - d;
+      if (d < 0.22) return;
+    }
+    steerAt.current = now;
+    if (bubble) setBubble(false);
+    if (meAct) setMeAct(null);
+    pluckGoal.current = null;
+    setSteer({ ang, run, n: (steer?.n ?? 0) + 1 });
+  };
+
   // Нажали на пустую землю — идём туда
   const tapGround = (pageX: number, pageY: number) => {
     if (meSleeps) return;
@@ -300,6 +325,9 @@ export default function HomeScreen() {
       const slot = basketSlot(Math.min(4, hunt.basket.length));
       setChpok((c) => ({ n: (c?.n ?? 0) + 1, x: x + dir * mushSize * 0.9, y: y - mushSize * 0.5 })); // в сторону от чибика
       setFly((f) => ({ n: (f?.n ?? 0) + 1, c: m.c, from: { x, y }, to: { x: (width - BASKET_W) / 2 + slot.x, y: basketTop + slot.y } }));
+      // убираем сами, не полагаясь на конец анимации (на Android «чпок» мог остаться висеть)
+      later('chpokOff', 900, () => setChpok(null));
+      later('flyOff', 800, () => setFly(null));
       later('pluckUp', 420, () => setPlucking(null));
       later('put', 560, () => {
         putMushroom(m.c, hasHat).then((r) => {
@@ -398,7 +426,8 @@ export default function HomeScreen() {
         />
       ) : null}
 
-      <View style={[StyleSheet.absoluteFill, playing ? styles.hidden : null]} pointerEvents={playing ? 'none' : 'box-none'}>
+      {/* сцена с чибиками — свой слой (zIndex 0): их zIndex по глубине не поднимет их над кнопками */}
+      <View style={[StyleSheet.absoluteFill, styles.stage, playing ? styles.hidden : null]} pointerEvents={playing ? 'none' : 'box-none'}>
       <Pressable
         style={[styles.ground, { top: tf.y(505) }]}
         onPress={(e) => tapGround(e.nativeEvent.pageX, e.nativeEvent.pageY)}
@@ -474,6 +503,7 @@ export default function HomeScreen() {
           pose={plucking ? 'sit' : meAct === 'wave' ? 'wave' : meAct === 'jump' ? 'jump' : meetPose ?? 'idle'}
           face={plucking ? plucking.dir : meet === 'five' ? 1 : undefined}
           goTo={goMe}
+          steer={steer}
           onArrive={(id) => {
             const p = pluckGoal.current;
             if (p && p.id === id) {
@@ -615,6 +645,15 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
+      {!playing && stick && !meSleeps ? (
+        <Joystick
+          size={Math.round(Math.min(100, width * 0.25))}
+          onSteer={onSteer}
+          onRelease={() => setSteer(null)}
+          style={{ left: 16, bottom: Math.max(insets.bottom, 10) + 6 + 68 + 14 }}
+        />
+      ) : null}
+
       {!playing ? <AbilityButton onMessage={showToast} busy={Boolean(scene)} /> : null}
 
       <Toast text={toast} top={insets.top + 58 + below} />
@@ -628,6 +667,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#6FB7F5', overflow: 'hidden' },
   hidden: { opacity: 0 },
   front: { zIndex: 5000 },
+  stage: { zIndex: 0 },
   ground: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   online: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.good, marginLeft: 2 },
   checkMode: {

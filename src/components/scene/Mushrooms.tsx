@@ -1,6 +1,6 @@
 // Грибы в лесу (0.2.2): гриб на земле, корзинка сверху и гриб, который летит в корзинку.
 // Гриб: ночью светится, сорванный вырастает снова через 2 с, при неверном порядке вянет и встаёт обратно.
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, G, Path, RadialGradient, Stop } from 'react-native-svg';
 import { INK } from '../../lib/face';
@@ -246,12 +246,23 @@ export function FlyingShroom({ from, to, color, nonce, size }: { from: { x: numb
 }
 
 // «Чпок» над чибиком
+// Родитель сам убирает надпись через ~0,9 с: на Android конец нативной анимации не гарантирует, что она погаснет
 export function PluckWord({ x, y, nonce }: { x: number; y: number; nonce: number }) {
   const t = useRef(new Animated.Value(0)).current;
   useEffect(() => {
     t.setValue(0);
-    Animated.timing(t, { toValue: 1, duration: 760, easing: Easing.out(Easing.quad), useNativeDriver: nativeDriver }).start();
+    const a = Animated.timing(t, { toValue: 1, duration: 760, easing: Easing.out(Easing.quad), useNativeDriver: nativeDriver });
+    a.start();
+    return () => a.stop();
   }, [nonce, t]);
+  // интерполяции — один раз: новые узлы на каждой перерисовке рвут нативную анимацию
+  const anim = useMemo(
+    () => ({
+      opacity: t.interpolate({ inputRange: [0, 0.1, 0.7, 1], outputRange: [0, 1, 1, 0] }),
+      transform: [{ translateY: t.interpolate({ inputRange: [0, 1], outputRange: [0, -26] }) }, { scale: t.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0.6, 1.12, 1] }) }],
+    }),
+    [t],
+  );
   return (
     <Animated.View
       pointerEvents="none"
@@ -262,8 +273,7 @@ export function PluckWord({ x, y, nonce }: { x: number; y: number; nonce: number
         width: 100,
         alignItems: 'center',
         zIndex: 6000,
-        opacity: t.interpolate({ inputRange: [0, 0.1, 0.7, 1], outputRange: [0, 1, 1, 0] }),
-        transform: [{ translateY: t.interpolate({ inputRange: [0, 1], outputRange: [0, -26] }) }, { scale: t.interpolate({ inputRange: [0, 0.2, 1], outputRange: [0.6, 1.12, 1] }) }],
+        ...anim,
       }}
     >
       <Txt weight="display" size={16} color="#FFF4C2" style={styles.word}>

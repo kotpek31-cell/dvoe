@@ -174,7 +174,7 @@ export function useRoomGame(d: Deps) {
             if (closed.current !== s.id) setSnap(s);
             dRef.current.send({ t: 'g', s });
           },
-          finish: (places, best) => roomGameFinish(res.id, places, best),
+          finish: (places, best, ranks) => roomGameFinish(res.id, places, best, ranks),
           starBots,
         },
       );

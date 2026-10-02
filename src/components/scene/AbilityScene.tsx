@@ -25,10 +25,12 @@ export const sceneKind = (ability: string): SceneKind => (ability === 'ability.m
 
 export function sceneLength(kind: SceneKind, reduce: boolean): number {
   if (kind === 'mog') return reduce ? 3000 : 7000;
-  return reduce ? 2400 : 4000;
+  return reduce ? 2400 : 4600;
 }
 
 const clamp = { extrapolate: 'clamp' as const };
+// Таймлайн объятий (мс): тянут руки, встретились, второе облачко сердец, отпустили
+const HUG = { reach: 620, meet: 1050, second: 2350, release: 3400 };
 
 // Приближение и тряска всей картинки (луг тоже) — их же применяет главная к фону
 export function worldTransform(t: Animated.Value, kind: SceneKind, reduce: boolean) {
@@ -205,14 +207,30 @@ export function AbilityScene({ scene, t, reduce, caster, target, width, height, 
         });
         at(reduce ? 2600 : 6200, () => set({ target: 'idle', targetFace: ['calm', 40], closed: false }));
       }
-    } else {
-      const meet = reduce ? 0 : 900;
-      at(meet, () => {
+    } else if (reduce) {
+      at(0, () => {
         set({ caster: 'hug', target: 'hug', casterFace: ['love', 80], targetFace: ['love', 80] });
         playSound('chime', 0.8);
         haptic.success();
         setHearts((n) => n + 1);
       });
+    } else {
+      // подбегают → тянут руки → обнимаются и покачиваются (глаза закрыты от счастья) → отпускают и машут
+      at(HUG.reach, () => set({ caster: 'reach', target: 'reach', casterFace: ['joy', 85], targetFace: ['joy', 85] }));
+      at(HUG.meet, () => {
+        set({ caster: 'hug', target: 'hug', casterFace: ['love', 85], targetFace: ['love', 85] });
+        playSound('chime', 0.8);
+        haptic.success();
+        setHearts((n) => n + 1);
+      });
+      at(HUG.meet + 320, () => set({ closed: true, casterClosed: true }));
+      at(HUG.second, () => {
+        setHearts((n) => n + 1);
+        playSound('pop', 0.45);
+        haptic.light();
+      });
+      at(HUG.release, () => set({ caster: 'idle', target: 'idle', closed: false, casterClosed: false, casterFace: ['joy', 90], targetFace: ['joy', 90] }));
+      at(HUG.release + 260, () => set({ caster: 'wave', target: 'wave' }));
     }
     at(total, () => done.current());
     return () => {
@@ -244,6 +262,22 @@ export function AbilityScene({ scene, t, reduce, caster, target, width, height, 
     const fallAt = blocked ? hitAt + (reduce ? 200 : 350) : hitAt;
     let casterX = t.interpolate({ inputRange: [0, runTo], outputRange: [pos.c0, pos.c1], ...clamp });
     let targetX = t.interpolate({ inputRange: [0, runTo], outputRange: [pos.t0, pos.t1], ...clamp });
+    // объятия: бегом почти до конца, последний шажок — с протянутыми руками; после — отходят на полшага
+    let hugLean: { caster: Animated.AnimatedInterpolation<string>; target: Animated.AnimatedInterpolation<string>; hop: Animated.AnimatedInterpolation<number> } | null = null;
+    if (kind === 'hug' && !reduce) {
+      const near = size * 0.2;
+      const back = size * 0.12;
+      casterX = t.interpolate({ inputRange: [0, HUG.reach, HUG.meet, HUG.release, HUG.release + 400], outputRange: [pos.c0, pos.c1 - near, pos.c1, pos.c1, pos.c1 - back], ...clamp });
+      targetX = t.interpolate({ inputRange: [0, HUG.reach, HUG.meet, HUG.release, HUG.release + 400], outputRange: [pos.t0, pos.t1 + near, pos.t1, pos.t1, pos.t1 + back], ...clamp });
+      // покачиваются вместе, наклонившись друг к другу (поворот вокруг ног)
+      const swayIn = [HUG.meet, HUG.meet + 300, HUG.meet + 750, HUG.meet + 1200, HUG.meet + 1650, HUG.meet + 2100, HUG.release];
+      const lean = [0, 6, 1, 6, 1, 5, 0];
+      hugLean = {
+        caster: t.interpolate({ inputRange: swayIn, outputRange: lean.map((d) => `${d}deg`), ...clamp }),
+        target: t.interpolate({ inputRange: swayIn, outputRange: lean.map((d) => `${-d}deg`), ...clamp }),
+        hop: t.interpolate({ inputRange: [HUG.meet - 120, HUG.meet + 40, HUG.meet + 220], outputRange: [0, -7 * (size / 120), 0], ...clamp }),
+      };
+    }
     if (blocked) {
       // отбросило назад от купола
       casterX = reduce
@@ -266,7 +300,7 @@ export function AbilityScene({ scene, t, reduce, caster, target, width, height, 
           : blocked
             ? t.interpolate({ inputRange: [1600, 1900, 4000, 4600], outputRange: [0, 1, 1, 0], ...clamp })
             : t.interpolate({ inputRange: [1600, 1900, 3800, 4050], outputRange: [0, 1, 1, 0], ...clamp })
-        : t.interpolate({ inputRange: reduce ? [0, 300, 1900, 2300] : [700, 1100, 3300, 3900], outputRange: [0, 1, 1, 0], ...clamp });
+        : t.interpolate({ inputRange: reduce ? [0, 300, 1900, 2300] : [HUG.reach, HUG.meet, HUG.release, HUG.release + 700], outputRange: [0, 1, 1, 0], ...clamp });
     const word = reduce
       ? { opacity: t.interpolate({ inputRange: [0, 200, 1400, 1600], outputRange: [0, 1, 1, 0], ...clamp }), scale: 1 }
       : {
@@ -295,7 +329,7 @@ export function AbilityScene({ scene, t, reduce, caster, target, width, height, 
           pill: t.interpolate({ inputRange: [fallAt + 100, fallAt + 400], outputRange: [0, 1], ...clamp }),
         }
       : null;
-    return { casterX, targetX, fadeOut, dark, aura, word, bars, flash, burst, dust, stars, shield };
+    return { casterX, targetX, hugLean, fadeOut, dark, aura, word, bars, flash, burst, dust, stars, shield };
   }, [kind, blocked, reduce, total, t, pos, size]);
 
   // Черепа кружат вокруг пары (1,6–4 с)
@@ -383,7 +417,19 @@ export function AbilityScene({ scene, t, reduce, caster, target, width, height, 
         ) : null}
 
         {/* тот, к кому применили */}
-        <Animated.View style={[styles.actor, { top: ground, width: size, height: chibiH, transform: [{ translateX: anim.targetX }] }]}>
+        <Animated.View
+          style={[
+            styles.actor,
+            {
+              top: ground,
+              width: size,
+              height: chibiH,
+              transform: anim.hugLean
+                ? [{ translateX: anim.targetX }, { translateY: anim.hugLean.hop }, { translateY: chibiH / 2 }, { rotate: anim.hugLean.target }, { translateY: -chibiH / 2 }]
+                : [{ translateX: anim.targetX }],
+            },
+          ]}
+        >
           {anim.shield ? (
             <Animated.View style={{ position: 'absolute', left: size / 2 - size * 0.7, top: -size * 0.45, opacity: anim.shield.hat }}>
               <Glow size={size * 1.4} color="#C9FFB0" opacity={0.9} />
@@ -402,7 +448,19 @@ export function AbilityScene({ scene, t, reduce, caster, target, width, height, 
         </Animated.View>
 
         {/* тот, кто применил */}
-        <Animated.View style={[styles.actor, { top: ground, width: size, height: chibiH, transform: [{ translateX: anim.casterX }] }]}>
+        <Animated.View
+          style={[
+            styles.actor,
+            {
+              top: ground,
+              width: size,
+              height: chibiH,
+              transform: anim.hugLean
+                ? [{ translateX: anim.casterX }, { translateY: anim.hugLean.hop }, { translateY: chibiH / 2 }, { rotate: anim.hugLean.caster }, { translateY: -chibiH / 2 }]
+                : [{ translateX: anim.casterX }],
+            },
+          ]}
+        >
           {anim.dust ? (
             <Animated.View style={{ position: 'absolute', left: -size * 0.25, top: chibiH * 0.82, opacity: anim.dust }}>
               <Svg width={size * 0.5} height={size * 0.2} viewBox="0 0 50 20">

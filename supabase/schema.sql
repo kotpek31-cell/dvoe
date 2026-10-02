@@ -2906,7 +2906,8 @@ declare
   v_min     integer;
   v_places  text[];
   v_ids     text[];
-  v_winner  uuid;
+  v_winners uuid[];
+  v_ranks   jsonb := p_result -> 'ranks';
   v_counted boolean;
   v_p       jsonb;
   v_u       uuid;
@@ -2937,7 +2938,21 @@ begin
      or not (v_places <@ v_ids) then
     return jsonb_build_object('ok', false, 'error', 'result', 'message', 'Итог не сходится с игроками');
   end if;
-  v_winner := v_places[1]::uuid;
+  -- Места с повторами (этап фиксации 0.2): одинаковый результат — общее место. Победа — всем на первом месте;
+  -- все на первом (ничья) — никому. Без ranks (старые версии) — победил первый в списке.
+  if jsonb_typeof(v_ranks) = 'object' then
+    if exists (select 1 from unnest(v_ids) m
+               where not coalesce(case when jsonb_typeof(v_ranks -> m) = 'number'
+                                       then (v_ranks ->> m)::numeric between 1 and cardinality(v_ids) end, false)) then
+      return jsonb_build_object('ok', false, 'error', 'result', 'message', 'Итог не сходится с игроками');
+    end if;
+    v_winners := array(select m::uuid from unnest(v_ids) m where (v_ranks ->> m)::numeric = 1);
+    if cardinality(v_winners) = cardinality(v_ids) then
+      v_winners := '{}';
+    end if;
+  else
+    v_winners := array[v_places[1]::uuid];
+  end if;
   v_counted := v_g.humans >= 2 and now() < v_g.started_at + interval '20 minutes';
   update public.room_games set finished_at = now(), result = p_result where id = p_game;
 
@@ -2955,7 +2970,7 @@ begin
                                       or (v_g.game = 'stars' and v_val > v_old)
                                       or (v_g.game = 'reaction' and v_val < v_old));
       insert into public.game_records as r (user_id, game, played, wins, best, best_at)
-      values (v_u, v_g.game, 1, case when (v_p ->> 'm')::uuid = v_winner then 1 else 0 end,
+      values (v_u, v_g.game, 1, case when (v_p ->> 'm')::uuid = any(v_winners) then 1 else 0 end,
               v_val, case when v_val is not null then now() end)
       on conflict (user_id, game) do update
         set played = r.played + 1,
@@ -2967,7 +2982,7 @@ begin
         v_records := v_records || jsonb_build_object('user_id', v_u, 'member', v_p ->> 'm', 'best', v_val);
       end if;
       -- награды за победы: 1 — кубок, 10 — корона, 25 — плащ
-      if (v_p ->> 'm')::uuid = v_winner then
+      if (v_p ->> 'm')::uuid = any(v_winners) then
         select coalesce(sum(g.wins), 0) into v_total from public.game_records g where g.user_id = v_u;
         foreach v_item in array array['hand.trophy', 'hat.champion', 'back.champion'] loop
           continue when v_total < case v_item when 'hand.trophy' then 1 when 'hat.champion' then 10 else 25 end;
@@ -2982,7 +2997,8 @@ begin
     end loop;
   end if;
 
-  return jsonb_build_object('ok', true, 'counted', v_counted, 'winner', v_winner, 'records', v_records, 'rewards', v_rewards);
+  return jsonb_build_object('ok', true, 'counted', v_counted, 'winner', v_winners[1], 'winners', to_jsonb(v_winners),
+                            'draw', cardinality(v_winners) = 0, 'records', v_records, 'rewards', v_rewards);
 end;
 $$;
 

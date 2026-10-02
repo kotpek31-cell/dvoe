@@ -12,7 +12,7 @@ export type ReactionKind = 'heart' | 'laugh' | 'wow' | 'fire' | 'tear' | 'star';
 export const REACTIONS: ReactionKind[] = ['heart', 'laugh', 'wow', 'fire', 'tear', 'star'];
 
 export type Wire =
-  | { t: 'move'; m: string; x: number; y: number; run?: boolean; snap?: boolean }
+  | { t: 'move'; m: string; x: number; y: number; run?: boolean; snap?: boolean; e?: 1 } // e — мягкий разгон (нажатие на землю)
   | { t: 'react'; m: string; k: ReactionKind }
   | { t: 'five'; id: string; a: string; b: string; ax: number; ay: number; bx: number; by: number }
   | { t: 'fiveAll'; id: string; from: string; spots: Record<string, [number, number]> }

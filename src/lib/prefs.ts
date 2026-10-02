@@ -6,6 +6,8 @@ const KEYS = {
   nudgeHint: 'dvoe:hint-nudge',
   abilitySoundsOff: 'dvoe:ability-sounds-off',
   ambientOff: 'dvoe:ambient-off',
+  quietInSilent: 'dvoe:quiet-in-silent',
+  joystick: 'dvoe:joystick-off',
   whatsNew: 'dvoe:whats-new-0.2.2',
 } as const;
 

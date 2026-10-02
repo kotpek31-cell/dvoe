@@ -102,6 +102,12 @@ export function freeSpot(g: Geo, loc: LocationId, px: number, py: number): { px:
 // ---------- Ходок ----------
 export type MoverState = { moving: boolean; run: boolean; dir: 1 | -1; to: { x: number; y: number } };
 
+// Шаг по нажатию — мягкий разгон и торможение; джойстик — ровно (отрезки идут один за другим без рывков)
+const EASE = Easing.bezier(0.3, 0, 0.25, 1);
+const LINEAR = (t: number) => t;
+export const RUN_SPEED = 160; // пикселей сцены в секунду
+export const WALK_SPEED = 64;
+
 export class Mover {
   x: Animated.Value;
   y: Animated.Value;
@@ -110,6 +116,7 @@ export class Mover {
   private start = 0;
   private dur = 0;
   private anim: Animated.CompositeAnimation | null = null;
+  private ease: (t: number) => number = LINEAR;
   private seq = 0;
   state: MoverState;
   private listeners = new Set<() => void>();
@@ -137,7 +144,7 @@ export class Mover {
   // Где сейчас (доли) — с учётом того, что идёт
   now(): { x: number; y: number } {
     if (!this.state.moving || this.dur <= 0) return this.state.to;
-    const k = Math.min(1, (Date.now() - this.start) / this.dur);
+    const k = this.ease(Math.min(1, (Date.now() - this.start) / this.dur));
     return { x: this.from.x + (this.state.to.x - this.from.x) * k, y: this.from.y + (this.state.to.y - this.from.y) * k };
   }
 
@@ -157,8 +164,9 @@ export class Mover {
     this.set({ moving: false, to });
   }
 
-  // Идёт (или бежит) в точку; onArrive — когда дошёл (не вызывается, если перебили новой командой)
-  go(fx: number, fy: number, run: boolean, onArrive?: () => void, reduce = false): number {
+  // Идёт (или бежит) в точку; onArrive — когда дошёл (не вызывается, если перебили новой командой).
+  // smooth — мягкий разгон и торможение (нажатие на землю); без него — ровно (джойстик, чужие команды старых версий)
+  go(fx: number, fy: number, run: boolean, onArrive?: () => void, reduce = false, smooth = false): number {
     const to = { x: clamp01(fx), y: clamp01(fy) };
     const cur = this.now();
     this.anim?.stop();
@@ -166,7 +174,7 @@ export class Mover {
     const dx = pxX(this.g, to.x) - pxX(this.g, cur.x);
     const dy = (pxY(this.g, to.y) - pxY(this.g, cur.y)) * 1.4; // вглубь — чуть медленнее
     const dist = Math.hypot(dx, dy);
-    const speed = (run ? 150 : 62) * this.g.s;
+    const speed = (run ? RUN_SPEED : WALK_SPEED) * this.g.s;
     this.from = cur;
     if (reduce || dist < 2) {
       this.from = to;
@@ -177,12 +185,14 @@ export class Mover {
       return 0;
     }
     this.start = Date.now();
-    this.dur = Math.max(350, (dist / speed) * 1000);
+    this.ease = smooth ? EASE : LINEAR;
+    // с разгоном путь чуть дольше — средняя скорость та же
+    this.dur = Math.max(smooth ? 420 : 250, (dist / speed) * 1000 * (smooth ? 1.18 : 1));
     this.set({ moving: true, run, to, dir: Math.abs(dx) > 4 ? (dx > 0 ? 1 : -1) : this.state.dir });
     this.x.setValue(pxX(this.g, cur.x));
     this.y.setValue(pxY(this.g, cur.y));
     const t = (v: Animated.Value, toValue: number) =>
-      Animated.timing(v, { toValue, duration: this.dur, easing: Easing.linear, useNativeDriver: nativeDriver });
+      Animated.timing(v, { toValue, duration: this.dur, easing: this.ease, useNativeDriver: nativeDriver });
     this.anim = Animated.parallel([t(this.x, pxX(this.g, to.x)), t(this.y, pxY(this.g, to.y))]);
     this.anim.start(({ finished }) => {
       if (!finished || id !== this.seq) return;
@@ -203,6 +213,8 @@ export class Mover {
     this.anim?.stop();
     this.seq++;
     this.from = cur;
+    this.x.setValue(pxX(this.g, cur.x));
+    this.y.setValue(pxY(this.g, cur.y));
     this.set({ moving: false, to: cur });
   }
 }

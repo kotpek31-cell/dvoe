@@ -597,8 +597,9 @@ export async function roomGameStart(players: string[]): Promise<GameStartReply> 
 export type GameFinishReply =
   | { ok: true; counted: boolean; records: { member: string; best: number }[]; rewards: { user_id: string; item_id: string }[] }
   | { ok: false; error: string; message: string };
-export async function roomGameFinish(id: string, places: string[], best: Record<string, number>): Promise<GameFinishReply> {
-  const res = ((await rpc<Record<string, unknown>>('room_game_finish', { p_game: id, p_result: { places, best } })) ?? {});
+// ranks — места с повторами: сервер засчитывает победу всем на первом месте, при ничьей — никому
+export async function roomGameFinish(id: string, places: string[], best: Record<string, number>, ranks: Record<string, number>): Promise<GameFinishReply> {
+  const res = ((await rpc<Record<string, unknown>>('room_game_finish', { p_game: id, p_result: { places, best, ranks } })) ?? {});
   if (res.ok === true) {
     return {
       ok: true,

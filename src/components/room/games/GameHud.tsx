@@ -2,7 +2,7 @@
 // «Финиш!». Звуки событий игры — здесь же (сравниваем прошлый снимок с новым).
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
-import { RPS, type Action, type GamePub, type Hand, type ReactionPub, type RpsPub, type StarsPub, HANDS, placesOf } from '../../../lib/games/rules';
+import { RPS, type Action, type GamePub, type Hand, type ReactionPub, type RpsPub, type StarsPub, HANDS, isDraw, placesOf, ranksOf, winnersOf } from '../../../lib/games/rules';
 import type { GameSnap } from '../../../lib/games/host';
 import { haptic, nativeDriver } from '../../../lib/motion';
 import { playSound } from '../../../lib/sound';
@@ -332,14 +332,22 @@ function EndBanner({ st, nameOf, meId, height, reduce }: Props & { st: GamePub }
   useEffect(() => {
     if (!reduce) Animated.timing(v, { toValue: 1, duration: 420, easing: Easing.out(Easing.back(2)), useNativeDriver: nativeDriver }).start();
   }, [v, reduce]);
-  const win = placesOf(st)[0];
+  const ranks = ranksOf(st);
+  const winners = winnersOf(ranks, placesOf(st));
+  const line = isDraw(ranks)
+    ? 'Ничья'
+    : winners.length === 1
+      ? winners[0] === meId
+        ? 'Ты побеждаешь!'
+        : `Побеждает ${nameOf(winners[0])}`
+      : `Побеждают ${winners.map((m) => (m === meId ? 'ты' : nameOf(m))).join(' и ')}`;
   return (
     <View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(8,5,18,0.3)' }]}>
       <Animated.View style={[styles.endWrap, { top: height * 0.3, opacity: v, transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }) }] }]}>
         <Txt weight="display" size={40} center color="#FFD45E" style={styles.bigShadow}>
           {st.g === 'stars' ? 'Время!' : 'Финиш!'}
         </Txt>
-        {win ? <Hint text={win === meId ? 'Ты побеждаешь!' : `Побеждает ${nameOf(win)}`} size={16} /> : null}
+        {winners.length || isDraw(ranks) ? <Hint text={line} size={16} /> : null}
       </Animated.View>
     </View>
   );

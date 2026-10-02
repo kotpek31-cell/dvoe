@@ -6,6 +6,7 @@ import type { RoomMember } from '../../../lib/api';
 import type { Catalog } from '../../../lib/catalog';
 import { lookOf, wear, type Look, type WearCat } from '../../../lib/chibi';
 import type { GameSnap } from '../../../lib/games/host';
+import { isDraw, winnersOf } from '../../../lib/games/rules';
 import { haptic } from '../../../lib/motion';
 import { playSound } from '../../../lib/sound';
 import { C } from '../../../theme';
@@ -56,7 +57,18 @@ export function Podium({ snap, meId, userId, members, catalog, width, height, to
   if (!res) return null;
   const member = (m: string) => members.find((x) => x.id === m);
   const name = (m: string) => (m === meId ? 'ты' : (member(m)?.name ?? 'Кто-то'));
-  const win = res.places[0];
+  // места с повторами: одинаковый результат — общее место; у старых версий ranks нет — места подряд
+  const ranks: Record<string, number> = res.ranks ?? Object.fromEntries(res.places.map((m, i) => [m, i + 1]));
+  const draw = isDraw(ranks);
+  const winners = winnersOf(ranks, res.places);
+  const names = (list: string[]) => list.map(name).join(' и ');
+  const title = draw
+    ? 'Ничья!'
+    : winners.length === 1
+      ? winners[0] === meId
+        ? 'Победа — твоя!'
+        : `Победа — ${name(winners[0])}!`
+      : `Победа делится: ${names(winners)}`;
   const st = snap.st;
   const value = (m: string): string => {
     if (st?.g === 'stars') return bestText('stars', st.scores[m] ?? 0);
@@ -70,13 +82,22 @@ export function Podium({ snap, meId, userId, members, catalog, width, height, to
   const otherRecords = res.records.filter((r) => r.member !== meId);
   const myRewards = res.rewards.filter((r) => r.user_id === userId);
   const otherRewards = res.rewards.filter((r) => r.user_id !== userId);
-  const top3 = res.places.slice(0, 3);
-  const rest = res.places.slice(3);
-  const pedW = Math.min(110, (width - 48) / 3);
+  // ступени: на каждой — все, кто делит это место (1, 1, 3 — две на золотой, одна на бронзовой)
+  const tiers: { rank: number; list: string[] }[] = [];
+  res.places.forEach((m) => {
+    const r = ranks[m] ?? res.places.length;
+    if (r > 3) return;
+    const t = tiers.find((x) => x.rank === r);
+    if (t) t.list.push(m);
+    else tiers.push({ rank: r, list: [m] });
+  });
+  const rest = res.places.filter((m) => (ranks[m] ?? 99) > 3);
+  const onStage = tiers.reduce((a, t) => a + t.list.length, 0);
+  const pedW = Math.min(110, (width - 48) / Math.max(3, onStage));
   const pedH = Math.min(150, height * 0.17);
   const chibi = Math.round(pedW * 0.86);
   // порядок на пьедестале: 2 — 1 — 3
-  const order = top3.length === 2 ? [1, 0] : [1, 0, 2].filter((i) => i < top3.length);
+  const order = tiers.length === 2 ? [1, 0] : [1, 0, 2].filter((i) => i < tiers.length);
   const myLook: Look | null = meId ? lookOf({ chibi: member(meId)?.chibi }) : null;
 
   const status =
@@ -96,7 +117,7 @@ export function Podium({ snap, meId, userId, members, catalog, width, height, to
           {GAME_NAME[snap.game]}
         </Txt>
         <Txt weight="display" size={24} center style={styles.shadow}>
-          {win === meId ? 'Победа — твоя!' : `Победа — ${name(win)}!`}
+          {title}
         </Txt>
         {myRecord ? (
           <View style={styles.record}>
@@ -114,22 +135,27 @@ export function Podium({ snap, meId, userId, members, catalog, width, height, to
 
         <View style={[styles.stage, { height: pedH + chibi * 1.3 }]}>
           {order.map((i) => {
-            const m = top3[i];
-            const mem = member(m);
-            const ph = pedH * PED[i].h;
+            const t = tiers[i];
+            const step = Math.min(3, t.rank) - 1;
+            const ph = pedH * PED[step].h;
+            const one = t.list.length === 1 ? t.list[0] : null;
             return (
-              <View key={m} style={[styles.col, { width: pedW }]}>
-                <Chibi look={lookOf({ chibi: mem?.chibi })} emotion={i === 0 ? 'joy' : i === 1 ? 'calm' : 'calm'} value={i === 0 ? 95 : 55} pose={i === 0 ? 'cheer' : 'idle'} size={chibi} />
-                <View style={[styles.ped, { height: ph, backgroundColor: PED[i].color }]}>
+              <View key={t.rank} style={[styles.col, { width: pedW * t.list.length }]}>
+                <View style={styles.row}>
+                  {t.list.map((m) => (
+                    <Chibi key={m} look={lookOf({ chibi: member(m)?.chibi })} emotion={t.rank === 1 ? 'joy' : 'calm'} value={t.rank === 1 ? (draw ? 70 : 95) : 55} pose={t.rank === 1 && !draw ? 'cheer' : 'idle'} size={chibi} />
+                  ))}
+                </View>
+                <View style={[styles.ped, { height: ph, backgroundColor: PED[step].color }]}>
                   <Txt weight="display" size={26} color="#2B2035">
-                    {i + 1}
+                    {t.rank}
                   </Txt>
                   <Txt weight="heavy" size={12.5} color="#2B2035" numberOfLines={1}>
-                    {m === meId ? 'Ты' : (mem?.name ?? '—')}
+                    {one ? (one === meId ? 'Ты' : (member(one)?.name ?? '—')) : t.list.map((m) => (m === meId ? 'Ты' : (member(m)?.name ?? '—'))).join(' · ')}
                   </Txt>
-                  {value(m) ? (
+                  {value(t.list[0]) ? (
                     <Txt weight="bold" size={11.5} color="rgba(43,32,53,0.8)" numberOfLines={1}>
-                      {value(m)}
+                      {value(t.list[0])}
                     </Txt>
                   ) : null}
                 </View>
@@ -139,7 +165,7 @@ export function Podium({ snap, meId, userId, members, catalog, width, height, to
         </View>
         {rest.length ? (
           <Txt weight="bold" size={13} muted center>
-            {rest.map((m, k) => `${k + 4}. ${m === meId ? 'ты' : (member(m)?.name ?? '—')}${value(m) ? ` (${value(m)})` : ''}`).join(' · ')}
+            {rest.map((m) => `${ranks[m]}. ${m === meId ? 'ты' : (member(m)?.name ?? '—')}${value(m) ? ` (${value(m)})` : ''}`).join(' · ')}
           </Txt>
         ) : null}
 
@@ -198,6 +224,7 @@ const styles = StyleSheet.create({
   record: { alignSelf: 'center', flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, paddingVertical: 6, borderRadius: 16, backgroundColor: 'rgba(94,211,160,0.16)', borderWidth: 1, borderColor: C.good },
   stage: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 6, marginTop: 6 },
   col: { alignItems: 'center' },
+  row: { flexDirection: 'row', justifyContent: 'center' },
   ped: { alignSelf: 'stretch', alignItems: 'center', paddingTop: 6, borderRadius: 10, borderWidth: 2, borderColor: '#2B2035', marginTop: -6 },
   reward: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 22, backgroundColor: 'rgba(255,212,94,0.12)', borderWidth: 1, borderColor: 'rgba(255,212,94,0.5)' },
   flex: { flex: 1 },
