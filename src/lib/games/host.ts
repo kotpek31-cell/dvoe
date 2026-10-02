@@ -27,6 +27,7 @@ export type GamePhase = 'wheel' | 'play' | 'end' | 'podium' | 'aborted';
 
 export type GameResult = {
   places: string[];
+  ranks?: Record<string, number>; // места с повторами: одинаковый результат — общее место (нет — у старых версий)
   best: Record<string, number>;
   saved: boolean | null; // null — ещё сохраняем
   counted: boolean; // рекорды и награды считались (людей ≥ 2)
@@ -71,7 +72,7 @@ type Opts = {
   rules: Rules;
   clock: () => number;
   emit: (s: GameSnap) => void;
-  finish: (places: string[], best: Record<string, number>) => Promise<FinishReply>;
+  finish: (places: string[], best: Record<string, number>, ranks: Record<string, number>) => Promise<FinishReply>;
   starBots?: StarBots;
   wait?: (ms: number) => Promise<void>;
   random?: () => number;
@@ -191,7 +192,7 @@ export class GameHost {
       const st = this.state!;
       this.set({
         phase: 'podium',
-        result: this.snap.result ?? { places: this.o.rules.placesOf(st), best: this.o.rules.bestOf(st), saved: null, counted: false, records: [], rewards: [] },
+        result: this.snap.result ?? { places: this.o.rules.placesOf(st), ranks: this.o.rules.ranksOf(st), best: this.o.rules.bestOf(st), saved: null, counted: false, records: [], rewards: [] },
       });
     }
     if (now - this.lastEmit >= BEAT_MS && !this.done) this.dirty = true;
@@ -203,6 +204,7 @@ export class GameHost {
     if (this.saving || !this.state) return;
     const st = this.state;
     const places = this.o.rules.placesOf(st);
+    const ranks = this.o.rules.ranksOf(st);
     const best = this.o.rules.bestOf(st);
     const wait = this.o.wait ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
     this.saving = (async () => {
@@ -212,7 +214,7 @@ export class GameHost {
         const left = minAt - this.o.clock();
         if (left > 0) await wait(left);
         try {
-          reply = await this.o.finish(places, best);
+          reply = await this.o.finish(places, best, ranks);
         } catch (e) {
           reply = { ok: false, error: 'net', message: e instanceof Error ? e.message : 'Нет связи — итог не сохранился' };
         }
@@ -220,8 +222,8 @@ export class GameHost {
         await wait(2000);
       }
       const result: GameResult = reply.ok
-        ? { places, best, saved: true, counted: reply.counted, records: reply.records, rewards: reply.rewards }
-        : { places, best, saved: false, counted: false, records: [], rewards: [], message: reply.message };
+        ? { places, ranks, best, saved: true, counted: reply.counted, records: reply.records, rewards: reply.rewards }
+        : { places, ranks, best, saved: false, counted: false, records: [], rewards: [], message: reply.message };
       if (this.snap.phase === 'aborted') return;
       this.set({ result });
       this.flush(true);

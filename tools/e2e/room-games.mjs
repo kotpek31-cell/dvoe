@@ -1,6 +1,6 @@
 // Партия на двух телефонах (Gaster ведёт, Соня играет, Тестик — бот): колесо → игра → пьедестал, снимки в OUT.
 // node tools/e2e/room-games.mjs <pumpkin|stars|reaction|rps> [--records]
-import { launch, log, openPhone, startServer, state } from './harness.mjs';
+import { launch, log, openPhone, startServer, state, MENU, menuItem } from './harness.mjs';
 
 const OUT = process.env.OUT ?? '/tmp/dvoe-shots';
 import fs from 'node:fs';
@@ -15,11 +15,11 @@ try {
   const A = await openPhone(browser, port, '11111111-1111-4111-8111-111111111111', 'Gaster');
   await wait(1500);
   const B = await openPhone(browser, port, '22222222-2222-4222-8222-222222222222', 'Соня');
-  await A.page.getByText('Играть').waitFor({ timeout: 30000 });
-  await B.page.getByText('Играть').waitFor({ timeout: 30000 });
+  await A.page.getByLabel(MENU).waitFor({ timeout: 30000 });
+  await B.page.getByLabel(MENU).waitFor({ timeout: 30000 });
   await wait(2500);
   await A.page.screenshot({ path: `${OUT}/${game}-00-room-A.png` });
-  await A.page.getByLabel('Играть').click();
+  await menuItem(A.page, 'Играть');
   const t0 = Date.now();
   const at = async (ms, label) => {
     const left = t0 + ms - Date.now();

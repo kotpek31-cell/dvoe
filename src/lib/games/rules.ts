@@ -144,6 +144,7 @@ const pumpkin = {
     return pub;
   },
   places: (s: PumpkinState) => [...s.alive, ...[...s.out].reverse()],
+  ranks: (s: PumpkinPub) => groupRanks([s.alive, ...[...s.out].reverse().map((m) => [m])]),
   best: (_s: PumpkinState): Record<string, number> => ({}),
 };
 
@@ -222,6 +223,11 @@ const stars = {
     const idx = (m: string) => s.players.indexOf(m);
     active.sort((a, b) => (s.scores[b] ?? 0) - (s.scores[a] ?? 0) || (s.scoreAt[a] ?? Infinity) - (s.scoreAt[b] ?? Infinity) || idx(a) - idx(b));
     return [...active, ...[...s.out].reverse()];
+  },
+  ranks(s: StarsPub) {
+    const order = stars.places(s as StarsState);
+    const score = (m: string) => s.scores[m] ?? 0;
+    return sameRanks(order, s.out, (a, b) => score(a) === score(b));
   },
   best(s: StarsState) {
     const best: Record<string, number> = {};
@@ -321,6 +327,11 @@ const reaction = {
     );
     return [...alive, ...[...s.out].reverse()];
   },
+  ranks(s: ReactionPub) {
+    const order = reaction.places(s as ReactionState);
+    const ms = (m: string) => (Number.isFinite(s.bestMs[m]) ? s.bestMs[m] : -1);
+    return sameRanks(order, s.out, (a, b) => (s.points[a] ?? 0) === (s.points[b] ?? 0) && ms(a) === ms(b));
+  },
   best(s: ReactionState) {
     const best: Record<string, number> = {};
     s.alive.forEach((m) => {
@@ -346,6 +357,7 @@ export type RpsPub = Common & {
   auto: string[]; // не успели — выбрано случайно
   result: Hand | 'draw' | null; // какая рука победила
   lost: string[]; // выбыли в этом раунде
+  groups: string[][]; // выбывшие группами: проигравшие в одном раунде делят место
 };
 type RpsState = RpsPub & Hidden & { picks: Record<string, Hand>; botAt: Record<string, number> };
 
@@ -382,6 +394,7 @@ const rps = {
       auto: [],
       result: null,
       lost: [],
+      groups: [],
       picks: {},
       botAt: {},
       r: rng(seed),
@@ -426,7 +439,8 @@ const rps = {
         result = shown[keep];
       }
       const alive = s.alive.filter((m) => !lost.includes(m));
-      return { ...s, shown, result, lost, alive, out: [...s.out, ...lost], phase: 'reveal', revealEnd: now + RPS.REVEAL_MS };
+      const groups = lost.length ? [...(s.groups ?? []), lost] : (s.groups ?? []);
+      return { ...s, shown, result, lost, alive, groups, out: [...s.out, ...lost], phase: 'reveal', revealEnd: now + RPS.REVEAL_MS };
     }
     if (s.phase === 'reveal' && now >= s.revealEnd) {
       return s.alive.length <= 1 ? { ...s, phase: 'done', done: true } : rpsRound(s, now);
@@ -437,7 +451,7 @@ const rps = {
     if (s.done || !s.alive.includes(m)) return s;
     const alive = without(s.alive, m);
     const { [m]: _gone, ...picks } = s.picks;
-    const next: RpsState = { ...s, alive, picks, picked: s.picked.filter((x) => x !== m), out: [...s.out, m] };
+    const next: RpsState = { ...s, alive, picks, picked: s.picked.filter((x) => x !== m), out: [...s.out, m], groups: [...(s.groups ?? []), [m]] };
     // на «раз!» уже показали руки — дождёмся конца раунда; иначе один остался — победил
     if (alive.length <= 1 && s.phase !== 'reveal') return { ...next, phase: 'done', done: true };
     return next;
@@ -447,6 +461,8 @@ const rps = {
     return pub;
   },
   places: (s: RpsState) => [...s.alive, ...[...s.out].reverse()],
+  // в одном раунде проиграли несколько — общее место
+  ranks: (s: RpsPub) => groupRanks([s.alive, ...[...(s.groups ?? s.out.map((m) => [m]))].reverse()]),
   best: (_s: RpsState): Record<string, number> => ({}),
 };
 
@@ -492,12 +508,51 @@ export function pubGame(s: GameState): GamePub {
   return rps.pub(s);
 }
 
-// Места от первого до последнего — все участники, без повторов (так требует сервер)
+// Порядок мест от первого до последнего — все участники, без повторов (так требует сервер); равные — см. ranksOf
 export function placesOf(s: GameState | GamePub): string[] {
   if (s.g === 'pumpkin') return pumpkin.places(s as PumpkinState);
   if (s.g === 'stars') return stars.places(s as StarsState);
   if (s.g === 'reaction') return reaction.places(s as ReactionState);
   return rps.places(s as RpsState);
+}
+
+// Места с повторами (1, 1, 3): одинаковый результат — общее место. Ушедшие из игры — после всех, каждый на своём.
+export function ranksOf(s: GameState | GamePub): Record<string, number> {
+  if (s.g === 'pumpkin') return pumpkin.ranks(s);
+  if (s.g === 'stars') return stars.ranks(s);
+  if (s.g === 'reaction') return reaction.ranks(s);
+  return rps.ranks(s);
+}
+
+// Ничья: все участники на первом месте (двое с одинаковым результатом — ничья)
+export const isDraw = (ranks: Record<string, number>) => {
+  const v = Object.values(ranks);
+  return v.length >= 2 && v.every((r) => r === 1);
+};
+
+// Победители — все на первом месте; при ничьей — никто
+export const winnersOf = (ranks: Record<string, number>, order: string[]) => (isDraw(ranks) ? [] : order.filter((m) => ranks[m] === 1));
+
+// Группы по порядку мест → места с повторами
+function groupRanks(groups: string[][]): Record<string, number> {
+  const ranks: Record<string, number> = {};
+  let at = 1;
+  groups.forEach((g) => {
+    if (!g.length) return;
+    g.forEach((m) => (ranks[m] = at));
+    at += g.length;
+  });
+  return ranks;
+}
+
+// По порядку мест: соседи с равным результатом делят место (ушедшие из игры — каждый на своём)
+function sameRanks(order: string[], out: string[], same: (a: string, b: string) => boolean): Record<string, number> {
+  const ranks: Record<string, number> = {};
+  order.forEach((m, i) => {
+    const prev = order[i - 1];
+    ranks[m] = i > 0 && !out.includes(m) && !out.includes(prev) && same(prev, m) ? ranks[prev] : i + 1;
+  });
+  return ranks;
 }
 
 // Лучший результат для рекордов: звездопад — очки, реакция — мс; остальным не нужен

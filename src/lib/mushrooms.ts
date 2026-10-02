@@ -17,7 +17,7 @@ export const HAT_ID = 'hat.mushroom';
 // мимо бревна, костра, пледа и кнопки способности (справа внизу)
 export const HOME_MUSHROOMS: { c: MushColor; x: number; y: number }[] = [
   { c: 'red', x: 152, y: 664 },
-  { c: 'yellow', x: 40, y: 712 },
+  { c: 'yellow', x: 28, y: 618 }, // был под джойстиком (этап фиксации 0.2) — теперь у костра
   { c: 'white', x: 122, y: 740 },
   { c: 'purple', x: 206, y: 724 },
   { c: 'blue', x: 286, y: 738 },

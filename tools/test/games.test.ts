@@ -7,11 +7,13 @@ import {
   HANDS,
   initGame,
   inputGame,
+  isDraw,
   leaveGame,
   near,
   placesOf,
   pubGame,
   PUMPKIN,
+  ranksOf,
   REACTION,
   rng,
   RPS,
@@ -23,6 +25,7 @@ import {
   type GameId,
   type GameState,
   type Hand,
+  winnersOf,
 } from '../../src/lib/games/rules.ts';
 
 const P3 = ['a', 'b', 'c'];
@@ -212,8 +215,19 @@ describe('Звездопад', () => {
     let t: number;
     [s, t] = run(s, 0, (x) => x.done);
     assert.ok(t >= STARS.DURATION && t < STARS.DURATION + 100);
-    assert.deepEqual(placesOf(s), ['b', 'c', 'a'], 'b набрал 2 раньше c');
+    assert.deepEqual(placesOf(s), ['b', 'c', 'a'], 'b набрал 2 раньше c — выше в списке');
+    assert.deepEqual(ranksOf(s), { b: 1, c: 1, a: 3 }, 'но место у равных общее');
+    assert.deepEqual(winnersOf(ranksOf(s), placesOf(s)), ['b', 'c']);
+    assert.equal(isDraw(ranksOf(s)), false);
     assert.deepEqual(bestOf(s), { a: 0, b: 2, c: 2 });
+  });
+
+  it('двое с одинаковым счётом — ничья, победителей нет', () => {
+    let s = initGame('stars', ['a', 'b'], [], 8, 0);
+    [s] = run(s, 0, (x) => x.done);
+    assert.deepEqual(ranksOf(s), { a: 1, b: 1 });
+    assert.equal(isDraw(ranksOf(s)), true);
+    assert.deepEqual(winnersOf(ranksOf(s), placesOf(s)), []);
   });
 
   it('ушёл — выбыл: счёт замер, место внизу, рекорда нет', () => {
@@ -326,6 +340,14 @@ describe('Реакция', () => {
     }
     assert.deepEqual(wait(q).points, { a: 2, b: 2 });
     assert.deepEqual(placesOf(q), ['b', 'a'], 'у b лучшее 240');
+    assert.deepEqual(ranksOf(q), { b: 1, a: 2 }, 'очки равны, но время разное — места разные');
+  });
+
+  it('никто не нажал ни разу — ничья', () => {
+    let s = initGame('reaction', ['a', 'b'], [], 21, 0);
+    [s] = run(s, 0, (x) => x.done);
+    assert.deepEqual(ranksOf(s), { a: 1, b: 1 });
+    assert.equal(isDraw(ranksOf(s)), true);
   });
 
   it('ушёл посреди раунда — выбыл; остался один — конец', () => {
@@ -427,6 +449,18 @@ describe('Камень, ножницы, бумага', () => {
     s = leaveGame(s, 'a', 300);
     assert.equal(s.done, true);
     assert.deepEqual(placesOf(s), ['c', 'a', 'b']);
+    assert.deepEqual(ranksOf(s), { c: 1, a: 2, b: 3 }, 'ушедшие — каждый на своём месте');
+  });
+
+  it('проиграли в одном раунде — общее место', () => {
+    let s = initGame('rps', P3, [], 6, 0);
+    s = inputGame(s, 'a', { k: 'pick', r: 1, h: 'paper' }, 100);
+    s = inputGame(s, 'b', { k: 'pick', r: 1, h: 'rock' }, 100);
+    s = inputGame(s, 'c', { k: 'pick', r: 1, h: 'rock' }, 100);
+    [s] = run(s, 100, (x) => x.done);
+    assert.deepEqual(R(s).alive, ['a']);
+    assert.deepEqual(ranksOf(s), { a: 1, b: 2, c: 2 });
+    assert.deepEqual(winnersOf(ranksOf(s), placesOf(s)), ['a']);
   });
 });
 

@@ -1,7 +1,8 @@
-// «Что нового» в 0.2.2: загадка про грибы и ходьба вглубь, за ними — карточки 0.2.1. Яркие карточки, листаются вбок; на каждой картинка и 1–2 строки, внизу «Понятно».
+// «Что нового» после этапа фиксации 0.2: джойстик, объятия, шапки, звук (на iPhone — и новая иконка), за ними — карточки 0.2.2 и 0.2.1.
+// Про комнату — ни слова (она секретная). Яркие карточки, листаются вбок; на каждой картинка и 1–2 строки, внизу «Понятно».
 // Тексты хранятся в приложении. Картинки собраны из чибиков, иконок и маленькой локации — без файлов.
 import { useRef, useState, type ReactNode } from 'react';
-import { Modal, ScrollView, StyleSheet, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { Modal, Platform, ScrollView, StyleSheet, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { usePair } from '../context/PairProvider';
 import { LOOKS, lookOf, type Look } from '../lib/chibi';
 import { closeWhatsNew, useWhatsNew } from '../lib/whatsNew';
@@ -9,6 +10,7 @@ import { C, R, S } from '../theme';
 import { Chibi } from './Chibi';
 import { Location } from './scene/Location';
 import { MushroomArt } from './scene/Mushrooms';
+import { Icon } from './Icon';
 import { Button, Txt } from './ui';
 
 type Card = { title: string; text: string; tint: string; art: (w: number, h: number, me: Look) => ReactNode };
@@ -33,7 +35,83 @@ const SHROOMS = [
   { c: 'red', x: 0.74, y: 0.66, s: 0.17 },
 ] as const;
 
+// iPhone: иконку экрана «Домой» (и в уведомлениях) система запоминает, когда сайт добавляют, — её меняет только повторное добавление
+const iosWeb = Platform.OS === 'web' && typeof navigator !== 'undefined' && /iPhone|iPad|iPod/.test(navigator.userAgent);
+
+// Джойстик: стекло и кнопка-кругляш (как в приложении)
+const stick = (size: number) => (
+  <View style={[styles.stick, { width: size, height: size, borderRadius: size / 2 }]}>
+    <View style={[styles.knob, { width: size * 0.44, height: size * 0.44, borderRadius: size * 0.22, transform: [{ translateX: size * 0.16 }, { translateY: -size * 0.08 }] }]} />
+  </View>
+);
+
+const FIX: Card[] = [
+  {
+    title: 'Джойстик',
+    text: 'Слева внизу на главной: веди пальцем — чибик идёт, дальше от центра — бежит. Выключить — в настройках.',
+    tint: C.me,
+    art: (w, h, me) => (
+      <View style={[styles.center, styles.row, { gap: w * 0.08 }]}>
+        <View style={{ marginBottom: h * 0.12 }}>{stick(h * 0.36)}</View>
+        <Chibi look={me} emotion="joy" value={80} pose="run" size={h * 0.56} still />
+      </View>
+    ),
+  },
+  {
+    title: 'Объятия ожили',
+    text: 'Чибики подбегают, тянут руки, обнимаются и покачиваются — а потом машут друг другу.',
+    tint: C.partner,
+    art: (w, h, me) => (
+      <View style={[styles.center, styles.row]}>
+        <Chibi look={me} emotion="love" value={85} pose="hug" size={h * 0.56} still />
+        <View style={{ marginLeft: -h * 0.2 }}>
+          <Chibi look={LOOKS.girl} emotion="love" value={85} pose="hug" size={h * 0.56} flip still />
+        </View>
+      </View>
+    ),
+  },
+  {
+    title: 'Шапки с объёмом',
+    text: 'У головных уборов появились блики, тени и строчки — сидят на голове, а не лежат наклейкой.',
+    tint: '#FFC266',
+    art: (w, h, me) => (
+      <View style={[styles.center, styles.row, { gap: w * 0.04 }]}>
+        <Chibi look={{ ...me, hat: { id: 'hat.beanie' } }} emotion="joy" value={70} pose="idle" size={h * 0.5} still />
+        <Chibi look={{ ...LOOKS.girl, hat: { id: 'hat.panama' } }} emotion="joy" value={70} pose="idle" size={h * 0.5} still />
+      </View>
+    ),
+  },
+  {
+    title: 'Звук',
+    text:
+      Platform.OS === 'web'
+        ? 'Звуки снова слышны на iPhone — и в беззвучном режиме. Если нужно тихо — «Настройки» → «Тихо в беззвучном режиме».'
+        : 'Звуки способностей и мест играют на громкости медиа. Выключить — в настройках.',
+    tint: C.good,
+    art: (w, h) => (
+      <View style={styles.center}>
+        <Icon name="bell" size={h * 0.4} color={C.good} strokeWidth={1.6} />
+      </View>
+    ),
+  },
+  ...(iosWeb
+    ? [
+        {
+          title: 'Новая иконка на iPhone',
+          text: 'Чтобы «Ладошки» появились на экране «Домой» и в уведомлениях: удали «Двое» с экрана «Домой», открой сайт в Safari, «Поделиться» → «На экран Домой», войди и включи уведомления в настройках.',
+          tint: C.accent,
+          art: (w: number, h: number) => (
+            <View style={styles.center}>
+              <Icon name="phone" size={h * 0.42} color={C.accent} strokeWidth={1.6} />
+            </View>
+          ),
+        },
+      ]
+    : []),
+];
+
 const CARDS: Card[] = [
+  ...FIX,
   {
     title: 'В лесу что-то выросло',
     text: 'Говорят, грибы любят порядок.',
@@ -188,5 +266,7 @@ const styles = StyleSheet.create({
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 6, paddingVertical: S.md },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.22)' },
   dotOn: { width: 20, backgroundColor: C.accent },
+  stick: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(24,18,40,0.55)', borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.24)' },
+  knob: { backgroundColor: 'rgba(246,243,255,0.9)', borderWidth: 2, borderColor: '#2B2035' },
   actions: { paddingHorizontal: S.lg, gap: S.xs },
 });

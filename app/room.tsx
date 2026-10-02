@@ -8,11 +8,12 @@
 // «Назад» — остаёшься в комнате (у других — сидит полупрозрачный), «Выйти» — освобождаешь место.
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, AppState, Easing, PanResponder, Platform, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Animated, AppState, Easing, PanResponder, Platform, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Chibi } from '../src/components/Chibi';
 import { Confetti, SparkPop, Toast } from '../src/components/Effects';
 import { Icon, type IconName } from '../src/components/Icon';
+import { Joystick } from '../src/components/Joystick';
 import { LocationSheet } from '../src/components/LocationSheet';
 import { actorGame } from '../src/components/room/games/actorGame';
 import { GameHud } from '../src/components/room/games/GameHud';
@@ -64,7 +65,8 @@ import { haptic, nativeDriver, useReducedMotion } from '../src/lib/motion';
 import { HAT_ID, MUSH_REGROW_MS, putMushroom, ROOM_MUSHROOMS, showHatReveal, useHunt, type MushColor } from '../src/lib/mushrooms';
 import { NightContext } from '../src/lib/night';
 import { REACTIONS, RoomLink, type Presence, type ReactionKind, type Wire } from '../src/lib/roomLink';
-import { fracX, fracY, freeSpot, makeGeo, Mover, pxX, pxY, scaleAt, type Geo } from '../src/lib/roomWorld';
+import { fracX, fracY, freeSpot, makeGeo, Mover, pxX, pxY, RUN_SPEED, scaleAt, WALK_SPEED, type Geo } from '../src/lib/roomWorld';
+import { getFlag } from '../src/lib/prefs';
 import { canAutoplay, playSound } from '../src/lib/sound';
 import { dayTimeOf } from '../src/lib/scene';
 import { C, F } from '../src/theme';
@@ -110,9 +112,12 @@ export default function RoomScreen() {
   const [linkOk, setLinkOk] = useState(false);
   const [owned, setOwned] = useState<Set<string>>(() => new Set());
   const [toast, setToast] = useState<string | null>(null);
-  const [menu, setMenu] = useState<string | null>(null); // меню на чужом чибике
-  const [reactOpen, setReactOpen] = useState(false);
+  const [menu, setMenu] = useState<string | null>(null); // «инфо об игроке» — нажали на чужого чибика
+  const [menuOpen, setMenuOpen] = useState(false); // одна кнопка-меню вверху: реакции, игры, место…
+  const [people, setPeople] = useState(false); // список «Кто в комнате»
   const [picker, setPicker] = useState(false);
+  const [zoomed, setZoomed] = useState(false); // камера отдалена — над головами видны имена
+  const [stick, setStick] = useState(true); // джойстик (выключается в настройках)
   const [reacts, setReacts] = useState<Record<string, { k: ReactionKind; n: number }>>({});
   const [poses, setPoses] = useState<Record<string, Pose>>({});
   const [faces, setFaces] = useState<Record<string, 1 | -1>>({});
@@ -130,7 +135,12 @@ export default function RoomScreen() {
 
   const link = useRef<RoomLink | null>(null);
   const movers = useRef(new Map<string, Mover>());
+  // Камера: свободная (camX — левый край в пикселях мира) или «приклеена» к моему чибику (без рывков: прямо от его x).
+  // mix — плавный переход между ними; zoom — отдаление (1 — обычно, меньше — видно больше мира, у ног — земля).
   const camX = useRef(new Animated.Value(0)).current;
+  const mix = useRef(new Animated.Value(1)).current;
+  const zoom = useRef(new Animated.Value(1)).current;
+  const zoomRef = useRef(1);
   const camRef = useRef(0);
   const followRef = useRef(true);
   const sceneT = useRef(new Animated.Value(0)).current;
@@ -226,24 +236,78 @@ export default function RoomScreen() {
   }, [applyState, showToast]);
 
   // ---------- камера ----------
-  const clampCam = useCallback((v: number) => Math.min(Math.max(0, v), Math.max(0, geoRef.current.worldW - geoRef.current.width)), []);
+  const zoomedRef = useRef(false);
+  const fitZoom = () => Math.min(1, geoRef.current.width / Math.max(1, geoRef.current.worldW));
+  const clampCam = useCallback((v: number) => Math.min(Math.max(0, v), Math.max(0, geoRef.current.worldW - geoRef.current.width / zoomRef.current)), []);
+  // Где камера сейчас (левый край мира на экране): приклеена — от моего чибика, свободна — camRef
+  const camNow = useCallback(() => {
+    const me = meRef.current;
+    const mv = me ? movers.current.get(me) : undefined;
+    if (followRef.current && mv && zoomRef.current === 1) return clampCam(pxX(geoRef.current, mv.now().x) - geoRef.current.width / 2);
+    return camRef.current;
+  }, [clampCam]);
+  // Отцепить камеру от чибика там, где она сейчас
+  const freeCam = useCallback(() => {
+    if (!followRef.current) return;
+    const v = camNow();
+    camRef.current = v;
+    camX.setValue(v);
+    mix.setValue(0);
+    followRef.current = false;
+    setFollow(false);
+  }, [camNow, camX, mix]);
+  // Камеру — на точку мира (свободная камера)
   const camTo = useCallback(
-    (px: number, duration = 450, linear = false) => {
-      const v = clampCam(px - geoRef.current.width / 2);
+    (px: number, duration = 450) => {
+      freeCam();
+      const v = clampCam(px - geoRef.current.width / zoomRef.current / 2);
       camRef.current = v;
-      Animated.timing(camX, {
-        toValue: v,
-        duration: reduce ? 0 : duration,
-        easing: linear ? Easing.linear : Easing.inOut(Easing.quad),
-        useNativeDriver: nativeDriver,
-      }).start(() => bump());
+      Animated.timing(camX, { toValue: v, duration: reduce ? 0 : duration, easing: Easing.inOut(Easing.quad), useNativeDriver: nativeDriver }).start(() => bump());
     },
-    [camX, clampCam, reduce, bump],
+    [camX, clampCam, freeCam, reduce, bump],
   );
-  const setFollowing = (on: boolean) => {
-    followRef.current = on;
-    setFollow(on);
+  // Снова за мной — плавно, даже если чибик сейчас идёт
+  const followMe = useCallback(() => {
+    if (followRef.current) return;
+    followRef.current = true;
+    setFollow(true);
+    Animated.timing(mix, { toValue: 1, duration: reduce ? 0 : 480, easing: Easing.inOut(Easing.quad), useNativeDriver: nativeDriver }).start(() => bump());
+  }, [mix, reduce, bump]);
+  const markZoomed = (z: number) => {
+    const on = z < 0.86;
+    if (on === zoomedRef.current) return;
+    zoomedRef.current = on;
+    setZoomed(on);
   };
+  // Отдалить или приблизить (камера держит тот же центр); follow — после приближения снова за мной
+  const zoomTo = useCallback(
+    (z: number, follow = false) => {
+      freeCam();
+      const g = geoRef.current;
+      const center = camRef.current + g.width / zoomRef.current / 2;
+      zoomRef.current = z;
+      const v = clampCam(center - g.width / z / 2);
+      camRef.current = v;
+      markZoomed(z);
+      const t = (a: Animated.Value, to: number) => Animated.timing(a, { toValue: to, duration: reduce ? 0 : 420, easing: Easing.inOut(Easing.quad), useNativeDriver: nativeDriver });
+      Animated.parallel([t(zoom, z), t(camX, v)]).start(() => {
+        bump();
+        if (follow) followMe();
+      });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [freeCam, clampCam, followMe, reduce, bump, zoom, camX],
+  );
+  // Сразу без отдаления (сцена, игра)
+  const unzoom = useCallback(() => {
+    if (zoomRef.current === 1) return;
+    zoomRef.current = 1;
+    zoom.setValue(1);
+    camRef.current = clampCam(camRef.current);
+    camX.setValue(camRef.current);
+    markZoomed(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [zoom, camX, clampCam]);
 
   // ---------- движение ----------
   const persist = useCallback((id: string) => {
@@ -258,7 +322,7 @@ export default function RoomScreen() {
 
   // Пошёл: у себя сразу, остальным — через канал (только тем, кем управляю)
   const moveMember = useCallback(
-    (id: string, fx: number, fy: number, run: boolean, opts: { send?: boolean; force?: boolean; snap?: boolean; onArrive?: () => void } = {}) => {
+    (id: string, fx: number, fy: number, run: boolean, opts: { send?: boolean; force?: boolean; snap?: boolean; smooth?: boolean; onArrive?: () => void } = {}) => {
       const mv = movers.current.get(id);
       if (!mv) return;
       const mine = ownedRef.current.has(id);
@@ -272,13 +336,13 @@ export default function RoomScreen() {
         mv.snap(fx, fy);
         arrive();
       } else {
-        dur = mv.go(fx, fy, run, arrive, reduce);
+        dur = mv.go(fx, fy, run, arrive, reduce, opts.smooth);
       }
       // force — ведущий игры гонит чужого бота
-      if ((mine || opts.force) && opts.send !== false) link.current?.send({ t: 'move', m: id, x: mv.state.to.x, y: mv.state.to.y, run, snap: opts.snap });
-      if (id === meRef.current && followRef.current) camTo(pxX(geoRef.current, mv.state.to.x), Math.max(dur, 300), dur > 0);
+      if ((mine || opts.force) && opts.send !== false) link.current?.send({ t: 'move', m: id, x: mv.state.to.x, y: mv.state.to.y, run, snap: opts.snap, ...(opts.smooth ? { e: 1 as const } : {}) });
+      return dur; // камера за мной идёт сама (приклеена к чибику)
     },
-    [persist, bump, reduce, camTo],
+    [persist, bump, reduce],
   );
 
   // ---------- реакции ----------
@@ -422,7 +486,7 @@ export default function RoomScreen() {
     loc,
     movers,
     moveMember,
-    camCenter: () => camRef.current + geoRef.current.width / 2,
+    camCenter: () => camNow() + geoRef.current.width / 2,
     toast: showToast,
   });
   const gameRef = useRef(game);
@@ -452,7 +516,7 @@ export default function RoomScreen() {
         if (w.t === 'move') {
           if (!movers.current.has(w.m)) return;
           if (w.snap) movers.current.get(w.m)!.snap(w.x, w.y);
-          else movers.current.get(w.m)!.go(w.x, w.y, Boolean(w.run), bump, reduce);
+          else movers.current.get(w.m)!.go(w.x, w.y, Boolean(w.run), bump, reduce, w.e === 1);
           bump();
         } else if (w.t === 'react') {
           showReact(w.m, w.k);
@@ -585,6 +649,7 @@ export default function RoomScreen() {
 
   // ---------- сцены способностей ----------
   const current = queue[0] ?? null;
+  const sceneFollow = useRef(false);
   const castMember = (id: string) => members.find((m) => m.id === id);
   const sceneReady = Boolean(current && focused && !playing && !game.snap && (allowed === current.scene.key || canAutoplay() || current.cast.from_member === meId));
   useEffect(() => {
@@ -602,6 +667,10 @@ export default function RoomScreen() {
     const size = Math.round(g.base * scaleAt(g, p.y));
     const chibiH = Math.round((size * 170) / 120);
     const places = scenePlaces(current.cast.ability, width, size);
+    // сцена — на обычном приближении и со свободной камерой; потом камера снова за мной, если была
+    unzoom();
+    sceneFollow.current = followRef.current;
+    freeCam();
     const cam = clampCam(pxX(g, p.x) - (places.target + size / 2));
     camRef.current = cam;
     Animated.timing(camX, { toValue: cam, duration: reduce ? 0 : 420, easing: Easing.inOut(Easing.quad), useNativeDriver: nativeDriver }).start(() => {
@@ -615,6 +684,10 @@ export default function RoomScreen() {
     const done = playing;
     setPlaying(null);
     setQueue((q) => q.slice(1));
+    if (sceneFollow.current) {
+      sceneFollow.current = false;
+      setTimeout(followMe, 0); // после того, как применивший встал рядом с целью
+    }
     if (!done) return;
     const g = geoRef.current;
     const { cast } = done;
@@ -629,68 +702,167 @@ export default function RoomScreen() {
       later(`botHug-${cast.id}`, 1400, () => roomCast(cast.from_member, 'ability.hug', cast.to_member).then((r) => r.ok && enqueueCast({ ...cast, id: r.id, from_member: cast.to_member, to_member: cast.from_member, from_user: null, to_user: caster.user_id, ability: 'ability.hug', blocked: false, created_at: r.created_at })).catch(() => undefined));
     }
     bump();
-  }, [playing, userId, moveMember, enqueueCast, bump]);
+  }, [playing, userId, moveMember, enqueueCast, bump, followMe]);
 
   // ---------- действия ----------
   const myMover = meId ? movers.current.get(meId) : undefined;
 
-  const goTo = (pageX: number, pageY: number) => {
-    if (!meId || playing) return;
+  // Сдвиг мира на экране: камера (свободная или за мной) и отдаление — масштаб вокруг низа экрана (земля остаётся внизу).
+  // Всё на native driver: камера за чибиком едет в одном кадре с ним, без рывков.
+  const camFollow = useMemo(() => {
+    if (!myMover || geo.worldW <= geo.width + 1) return null;
+    return myMover.x.interpolate({ inputRange: [geo.width / 2, geo.worldW - geo.width / 2], outputRange: [0, geo.worldW - geo.width], extrapolate: 'clamp' });
+  }, [myMover, geo]);
+  const worldMove = useMemo(() => {
+    const one = new Animated.Value(1);
+    const minus = new Animated.Value(-1);
+    const cam = camFollow ? Animated.add(Animated.multiply(camX, Animated.subtract(one, mix)), Animated.multiply(camFollow, mix)) : camX;
+    const zm1 = Animated.subtract(zoom, one);
+    return [
+      { translateX: Animated.add(Animated.multiply(Animated.multiply(zoom, cam), minus), Animated.multiply(zm1, new Animated.Value(geo.worldW / 2))) },
+      { translateY: Animated.multiply(zm1, new Animated.Value(-height / 2)) },
+      { scale: zoom },
+    ];
+  }, [camFollow, camX, mix, zoom, geo.worldW, height]);
+  const unscale = useMemo(() => Animated.divide(new Animated.Value(1), zoom), [zoom]);
+
+  // Можно ли сейчас ходить: не во время сцены; в игре — только в «Звездопаде» (и не оглушён)
+  const canWalk = () => {
+    if (!meId || playing) return false;
     const gs = game.snap;
-    if (gs) {
-      if (gs.phase !== 'play' || gs.st?.g !== 'stars' || !gs.players.includes(meId) || gs.st.out.includes(meId)) return;
-      if (game.toLocal(gs.st.stun[meId] ?? 0) > Date.now()) return; // оглушило
-    }
+    if (!gs) return true;
+    if (gs.phase !== 'play' || gs.st?.g !== 'stars' || !gs.players.includes(meId) || gs.st.out.includes(meId)) return false;
+    return game.toLocal(gs.st.stun[meId] ?? 0) <= Date.now(); // оглушило — стоит
+  };
+
+  const goTo = (pageX: number, pageY: number) => {
+    if (!meId || !canWalk()) return;
     const g = geo;
     if (pageY < g.farPx - g.base * 0.4) return; // нажали в небо
     touch();
     haptic.tap();
     const want = freeSpot(g, loc, pageX, Math.min(g.nearPx, Math.max(g.farPx, pageY)));
-    if (!gs) setFollowing(true); // в игре камера стоит на арене
-    moveMember(meId, fracX(g, want.px), fracY(g, want.py), true);
+    if (!game.snap) followMe(); // в игре камера стоит на арене
+    moveMember(meId, fracX(g, want.px), fracY(g, want.py), true, { smooth: true });
   };
 
-  // Свайп по земле — осмотреться; короткое нажатие — идти туда
-  const pan = useRef({ start: 0, moved: false, x: 0, y: 0 });
+  // Джойстик: идёт в сторону пальца отрезками на ~1,6 с вперёд; новый отрезок — когда сменилось направление,
+  // скорость или отрезок кончается. Так движение ровное, а в канал уходит мало сообщений.
+  const steer = useRef<{ ang: number; run: boolean; at: number } | null>(null);
+  const onSteer = (ang: number, power: number) => {
+    if (!meId || !myMover || !canWalk()) return;
+    touch();
+    const run = power > 0.62;
+    const prev = steer.current;
+    const now = Date.now();
+    if (prev && prev.run === run && now - prev.at < 1100) {
+      let d = Math.abs(ang - prev.ang) % (Math.PI * 2);
+      if (d > Math.PI) d = Math.PI * 2 - d;
+      if (d < 0.22) return;
+    }
+    const g = geo;
+    const p = myMover.now();
+    const dist = (run ? RUN_SPEED : WALK_SPEED) * g.s * 1.6;
+    const tx = pxX(g, p.x) + Math.cos(ang) * dist;
+    const ty = pxY(g, p.y) + (Math.sin(ang) * dist) / 1.4; // вглубь медленнее
+    const want = freeSpot(g, loc, Math.min(g.worldW - g.margin, Math.max(g.margin, tx)), Math.min(g.nearPx, Math.max(g.farPx, ty)));
+    steer.current = { ang, run, at: now };
+    if (!game.snap) followMe();
+    moveMember(meId, fracX(g, want.px), fracY(g, want.py), run);
+  };
+  const onSteerEnd = () => {
+    steer.current = null;
+    if (!meId || !myMover || !myMover.state.moving) return;
+    const p = myMover.now();
+    moveMember(meId, p.x, p.y, false);
+  };
+  useEffect(() => {
+    getFlag('joystick').then((off) => setStick(!off)).catch(() => undefined);
+  }, [focused]);
+
+  // Свайп по земле — осмотреться; короткое нажатие — идти туда; щипок двумя пальцами — отдалить (видны имена)
+  const pan = useRef<{ start: number; moved: boolean; x: number; y: number; multi: boolean; pinch: { d: number; z: number; world: number } | null }>({
+    start: 0, moved: false, x: 0, y: 0, multi: false, pinch: null,
+  });
   const goRef = useRef(goTo);
   goRef.current = goTo;
+  const pinchMove = (ts: { pageX: number; pageY: number }[]) => {
+    const g = geoRef.current;
+    if (g.worldW <= g.width + 1 || gameRef.current.snap) return;
+    const d = Math.hypot(ts[0].pageX - ts[1].pageX, ts[0].pageY - ts[1].pageY);
+    const mid = (ts[0].pageX + ts[1].pageX) / 2;
+    if (!pan.current.pinch) {
+      freeCam();
+      camX.stopAnimation();
+      zoom.stopAnimation();
+      pan.current.multi = true;
+      pan.current.pinch = { d: Math.max(24, d), z: zoomRef.current, world: camRef.current + mid / zoomRef.current };
+      return;
+    }
+    const pz = pan.current.pinch;
+    const z = Math.min(1, Math.max(fitZoom(), (pz.z * d) / pz.d));
+    zoomRef.current = z;
+    zoom.setValue(z);
+    const v = clampCam(pz.world - mid / z);
+    camRef.current = v;
+    camX.setValue(v);
+    markZoomed(z);
+  };
+  const pinchRef = useRef(pinchMove);
+  pinchRef.current = pinchMove;
+  const zoomToRef = useRef(zoomTo);
+  zoomToRef.current = zoomTo;
   const responder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_e, gs) => Math.abs(gs.dx) > 6,
+        onMoveShouldSetPanResponder: (_e, gs) => Math.abs(gs.dx) > 6 || gs.numberActiveTouches > 1,
         onPanResponderGrant: (e) => {
-          pan.current = { start: camRef.current, moved: false, x: e.nativeEvent.locationX, y: e.nativeEvent.locationY };
-          camX.stopAnimation((v) => {
-            pan.current.start = v;
-            camRef.current = v;
-          });
+          pan.current = { start: camRef.current, moved: false, x: e.nativeEvent.locationX, y: e.nativeEvent.locationY, multi: false, pinch: null };
         },
-        onPanResponderMove: (_e, gs) => {
+        onPanResponderMove: (e, gs) => {
+          const ts = e.nativeEvent.touches;
+          if (ts && ts.length >= 2) {
+            pinchRef.current(ts as unknown as { pageX: number; pageY: number }[]);
+            return;
+          }
+          if (pan.current.multi) return; // после щипка — до отпускания не двигаем
           if (gameRef.current.snap) return; // в игре камера стоит на арене
           if (!pan.current.moved && Math.abs(gs.dx) < 8) return;
           if (!pan.current.moved) {
             pan.current.moved = true;
-            followRef.current = false;
-            setFollow(false);
+            freeCam();
+            pan.current.start = camRef.current;
+            camX.stopAnimation((v) => {
+              pan.current.start = v;
+              camRef.current = v;
+            });
           }
-          const v = clampCam(pan.current.start - gs.dx);
+          const v = clampCam(pan.current.start - gs.dx / zoomRef.current);
           camRef.current = v;
           camX.setValue(v);
         },
         onPanResponderRelease: () => {
+          if (pan.current.multi) {
+            // щипок кончился: почти без отдаления — обычный вид (камера снова за мной), иначе — как оставили
+            if (zoomRef.current > 0.9) zoomToRef.current(1, true);
+            setTick((n) => n + 1);
+            return;
+          }
           if (pan.current.moved) setTick((n) => n + 1);
+          else if (zoomRef.current < 0.98) zoomToRef.current(1, true); // в обзоре нажатие — вернуться к себе
           else goRef.current(pan.current.x, pan.current.y);
         },
         onPanResponderTerminate: () => setTick((n) => n + 1),
       }),
-    [camX, clampCam],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [camX, clampCam, freeCam, zoom],
   );
 
   const backToMe = () => {
     if (!myMover) return;
-    setFollowing(true);
-    camTo(pxX(geo, myMover.now().x));
+    if (zoomRef.current !== 1) zoomTo(1, true);
+    else followMe();
   };
 
   // Игра началась — камера на арену, меню закрыть; кончилась — камера снова за мной
@@ -702,9 +874,10 @@ export default function RoomScreen() {
       hadGame.current = true;
       if (gameRef.current.active) {
         setMenu(null);
-        setReactOpen(false);
+        setMenuOpen(false);
+        setPeople(false);
         setPicker(false);
-        setFollowing(false);
+        unzoom();
         camTo(pxX(geoRef.current, gs.cx), 700);
       }
       return;
@@ -715,6 +888,18 @@ export default function RoomScreen() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gameId, Boolean(game.snap)]);
+
+  // В игре камера стоит на арене: при каждой смене фазы и размера экрана — проверить и вернуть
+  const arenaPx = game.snap && game.active ? pxX(geo, game.snap.cx) : null;
+  useEffect(() => {
+    if (arenaPx === null) return;
+    const want = clampCam(arenaPx - geoRef.current.width / 2);
+    if (followRef.current || zoomRef.current !== 1 || Math.abs(camRef.current - want) > 1) {
+      unzoom();
+      camTo(arenaPx, 500);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arenaPx, game.snap?.phase]);
 
   // Нажали на чибика во время игры: тыква — передать, звездопад — бежать туда
   const tapInGame = (m: RoomMember) => {
@@ -774,7 +959,7 @@ export default function RoomScreen() {
       showToast('Пока в сети только ты');
       return;
     }
-    const cx = fracX(g, camRef.current + width / 2);
+    const cx = fracX(g, camNow() + width / 2);
     const step = (g.base * 0.62) / g.worldW;
     const spots: Record<string, [number, number]> = {};
     crowd.forEach((m, i) => {
@@ -854,14 +1039,18 @@ export default function RoomScreen() {
   // Нажал на гриб: бежит к нему, присаживается, срывает — гриб летит в корзинку
   const tapMushroom = (i: number) => {
     if (!meId || !myMover || playing || game.snap || plucking || hunt.checking || hunt.basket.length >= 5) return;
+    if (zoomRef.current !== 1) {
+      zoomTo(1, true); // в обзоре — сначала вернуться
+      return;
+    }
     touch();
     haptic.tap();
-    setFollowing(true);
+    followMe();
     const m = mushrooms[i];
     const me = pxX(geo, myMover.now().x);
     const dir: 1 | -1 = me <= m.px ? 1 : -1;
     const tx = m.px - dir * geo.base * m.k * 0.4;
-    moveMember(meId, fracX(geo, tx), fracY(geo, m.py), true, { onArrive: () => pluck(i, dir) });
+    moveMember(meId, fracX(geo, tx), fracY(geo, m.py), true, { smooth: true, onArrive: () => pluck(i, dir) });
   };
   const pluck = (i: number, dir: 1 | -1) => {
     const id = meRef.current;
@@ -889,11 +1078,14 @@ export default function RoomScreen() {
       setGone((g) => ({ ...g, [i]: at }));
       later(`regrow${i}`, MUSH_REGROW_MS + 600, () => setGone((g) => (g[i] === at ? { ...g, [i]: 0 } : g)));
       const size = mushSize(m.k);
-      const x = m.px - camRef.current;
+      const x = m.px - camNow();
       const y = m.py - size * 0.4;
       const slot = basketSlot(Math.min(4, hunt.basket.length));
       setChpok((c) => ({ n: (c?.n ?? 0) + 1, x: x + dir * size * 0.9, y: y - size * 0.5 })); // в сторону от чибика
       setFly((f) => ({ n: (f?.n ?? 0) + 1, c: m.c, from: { x, y }, to: { x: (width - BASKET_W) / 2 + slot.x, y: basketTop + slot.y } }));
+      // убираем сами, не полагаясь на конец анимации (на Android «чпок» мог остаться висеть)
+      later('chpokOff', 900, () => setChpok(null));
+      later('flyOff', 800, () => setFly(null));
       later('pluckUp', 420, up);
       later('put', 560, () => {
         putMushroom(m.c, inventory.has(HAT_ID)).then((r) => {
@@ -1047,35 +1239,46 @@ export default function RoomScreen() {
   const g = geo;
 
   // Кто за краем экрана — стрелка с именем
-  const cam = camRef.current;
-  const arrows = members
-    .filter((m) => m.id !== meId)
-    .map((m) => {
-      const mv = movers.current.get(m.id);
-      if (!mv) return null;
-      const p = mv.now();
-      const sx = pxX(g, p.x) - cam;
-      if (sx > -g.base * 0.25 && sx < width + g.base * 0.25) return null;
-      return { m, side: sx < 0 ? ('L' as const) : ('R' as const), y: pxY(g, p.y) - g.base * 0.9, px: pxX(g, p.x) };
-    })
-    .filter(Boolean) as { m: RoomMember; side: 'L' | 'R'; y: number; px: number }[];
+  const cam = camNow();
+  const arrows = zoomed
+    ? []
+    : (members
+        .filter((m) => m.id !== meId)
+        .map((m) => {
+          const mv = movers.current.get(m.id);
+          if (!mv) return null;
+          const p = mv.now();
+          const sx = pxX(g, p.x) - cam;
+          if (sx > -g.base * 0.25 && sx < width + g.base * 0.25) return null;
+          return { m, side: sx < 0 ? ('L' as const) : ('R' as const), y: pxY(g, p.y) - g.base * 0.9, px: pxX(g, p.x) };
+        })
+        .filter(Boolean) as { m: RoomMember; side: 'L' | 'R'; y: number; px: number }[]);
 
-  const bar: { key: string; icon: IconName; label: string; onPress: () => void; accent?: boolean }[] = [
-    { key: 'r', icon: 'smile', label: 'Реакции', onPress: () => setReactOpen((v) => !v) },
-    { key: 'f', icon: 'hand', label: 'Все — пять', onPress: fiveAll },
-    { key: 'p', icon: 'wheel', label: game.starting ? '…' : 'Играть', onPress: game.play, accent: true },
-    { key: 'm', icon: 'pin', label: 'Место', onPress: () => setPicker(true) },
+  const free = !playing && !game.snap; // не идёт ни сцена, ни игра
+  const stickOn = stick && !playing && !zoomed && (!game.snap || (game.snap.phase === 'play' && game.snap.st?.g === 'stars' && Boolean(meId && game.snap.players.includes(meId))));
+  const stickSize = Math.round(Math.min(112, width * 0.27));
+  const stickBottom = Math.max(insets.bottom, 12) + 14;
+  const topY = insets.top + 8;
+  const closeMenu = () => setMenuOpen(false);
+  const menuItems: { key: string; icon: IconName; label: string; onPress: () => void; color?: string; hide?: boolean }[] = [
+    { key: 'play', icon: 'wheel', label: game.starting ? 'Крутим…' : 'Играть', color: C.accent, onPress: () => (closeMenu(), game.play()) },
+    { key: 'five', icon: 'hand', label: 'Все — пять', onPress: () => (closeMenu(), fiveAll()) },
+    { key: 'people', icon: 'users', label: 'Кто здесь', onPress: () => (closeMenu(), setPeople(true)) },
+    { key: 'zoom', icon: zoomed ? 'zoomIn' : 'zoomOut', label: zoomed ? 'Ближе' : 'Обзор', hide: g.worldW <= g.width + 1, onPress: () => (closeMenu(), zoomed ? zoomTo(1, true) : zoomTo(Math.max(fitZoom(), 0.5))) },
+    { key: 'place', icon: 'pin', label: 'Место', onPress: () => (closeMenu(), setPicker(true)) },
+    { key: 'records', icon: 'trophy', label: 'Рекорды', color: '#FFD45E', onPress: () => (closeMenu(), setRecords(true)) },
+    { key: 'bot', icon: 'bot', label: busy === 'bot' ? 'Зовём…' : 'Позвать бота', color: C.good, hide: !isDevRole(access) || members.length >= (room?.capacity ?? 3), onPress: () => (closeMenu(), addBot()) },
+    { key: 'leave', icon: 'exit', label: busy === 'leave' ? 'Выходим…' : 'Выйти', color: C.accent, onPress: () => (closeMenu(), leave()) },
   ];
-  const barBottom = Math.max(insets.bottom, 10) + 6;
 
   return (
     <NightContext.Provider value={time === 'night'}>
     <View style={[styles.root, { backgroundColor: LOCATION_BG[loc][time] }]}>
       <Animated.View style={[StyleSheet.absoluteFill, { transform: world }]}>
         <WideSky id={loc} width={width} height={height} time={time} />
-        <Animated.View style={{ position: 'absolute', left: 0, top: 0, width: g.worldW, height, transform: [{ translateX: Animated.multiply(camX, -1) }] }}>
+        <Animated.View style={{ position: 'absolute', left: 0, top: 0, width: g.worldW, height, transform: worldMove }}>
           <WideLand id={loc} width={width} height={height} tiles={g.tiles} time={time} active={focused} />
-          <View style={StyleSheet.absoluteFill} pointerEvents={playing ? 'none' : 'auto'} {...responder.panHandlers} accessibilityLabel="Земля: нажми — твой чибик побежит туда, проведи — осмотреться" />
+          <View style={StyleSheet.absoluteFill} pointerEvents={playing ? 'none' : 'auto'} {...responder.panHandlers} accessibilityLabel="Земля: нажми — твой чибик побежит туда, проведи — осмотреться, сведи два пальца — обзор" />
           {forest
             ? mushrooms.map((m, i) => (
                 <MushroomPatch
@@ -1103,6 +1306,8 @@ export default function RoomScreen() {
             const ga = actorGame(game.snap, m.id, game.toLocal, g.base, reduce);
             const playingNow = Boolean(game.active && game.snap?.players.includes(m.id));
             const pose = ga?.pose ?? poses[m.id] ?? (r ? 'wave' : null);
+            // свой чибик не перехватывает нажатия — нажал рядом с собой, значит идёшь туда (в игре — как раньше)
+            const tappable = !isMe || Boolean(game.snap);
             return (
               <RoomActor
                 key={m.id}
@@ -1113,23 +1318,26 @@ export default function RoomScreen() {
                 value={ga?.value ?? (pose || r ? 80 : 40)}
                 pose={pose}
                 face={faces[m.id]}
-                label={`${m.name} · ${m.title}`}
+                label={isMe ? `${m.name} · ты` : `${m.name} · ${m.title}`}
                 dot={isMe ? C.me : m.bot ? C.good : C.partner}
                 online={online || playingNow}
                 hidden={hidden}
                 faded={ga?.faded}
                 cover={ga?.cover}
-                a11y={isMe ? 'Это ты. Нажми — реакции' : `${m.name}. Нажми — дай пять и способности`}
+                showName={zoomed}
+                unscale={unscale}
+                tappable={tappable}
+                a11y={isMe ? 'Это ты' : `${m.name}. Нажми — инфо, дай пять и способности`}
                 onPress={() => {
                   if (playing) return;
                   if (game.snap) {
                     tapInGame(m);
                     return;
                   }
+                  if (isMe) return;
                   haptic.light();
                   touch();
-                  if (isMe) setReactOpen((v) => !v);
-                  else setMenu(m.id);
+                  setMenu(m.id);
                 }}
                 over={
                   ga?.over || r ? (
@@ -1166,7 +1374,7 @@ export default function RoomScreen() {
       <Confetti trigger={confetti} colors={SCENE_COLORS} width={width} />
       {forest && chpok ? <PluckWord key={chpok.n} x={chpok.x} y={chpok.y} nonce={chpok.n} /> : null}
       {forest && fly ? <FlyingShroom key={fly.n} from={fly.from} to={fly.to} color={fly.c} nonce={fly.n} size={mushSize(1)} /> : null}
-      {forest && !playing && !game.snap ? <Basket top={basketTop} width={width} /> : null}
+      {forest && free && !zoomed && !menuOpen ? <Basket top={basketTop} width={width} /> : null}
       {clapWord ? (
         <View pointerEvents="none" style={[styles.clapWrap, { top: height * 0.3 }]}>
           <Txt weight="display" size={34} color="#FFD45E" style={styles.clap}>
@@ -1222,24 +1430,84 @@ export default function RoomScreen() {
         />
       ) : null}
 
-      {/* верх: назад, кто и где, выйти */}
-      <View style={[styles.top, { top: insets.top + 8 }, playing ? styles.hidden : null]} pointerEvents="box-none">
+      {/* джойстик — слева внизу; кнопки сверху, внизу больше ничего нет: ходить ничто не мешает */}
+      {stickOn ? (
+        <Joystick size={stickSize} onSteer={onSteer} onRelease={onSteerEnd} style={{ left: 16, bottom: stickBottom + (game.snap ? 46 : 0) }} />
+      ) : null}
+
+      {menuOpen && !playing ? <Pressable style={StyleSheet.absoluteFill} onPress={closeMenu} accessibilityLabel="Закрыть меню" /> : null}
+
+      {/* верх: назад, кто и где, одна кнопка-меню */}
+      <View style={[styles.top, { top: topY }, playing ? styles.hidden : null]} pointerEvents="box-none">
         <IconButton icon="back" label="Назад — останешься в комнате" onPress={goBack} tint="rgba(24,18,40,0.66)" />
-        <View style={styles.title} pointerEvents="none">
+        <Pressy onPress={() => (closeMenu(), setPeople(true))} style={styles.flex} innerStyle={styles.title} scaleTo={0.97} accessibilityLabel="Кто в комнате">
           <Txt weight="display" size={15} center>
             Комната
           </Txt>
           <Txt weight="bold" size={12} center color="rgba(246,243,255,0.86)" numberOfLines={1}>
             {humans} из {room?.capacity ?? 3} · {locationName(loc)}
           </Txt>
-        </View>
-        <Pressy onPress={leave} innerStyle={styles.exit} scaleTo={0.94} accessibilityLabel="Выйти из комнаты — освободить место">
-          <Icon name="exit" size={18} color={C.text} />
-          <Txt weight="heavy" size={13}>
-            {busy === 'leave' ? '…' : 'Выйти'}
-          </Txt>
+        </Pressy>
+        <Pressy
+          onPress={() => setMenuOpen((v) => !v)}
+          innerStyle={[styles.menuBtn, menuOpen ? styles.menuBtnOn : null]}
+          scaleTo={0.92}
+          accessibilityLabel={menuOpen ? 'Закрыть меню' : 'Меню: игры, реакции, место, рекорды, выход'}
+        >
+          <Icon name={menuOpen ? 'close' : 'menu'} size={22} color={menuOpen ? C.onAccent : C.text} strokeWidth={2.4} />
         </Pressy>
       </View>
+
+      {/* меню: реакции рядком, ниже — действия */}
+      {menuOpen && !playing ? (
+        <>
+          <View style={[styles.menuCard, { top: topY + 50, width: Math.min(300, width - 32) }]}>
+            {free ? (
+              <View style={styles.reactRow}>
+                {REACTIONS.map((k) => (
+                  <Pressy
+                    key={k}
+                    onPress={() => {
+                      if (meId) react(meId, k);
+                      touch();
+                      closeMenu();
+                    }}
+                    innerStyle={styles.reactBtn}
+                    scaleTo={0.86}
+                    accessibilityLabel={`Реакция: ${REACTION_LABEL[k]}`}
+                  >
+                    <ReactionIcon kind={k} size={26} />
+                  </Pressy>
+                ))}
+              </View>
+            ) : null}
+            <View style={styles.menuGrid}>
+              {menuItems
+                .filter((it) => !it.hide && (free || it.key === 'leave' || it.key === 'people' || it.key === 'records'))
+                .map((it) => (
+                  <Pressy key={it.key} onPress={it.onPress} style={styles.menuCell} innerStyle={styles.menuItem} scaleTo={0.95} accessibilityLabel={it.label}>
+                    <Icon name={it.icon} size={20} color={it.color ?? C.text} />
+                    <Txt weight="heavy" size={13.5} numberOfLines={1} style={styles.flex}>
+                      {it.label}
+                    </Txt>
+                  </Pressy>
+                ))}
+            </View>
+          </View>
+        </>
+      ) : null}
+
+      {/* камера не на мне — «К себе» под верхней панелью справа */}
+      {free && (!follow || zoomed) && !menuOpen ? (
+        <View style={[styles.side, { top: topY + 52 }]} pointerEvents="box-none">
+          <Pressy onPress={backToMe} innerStyle={styles.sideBtn} scaleTo={0.94} accessibilityLabel="Камеру — к себе">
+            <Icon name="locate" size={18} color={C.text} />
+            <Txt weight="heavy" size={12.5}>
+              К себе
+            </Txt>
+          </Pressy>
+        </View>
+      ) : null}
 
       {playing ? (
         <View style={[styles.castWrap, { top: insets.top + 62 }]} pointerEvents="none">
@@ -1263,15 +1531,12 @@ export default function RoomScreen() {
         </View>
       ) : null}
 
-      {!playing && !game.snap
+      {free
         ? arrows.map((a) => (
             <Pressy
               key={a.m.id}
-              onPress={() => {
-                setFollowing(false);
-                camTo(a.px);
-              }}
-              style={[styles.arrow, a.side === 'L' ? { left: 6 } : { right: 6 }, { top: Math.min(height - barBottom - 140, Math.max(insets.top + 70 + (forest ? 62 : 0), a.y)) }]}
+              onPress={() => camTo(a.px)}
+              style={[styles.arrow, a.side === 'L' ? { left: 6 } : { right: 6 }, { top: Math.min(height - stickBottom - stickSize - 50, Math.max(insets.top + 70 + (forest ? 62 : 0), a.y)) }]}
               innerStyle={[styles.arrowIn, { borderColor: a.m.bot ? C.good : C.partner }]}
               accessibilityLabel={`${a.m.name} за краем экрана. Нажми — камера поедет к нему`}
             >
@@ -1285,78 +1550,25 @@ export default function RoomScreen() {
           ))
         : null}
 
-      {/* справа над панелью: рекорды, позвать бота, к себе */}
-      {!playing && !game.snap ? (
-        <View style={[styles.side, { bottom: barBottom + 76 }]} pointerEvents="box-none">
-          <Pressy onPress={() => setRecords(true)} innerStyle={styles.sideBtn} scaleTo={0.94} accessibilityLabel="Рекорды комнаты">
-            <Icon name="trophy" size={18} color="#FFD45E" />
-            <Txt weight="heavy" size={12.5}>
-              Рекорды
-            </Txt>
-          </Pressy>
-          {isDevRole(access) && members.length < (room?.capacity ?? 3) ? (
-            <Pressy onPress={addBot} innerStyle={styles.sideBtn} scaleTo={0.94} accessibilityLabel="Позвать бота">
-              <Icon name="bot" size={18} color={C.good} />
-              <Txt weight="heavy" size={12.5}>
-                {busy === 'bot' ? '…' : 'Бот'}
-              </Txt>
-            </Pressy>
-          ) : null}
-          {!follow ? (
-            <Pressy onPress={backToMe} innerStyle={styles.sideBtn} scaleTo={0.94} accessibilityLabel="Камеру — к себе">
-              <Icon name="locate" size={18} color={C.text} />
-              <Txt weight="heavy" size={12.5}>
-                К себе
-              </Txt>
-            </Pressy>
-          ) : null}
-        </View>
-      ) : null}
+      <Toast text={toast} top={insets.top + 62 + (forest && free ? 62 : 0)} />
 
-      {reactOpen && !playing && !game.snap ? (
-        <View style={[styles.reactCard, { bottom: barBottom + 76 }]}>
-          {REACTIONS.map((k) => (
-            <Pressy
-              key={k}
-              onPress={() => {
-                if (meId) react(meId, k);
-                touch();
-                setReactOpen(false);
-              }}
-              innerStyle={styles.reactBtn}
-              scaleTo={0.86}
-              accessibilityLabel={`Реакция: ${REACTION_LABEL[k]}`}
-            >
-              <ReactionIcon kind={k} size={28} />
-            </Pressy>
-          ))}
-        </View>
-      ) : null}
-
-      {/* нижняя панель */}
-      {!playing && !game.snap ? (
-        <View style={[styles.bar, { bottom: barBottom }]}>
-          {bar.map((b) => (
-            <Pressy key={b.key} onPress={b.onPress} style={styles.barItem} innerStyle={[styles.barIn, b.accent ? styles.barAccent : null]} scaleTo={0.92} accessibilityLabel={b.label}>
-              <Icon name={b.icon} size={22} color={b.accent ? C.accent : C.text} />
-              <Txt weight="heavy" size={11.5} color={b.accent ? C.accent : C.muted} numberOfLines={1}>
-                {b.label}
-              </Txt>
-            </Pressy>
-          ))}
-        </View>
-      ) : null}
-
-      <Toast text={toast} top={insets.top + 62 + (forest && !playing && !game.snap ? 62 : 0)} />
-
+      {/* «инфо об игроке»: кто это, в сети ли, дай пять и способности */}
       <Sheet visible={Boolean(menuMember)} onClose={() => setMenu(null)} title={menuMember ? `${menuMember.name} · ${menuMember.title}` : ''}>
         {menuMember ? (
           <View style={styles.menu}>
             <View style={styles.menuHead}>
               <Chibi look={lookOf({ chibi: menuMember.chibi })} emotion="joy" value={50} pose="idle" size={56} still />
-              <Txt muted size={13} style={styles.flex}>
-                {isOnline(menuMember) ? 'В сети' : 'Не в сети — увидит сцену, когда вернётся'}
-              </Txt>
+              <View style={styles.flex}>
+                <View style={styles.onlineRow}>
+                  <View style={[styles.arrowDot, { backgroundColor: isOnline(menuMember) ? C.good : '#7D7690' }]} />
+                  <Txt weight="heavy" size={13.5} color={isOnline(menuMember) ? C.good : C.muted}>
+                    {menuMember.bot ? `Бот${isOnline(menuMember) ? ' · в сети' : ''}` : isOnline(menuMember) ? 'В сети' : 'Не в сети'}
+                  </Txt>
+                </View>
+                <Txt muted size={12.5}>
+                  {isOnline(menuMember) ? 'Нажми на действие — твой чибик подбежит' : 'Увидит сцену, когда вернётся'}
+                </Txt>
+              </View>
             </View>
             <MenuRow icon="hand" color={C.text} label="Дай пять" onPress={() => giveFive(menuMember)} />
             {abilities.map((it) => {
@@ -1364,6 +1576,16 @@ export default function RoomScreen() {
               const info = abilityInfo(it.id);
               return <MenuRow key={it.id} icon={info.icon} color={info.color} label={it.name} note={left > 0 ? leftLabel(left) : undefined} onPress={() => cast(menuMember, it.id)} />;
             })}
+            <MenuRow
+              icon="locate"
+              color={C.text}
+              label="Показать"
+              onPress={() => {
+                const mv = movers.current.get(menuMember.id);
+                setMenu(null);
+                if (mv) camTo(pxX(geo, mv.now().x));
+              }}
+            />
             {menuMember.bot && (menuMember.bot_owner === userId || owner) ? (
               <MenuRow
                 icon="close"
@@ -1379,6 +1601,41 @@ export default function RoomScreen() {
             ) : null}
           </View>
         ) : null}
+      </Sheet>
+
+      {/* «Кто здесь»: имена теперь не висят над головами — они тут, в обзоре и в «инфо» */}
+      <Sheet visible={people} onClose={() => setPeople(false)} title={`Кто в комнате · ${humans} из ${room?.capacity ?? 3}`}>
+        <View style={styles.menu}>
+          {members.map((m) => {
+            const isMe = m.id === meId;
+            const on = isOnline(m);
+            return (
+              <Pressy
+                key={m.id}
+                onPress={() => {
+                  setPeople(false);
+                  if (isMe) backToMe();
+                  else setMenu(m.id);
+                }}
+                innerStyle={styles.personRow}
+                scaleTo={0.97}
+                accessibilityLabel={`${m.name}, ${m.title}, ${on ? 'в сети' : 'не в сети'}`}
+              >
+                <Chibi look={lookOf({ chibi: m.chibi })} emotion={on ? 'joy' : 'calm'} value={on ? 60 : 30} pose="idle" size={40} still />
+                <View style={styles.flex}>
+                  <Txt weight="heavy" size={15} numberOfLines={1}>
+                    {m.name}
+                    {isMe ? ' · ты' : ''}
+                  </Txt>
+                  <Txt size={12.5} color={on ? C.good : C.faint}>
+                    {m.title} · {on ? 'в сети' : 'не в сети'}
+                  </Txt>
+                </View>
+                <View style={[styles.who, { backgroundColor: isMe ? C.me : m.bot ? C.good : C.partner }]} />
+              </Pressy>
+            );
+          })}
+        </View>
       </Sheet>
 
       <RecordsSheet visible={records} onClose={() => setRecords(false)} userId={userId} initial={game.snap?.game} />
@@ -1432,8 +1689,17 @@ const styles = StyleSheet.create({
   busyIcon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   kick: { height: 34, paddingHorizontal: 14, borderRadius: 17, justifyContent: 'center', backgroundColor: 'rgba(255,107,138,0.16)', borderWidth: 1, borderColor: 'rgba(255,107,138,0.4)' },
   top: { position: 'absolute', left: 16, right: 16, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title: { flex: 1, alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 18, ...glass },
-  exit: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 40, paddingHorizontal: 14, borderRadius: 20, ...glass },
+  title: { alignItems: 'center', paddingVertical: 4, paddingHorizontal: 10, borderRadius: 18, ...glass },
+  menuBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', ...glass },
+  menuBtnOn: { backgroundColor: C.accent, borderColor: C.accent },
+  menuCard: { position: 'absolute', right: 16, padding: 10, gap: 10, borderRadius: 26, backgroundColor: 'rgba(28,23,48,0.96)', borderWidth: 1, borderColor: C.glassBorder, boxShadow: '0px 14px 34px rgba(8,5,18,0.5)' },
+  reactRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  menuGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  menuCell: { width: '48%', flexGrow: 1 },
+  menuItem: { flexDirection: 'row', alignItems: 'center', gap: 8, height: 46, paddingHorizontal: 12, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.07)' },
+  onlineRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  personRow: { flexDirection: 'row', alignItems: 'center', gap: 12, height: 58, paddingHorizontal: 12, borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.06)' },
+  who: { width: 6, height: 26, borderRadius: 3 },
   castWrap: { position: 'absolute', left: 16, right: 16, alignItems: 'center' },
   castPill: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, ...glass },
   castMog: { backgroundColor: 'rgba(255,194,102,0.18)', borderColor: C.warn },
@@ -1443,12 +1709,7 @@ const styles = StyleSheet.create({
   arrowDot: { width: 7, height: 7, borderRadius: 4 },
   side: { position: 'absolute', right: 16, alignItems: 'flex-end', gap: 8 },
   sideBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, height: 38, paddingHorizontal: 14, borderRadius: 19, ...glass },
-  reactCard: { position: 'absolute', left: 16, flexDirection: 'row', gap: 4, padding: 6, borderRadius: 26, backgroundColor: 'rgba(28,23,48,0.94)', borderWidth: 1, borderColor: C.glassBorder },
-  reactBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' },
-  bar: { position: 'absolute', left: 16, right: 16, height: 66, borderRadius: 33, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, backgroundColor: 'rgba(24,18,40,0.84)', borderWidth: 1, borderColor: C.glassBorder },
-  barItem: { flex: 1 },
-  barIn: { height: 54, borderRadius: 27, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  barAccent: { backgroundColor: 'rgba(255,107,138,0.2)' },
+  reactBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' },
   clapWrap: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   clap: { fontFamily: F.display, textShadowColor: '#2B2035', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 },
   menu: { gap: 8 },

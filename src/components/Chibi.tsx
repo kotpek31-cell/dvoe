@@ -18,7 +18,7 @@ import { CLOTH } from '../lib/palette';
 import { NEW_EYES } from '../lib/eyes';
 import { Face, type EyeStyle } from './Face';
 
-export type ChibiPose = 'idle' | 'walk' | 'run' | 'wave' | 'hug' | 'cheer' | 'jump' | 'fallen' | 'sleep' | 'sit';
+export type ChibiPose = 'idle' | 'walk' | 'run' | 'wave' | 'hug' | 'reach' | 'cheer' | 'jump' | 'fallen' | 'sleep' | 'sit';
 
 type Props = {
   look: Look;
@@ -263,6 +263,9 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
     if (moving) loops.push(Animated.loop(timing(cycle, 1, pose === 'run' ? 380 : 560)));
     else loops.push(swing(breath, sleep ? 2000 : 1600, Easing.inOut(Easing.sin)));
     if (pose === 'wave') loops.push(swing(wave, 420, Easing.inOut(Easing.quad)));
+    // объятия — руки чуть сжимают и отпускают; тянется — руки подрагивают навстречу
+    if (pose === 'hug') loops.push(swing(wave, 620, Easing.inOut(Easing.sin)));
+    if (pose === 'reach') loops.push(swing(wave, 260, Easing.inOut(Easing.sin)));
     if (pose === 'jump') {
       loops.push(
         Animated.loop(
@@ -361,13 +364,20 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
         : c(0);
 
     // руки: поза + размах при ходьбе + взмах + потягивание + прыжок
-    const baseL = pose === 'hug' ? 70 : pose === 'cheer' ? 140 : 0;
-    const baseR = pose === 'hug' ? -70 : pose === 'cheer' ? -140 : pose === 'wave' && !animate ? -114 : 0;
+    // reach — тянется к тому, кто справа (у отражённого — слева): ближняя рука вперёд, дальняя чуть вверх
+    const baseL = pose === 'hug' ? 70 : pose === 'reach' ? 28 : pose === 'cheer' ? 140 : 0;
+    const baseR = pose === 'hug' ? -70 : pose === 'reach' ? -92 : pose === 'cheer' ? -140 : pose === 'wave' && !animate ? -114 : 0;
     const amp = run ? 32 : 9;
     const swingL = moving ? cycle.interpolate({ inputRange: [0, 0.5, 1], outputRange: [amp, -amp, amp] }) : c(0);
     const swingR = moving ? cycle.interpolate({ inputRange: [0, 0.5, 1], outputRange: [-amp, amp, -amp] }) : c(0);
-    const waveR = pose === 'wave' && animate ? wave.interpolate({ inputRange: [0, 1], outputRange: [-100, -128] }) : c(0);
-    const armL = add(c(baseL), swingL, stretch.interpolate({ inputRange: [0, 1], outputRange: [0, 150] }), hop.interpolate({ inputRange: [0, 1], outputRange: [0, 40] }));
+    const waveR =
+      pose === 'wave' && animate
+        ? wave.interpolate({ inputRange: [0, 1], outputRange: [-100, -128] })
+        : (pose === 'hug' || pose === 'reach') && animate
+          ? wave.interpolate({ inputRange: [0, 1], outputRange: pose === 'hug' ? [0, -14] : [0, -9] })
+          : c(0);
+    const hugL = (pose === 'hug' || pose === 'reach') && animate ? wave.interpolate({ inputRange: [0, 1], outputRange: pose === 'hug' ? [0, 14] : [0, 6] }) : c(0);
+    const armL = add(c(baseL), swingL, hugL, stretch.interpolate({ inputRange: [0, 1], outputRange: [0, 150] }), hop.interpolate({ inputRange: [0, 1], outputRange: [0, 40] }));
     const armR = add(c(baseR), swingR, waveR, stretch.interpolate({ inputRange: [0, 1], outputRange: [0, -150] }), hop.interpolate({ inputRange: [0, 1], outputRange: [0, -40] }));
 
     // волосы сзади слегка качаются
@@ -395,7 +405,7 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
         { translateY: flap.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -1.8 * k, 0] }) },
         ...around(60, 0, [{ rotate: flap.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: ['0deg', '3deg', '0deg', '-3deg', '0deg'] }) }]),
       ],
-      shadow: around(60, 163, [{ scale: shadow }]),
+      shadow: around(60, 157, [{ scale: shadow }]),
       sleep: [{ translateY: breath.interpolate({ inputRange: [0, 1], outputRange: [0, -1.2 * k] }) }],
     };
   }, [k, pose, moving, fallen, hover, animate, cycle, breath, flap, wave, hop, stretch, swayV, art.pivot, art.hatPivot]);
@@ -466,7 +476,9 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
     <View pointerEvents="none" style={{ width: w, height: h, transform: [{ scaleX: flip ? -1 : 1 }] }}>
       <Moving transform={t.shadow}>
         <Layer k={k}>
-          <Ellipse cx={60} cy={163} rx={hover ? 20 : 27} ry={hover ? 3.6 : 4.5} fill="#1B1426" opacity={hover ? 0.16 : 0.22} />
+          {/* тень — прямо под подошвами (низ обуви — 156,5), а не ниже: иначе чибик будто висит над ней */}
+          <Ellipse cx={60} cy={hover ? 160 : 156.5} rx={hover ? 20 : 26} ry={hover ? 3.6 : 5} fill="#1B1426" opacity={hover ? 0.16 : 0.26} />
+          {hover ? null : <Ellipse cx={60} cy={156.5} rx={17} ry={3} fill="#1B1426" opacity={0.14} />}
         </Layer>
       </Moving>
       <Moving transform={t.root}>

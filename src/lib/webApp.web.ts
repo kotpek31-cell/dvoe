@@ -26,7 +26,8 @@ export function setupWebApp(): void {
   doc.documentElement.style.backgroundColor = '#0B0A14';
   // Относительные пути работают и при размещении сайта в подпапке (GitHub Pages)
   addTag(doc, 'link', { rel: 'manifest', href: 'manifest.json' });
-  addTag(doc, 'link', { rel: 'apple-touch-icon', href: 'apple-touch-icon.png' });
+  // ?v= — новая иконка «Ладошки»: браузер не возьмёт старую из кэша (iPhone берёт её, когда сайт добавляют на экран «Домой»)
+  addTag(doc, 'link', { rel: 'apple-touch-icon', href: 'apple-touch-icon.png?v=2' });
   addTag(doc, 'meta', { name: 'theme-color', content: '#0B0A14' });
   addTag(doc, 'meta', { name: 'apple-mobile-web-app-capable', content: 'yes' });
   addTag(doc, 'meta', { name: 'mobile-web-app-capable', content: 'yes' });

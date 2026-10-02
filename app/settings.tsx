@@ -15,7 +15,8 @@ import { isHealthKitSupported, requestSleepAccess } from '../src/lib/healthkit';
 import { refreshAccess, useAccess } from '../src/lib/access';
 import { haptic } from '../src/lib/motion';
 import { registerForPushAsync, scheduleReminders } from '../src/lib/notifications';
-import { loadAmbientEnabled, loadSoundsEnabled, setAmbientEnabled, setSoundsEnabled } from '../src/lib/sound';
+import { getFlag, setFlag } from '../src/lib/prefs';
+import { loadAmbientEnabled, loadQuietInSilent, loadSoundsEnabled, setAmbientEnabled, setQuietInSilent, setSoundsEnabled, silentSwitchSupported } from '../src/lib/sound';
 import { enableWebPush, webPushState, type WebPushState } from '../src/lib/webPush';
 import { refreshWidgets } from '../src/lib/widgets';
 import { C, S } from '../src/theme';
@@ -38,6 +39,8 @@ export default function SettingsScreen() {
   const [webState, setWebState] = useState<WebPushState | null>(null);
   const [usageAccess, setUsageAccess] = useState(ScreenSleep.hasUsageAccess());
   const [sounds, setSounds] = useState(true);
+  const [quiet, setQuiet] = useState(false);
+  const [stick, setStick] = useState(true);
   const [ambient, setAmbient] = useState(true);
   const [copied, setCopied] = useState(false);
   const access = useAccess();
@@ -59,6 +62,8 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     loadSoundsEnabled().then(setSounds).catch(() => undefined);
+    loadQuietInSilent().then(setQuiet).catch(() => undefined);
+    getFlag('joystick').then((off) => setStick(!off)).catch(() => undefined);
     loadAmbientEnabled().then(setAmbient).catch(() => undefined);
   }, []);
 
@@ -177,6 +182,29 @@ export default function SettingsScreen() {
         {pushInfo ? <Txt size={14}>{pushInfo}</Txt> : null}
       </Card>
 
+      <Card title="Управление">
+        <Row style={styles.between}>
+          <View style={styles.flex}>
+            <Txt weight="heavy" size={16}>
+              Джойстик
+            </Txt>
+            <Txt muted size={13}>
+              Слева внизу на главной и в комнате. Ходить можно и нажатием на землю
+            </Txt>
+          </View>
+          <Switch
+            value={stick}
+            onValueChange={(v) => {
+              setStick(v);
+              setFlag('joystick', !v).catch(() => undefined);
+            }}
+            trackColor={{ false: 'rgba(255,255,255,0.18)', true: C.accent }}
+            thumbColor="#FFFFFF"
+            accessibilityLabel="Джойстик"
+          />
+        </Row>
+      </Card>
+
       <Card title="Звуки">
         <Row style={styles.between}>
           <View style={styles.flex}>
@@ -184,7 +212,7 @@ export default function SettingsScreen() {
               Звуки способностей
             </Txt>
             <Txt muted size={13}>
-              {Platform.OS === 'web' ? 'В беззвучном режиме iPhone звука не будет' : 'Играют на громкости медиа'}
+              {Platform.OS === 'web' ? 'Сцены, игры, грибы' : 'Играют на громкости медиа'}
             </Txt>
           </View>
           <Switch
@@ -218,6 +246,28 @@ export default function SettingsScreen() {
             accessibilityLabel="Звуки места"
           />
         </Row>
+        {silentSwitchSupported() ? (
+          <Row style={styles.between}>
+            <View style={styles.flex}>
+              <Txt weight="heavy" size={16}>
+                Тихо в беззвучном режиме
+              </Txt>
+              <Txt muted size={13}>
+                {quiet ? 'Переключатель сбоку iPhone выключает звуки «Двое»' : 'Звук играет всегда; музыка других приложений встаёт на паузу'}
+              </Txt>
+            </View>
+            <Switch
+              value={quiet}
+              onValueChange={(v) => {
+                setQuiet(v);
+                setQuietInSilent(v).catch(() => undefined);
+              }}
+              trackColor={{ false: 'rgba(255,255,255,0.18)', true: C.accent }}
+              thumbColor="#FFFFFF"
+              accessibilityLabel="Тихо в беззвучном режиме"
+            />
+          </Row>
+        ) : null}
       </Card>
 
       {Platform.OS === 'android' ? (

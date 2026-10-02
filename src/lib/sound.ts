@@ -78,6 +78,11 @@ export async function loadSoundsEnabled(): Promise<boolean> {
   return enabled;
 }
 
+// Беззвучный режим iPhone — только в браузере (sound.web.ts); на Android звук идёт по громкости медиа
+export const silentSwitchSupported = () => false;
+export const loadQuietInSilent = async () => false;
+export const setQuietInSilent = async (_value: boolean) => undefined;
+
 // ---------- Фоновый звук места ----------
 // Переключатель «Звуки места» в настройках; по умолчанию включены. Играет только на главной.
 let ambientOn = true;

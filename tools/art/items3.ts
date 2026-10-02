@@ -1,6 +1,6 @@
 // Вещи 0.2.2: шляпа грибника (секрет: грибы в лесу) и награды за победы в мини-играх комнаты.
 // Подключается к ITEMS из chibi.ts (import './items3.ts'), как items2.ts.
-import { ITEMS, path, line, el, g, dark, light, SW, shine, type Item } from './chibi.ts';
+import { ITEMS, path, line, el, g, dark, light, SW, shine, vol, drop, type Item } from './chibi.ts';
 import './items2.ts';
 
 const INK = '#2B2035';
@@ -33,9 +33,11 @@ const NEW: Record<string, Item> = {
     layers: {
       hat: () =>
         // нижняя сторона шляпки (пластинки) и сама шляпка
+        drop('M8 42 C26 52 94 52 112 42 C110 50 94 57 60 57 C26 57 10 50 8 42 Z', 3.5, 0.22) +
         path('M8 42 C26 52 94 52 112 42 C110 50 94 57 60 57 C26 57 10 50 8 42 Z', GILLS, { 'stroke-width': 1.8 }) +
         line('M24 49 L27 54 M38 51 L40 56 M52 52 L53 57 M68 52 L67 57 M82 51 L80 56 M96 49 L93 54', dark(GILLS, 0.2), 1.2) +
         path('M4 44 C0 14 28 -8 60 -8 C92 -8 120 14 116 44 C98 52 22 52 4 44 Z', CAP) +
+        vol('mush', 'M4 44 C0 14 28 -8 60 -8 C92 -8 120 14 116 44 C98 52 22 52 4 44 Z', -8, 50, { glow: 0.38, shade: 0.34 }) +
         ellipse(32, 12, 9, 6.5, '#FFFFFF', { stroke: INK, 'stroke-width': 1.4 }) +
         ellipse(62, 3, 7, 5, '#FFFFFF', { stroke: INK, 'stroke-width': 1.4 }) +
         ellipse(90, 16, 8, 6, '#FFFFFF', { stroke: INK, 'stroke-width': 1.4 }) +
@@ -54,8 +56,11 @@ const NEW: Record<string, Item> = {
     cat: 'hat', name: 'Корона чемпиона', code: true,
     layers: {
       hat: () =>
+        drop('M28 26 C48 30 72 30 92 26 L91 34 C72 38 48 38 29 34 Z', 3, 0.22) +
         path('M30 30 L24 2 L42 16 L52 -6 L60 12 L68 -6 L78 16 L96 2 L90 30 Z', GOLD, { 'stroke-linejoin': 'round' }) +
+        vol('crown', 'M30 30 L24 2 L42 16 L52 -6 L60 12 L68 -6 L78 16 L96 2 L90 30 Z', -6, 30, { glow: 0.5, shade: 0.3 }) +
         path('M28 26 C48 30 72 30 92 26 L91 34 C72 38 48 38 29 34 Z', GOLD_D, { 'stroke-width': 1.8 }) +
+        vol('crownb', 'M28 26 C48 30 72 30 92 26 L91 34 C72 38 48 38 29 34 Z', 26, 38, { glow: 0.4, shade: 0.3 }) +
         circle(24, 2, 3.2, '#FF6B8A', 1.4) + circle(52, -6, 3.2, '#8FA2FF', 1.4) + circle(68, -6, 3.2, '#8FA2FF', 1.4) + circle(96, 2, 3.2, '#FF6B8A', 1.4) +
         el('path', { d: 'M60 18 L64 24 L60 30 L56 24 Z', fill: '#5ED3A0', stroke: INK, 'stroke-width': 1.4, 'stroke-linejoin': 'round' }) +
         shine('M36 14 L40 26 M80 14 L78 24'),

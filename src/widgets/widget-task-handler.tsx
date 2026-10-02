@@ -10,7 +10,7 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps) {
     case 'WIDGET_UPDATE':
     case 'WIDGET_RESIZED': {
       const snapshot = await loadSnapshotWithFallback();
-      props.renderWidget(<AndroidPartnerWidget snapshot={snapshot} />);
+      props.renderWidget(<AndroidPartnerWidget snapshot={snapshot} width={props.widgetInfo.width} height={props.widgetInfo.height} />);
       break;
     }
     case 'WIDGET_DELETED':

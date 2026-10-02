@@ -1,6 +1,7 @@
-// Звуки способностей в браузере: Web Audio. Safari (iPhone) разрешает звук только после касания,
-// поэтому контекст «будится» на первом касании; до него сцену запускают кнопкой «Смотреть».
-// В беззвучном режиме iPhone звука не будет — так решает система.
+// Звуки в браузере: Web Audio. Safari (iPhone) разрешает звук только из «настоящего» касания — touchend, click
+// или клавиши (pointerdown от пальца не считается!), поэтому будим контекст на каждом таком событии, пока он не заработает,
+// и снова — после ухода в фон (iOS «прерывает» звук). До первого касания сцену запускают кнопкой «Смотреть».
+// Беззвучный режим iPhone: по умолчанию звук играет и в нём (audioSession 'playback'); переключатель в настройках.
 import { Asset } from 'expo-asset';
 import { getFlag, setFlag } from './prefs';
 import { AMBIENT_FILES, AMBIENT_LOOP, AMBIENT_START, AMBIENT_VOLUME, SOUND_FILES, type AmbientId, type SoundName } from './soundFiles';
@@ -18,12 +19,30 @@ let touched = false;
 const buffers = new Map<SoundName, Promise<AudioBuffer | null>>();
 const playing = new Set<AudioBufferSourceNode>();
 
+// Safari 16.4+: тип звуковой сессии. 'playback' — играет и в беззвучном режиме, 'ambient' — молчит, как раньше.
+let quietInSilent = false;
+type SessionNav = Navigator & { audioSession?: { type: string } };
+function applySession() {
+  try {
+    const nav = (typeof navigator !== 'undefined' ? navigator : null) as SessionNav | null;
+    if (nav?.audioSession) nav.audioSession.type = quietInSilent ? 'ambient' : 'playback';
+  } catch {
+    // старый Safari — без переключателя
+  }
+}
+applySession();
+getFlag('quietInSilent').then((v) => {
+  quietInSilent = v;
+  applySession();
+});
+
 function context(): Ctx | null {
   if (ctx) return ctx;
   const W = globalThis as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext };
   const Ctor = W.AudioContext ?? W.webkitAudioContext;
   if (!Ctor) return null;
   try {
+    applySession();
     ctx = new Ctor();
   } catch {
     ctx = null;
@@ -31,31 +50,33 @@ function context(): Ctx | null {
   return ctx;
 }
 
+// Вызывается из обработчика касания: только там Safari разрешает resume()
 function unlock() {
-  touched = true;
   const c = context();
   if (!c) return;
-  if (c.state === 'suspended') c.resume().catch(() => undefined);
-  // короткая тишина — iOS после этого разрешает звук
-  try {
-    const src = c.createBufferSource();
-    src.buffer = c.createBuffer(1, 1, 22050);
-    src.connect(c.destination);
-    src.start(0);
-  } catch {
-    // ничего
+  touched = true;
+  if (c.state !== 'running') {
+    c.resume().catch(() => undefined);
+    // короткая тишина — iOS после этого разрешает звук
+    try {
+      const src = c.createBufferSource();
+      src.buffer = c.createBuffer(1, 1, 22050);
+      src.connect(c.destination);
+      src.start(0);
+    } catch {
+      // ничего
+    }
   }
   // фоновый звук ждал первого касания
   if (wanted && !amb) playAmbient(wanted);
 }
 
 if (typeof window !== 'undefined') {
-  const events = ['pointerdown', 'touchend', 'keydown'];
-  const once = () => {
-    unlock();
-    events.forEach((e) => window.removeEventListener(e, once, true));
-  };
-  events.forEach((e) => window.addEventListener(e, once, true));
+  // слушаем всегда: дёшево, а после звонка или ухода в фон контекст снова «прерван»
+  ['touchend', 'click', 'keydown'].forEach((e) => window.addEventListener(e, unlock, true));
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && ctx && ctx.state !== 'running') ctx.resume().catch(() => undefined);
+  });
 }
 
 function load(name: SoundName): Promise<AudioBuffer | null> {
@@ -129,6 +150,20 @@ export async function setSoundsEnabled(value: boolean) {
 export async function loadSoundsEnabled(): Promise<boolean> {
   enabled = !(await getFlag('abilitySoundsOff'));
   return enabled;
+}
+
+// Беззвучный режим iPhone: true — молчать в нём (как системные звуки), false — играть всегда
+export const silentSwitchSupported = () => typeof navigator !== 'undefined' && Boolean((navigator as SessionNav).audioSession);
+
+export async function loadQuietInSilent(): Promise<boolean> {
+  quietInSilent = await getFlag('quietInSilent');
+  return quietInSilent;
+}
+
+export async function setQuietInSilent(value: boolean) {
+  quietInSilent = value;
+  applySession();
+  await setFlag('quietInSilent', value);
 }
 
 // ---------- Фоновый звук места ----------

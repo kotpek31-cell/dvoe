@@ -1,5 +1,6 @@
 // Чибик на площадке: стоит ногами в точке мира (Mover), дальше — меньше и позади, ближе — крупнее и впереди.
-// Плашка «имя · роль» и облачко реакции над головой не уменьшаются — текст остаётся читаемым.
+// Этап фиксации 0.2: имени над головой больше нет — оно в «инфо об игроке», в «Кто здесь» и в обзоре (камера отдалена):
+// тогда плашка «имя · роль» видна и не уменьшается вместе с миром (unscale = 1 / отдаление).
 import { memo, useSyncExternalStore, type ReactNode } from 'react';
 import { Animated, Pressable, StyleSheet, View } from 'react-native';
 import type { Look } from '../../lib/chibi';
@@ -28,9 +29,12 @@ type Props = {
   over?: ReactNode; // облачко реакции, искры, тыква над головой
   cover?: ReactNode; // поверх чибика (сажа после взрыва) — масштабируется вместе с ним
   faded?: boolean; // выбыл из игры
+  showName?: boolean; // обзор: плашка с именем над головой
+  unscale?: Animated.AnimatedInterpolation<number> | Animated.AnimatedDivision<number>; // 1 / отдаление камеры
+  tappable?: boolean; // false — нажатия проходят на землю (свой чибик)
 };
 
-export const RoomActor = memo(function RoomActor({ mover, geo, look, emotion, value, pose, face, label, dot, online, hidden, onPress, onLongPress, a11y, over, cover, faded }: Props) {
+export const RoomActor = memo(function RoomActor({ mover, geo, look, emotion, value, pose, face, label, dot, online, hidden, onPress, onLongPress, a11y, over, cover, faded, showName, unscale, tappable = true }: Props) {
   const st = useSyncExternalStore(mover.subscribe, mover.getState, mover.getState);
   const size = geo.base;
   const h = Math.round((size * 170) / 120);
@@ -45,7 +49,7 @@ export const RoomActor = memo(function RoomActor({ mover, geo, look, emotion, va
 
   return (
     <Animated.View
-      pointerEvents={hidden ? 'none' : 'box-none'}
+      pointerEvents={hidden || !tappable ? 'none' : 'box-none'}
       style={[styles.feet, { left: -size / 2, top: -h, width: size, height: h, zIndex: z, opacity: hidden ? 0 : 1, transform: [{ translateX: mover.x }, { translateY: mover.y }] }]}
     >
       <Animated.View
@@ -61,18 +65,22 @@ export const RoomActor = memo(function RoomActor({ mover, geo, look, emotion, va
           ) : null}
         </Pressable>
       </Animated.View>
-      <Animated.View pointerEvents="none" style={[styles.over, { left: size / 2 - 120, transform: [{ translateY: headY }] }]}>
-        <View style={styles.overInner}>
-          {over}
-          <View style={[styles.tag, k < 0.8 ? styles.tagSmall : null]}>
-            <View style={[styles.dot, { backgroundColor: online ? C.good : '#7D7690' }]} />
-            <View style={[styles.who, { backgroundColor: dot }]} />
-            <Txt weight="heavy" size={12} numberOfLines={1}>
-              {label}
-            </Txt>
+      {over || showName ? (
+        <Animated.View pointerEvents="none" style={[styles.over, { left: size / 2 - 120, transform: [{ translateY: headY }, ...(unscale ? [{ scale: unscale }] : [])] }]}>
+          <View style={styles.overInner}>
+            {over}
+            {showName ? (
+              <View style={[styles.tag, k < 0.8 ? styles.tagSmall : null]}>
+                <View style={[styles.dot, { backgroundColor: online ? C.good : '#7D7690' }]} />
+                <View style={[styles.who, { backgroundColor: dot }]} />
+                <Txt weight="heavy" size={12} numberOfLines={1}>
+                  {label}
+                </Txt>
+              </View>
+            ) : null}
           </View>
-        </View>
-      </Animated.View>
+        </Animated.View>
+      ) : null}
     </Animated.View>
   );
 });

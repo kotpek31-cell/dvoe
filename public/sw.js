@@ -20,8 +20,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(message.title || 'Двое', {
       body: message.body || '',
-      icon: new URL('icon-192.png', scope).href,
-      badge: new URL('icon-192.png', scope).href,
+      icon: new URL('icon-192.png?v=2', scope).href,
+      badge: new URL('icon-192.png?v=2', scope).href,
       tag: extra.type || 'dvoe',
       renotify: true,
       data: { url },

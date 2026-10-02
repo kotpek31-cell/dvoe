@@ -6,7 +6,9 @@ const KEYS = {
   nudgeHint: 'dvoe:hint-nudge',
   abilitySoundsOff: 'dvoe:ability-sounds-off',
   ambientOff: 'dvoe:ambient-off',
-  whatsNew: 'dvoe:whats-new-0.2.2',
+  quietInSilent: 'dvoe:quiet-in-silent',
+  joystick: 'dvoe:joystick-off',
+  whatsNew: 'dvoe:whats-new-0.2-fix', // новый ключ — «Что нового» покажется само ещё раз
 } as const;
 
 type Key = keyof typeof KEYS;

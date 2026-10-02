@@ -2,7 +2,7 @@
 // Подключается к ITEMS из chibi.ts (import './items2.ts'); каталог и макет берут их оттуда же.
 // Костюмы (code: true) выдаются секретными кодами — сами коды только в базе.
 import { FACE_PATHS } from '../../src/lib/face.ts';
-import { ITEMS, path, line, el, g, dark, light, contrast, P, HOODIE, DRESS, GIRL_FRONT, SW, shine, type Item } from './chibi.ts';
+import { ITEMS, path, line, el, g, dark, light, contrast, P, HOODIE, DRESS, GIRL_FRONT, SW, shine, vol, drop, type Item } from './chibi.ts';
 
 const INK = '#2B2035';
 const circle = (cx: number, cy: number, r: number, fill: string, sw = SW, o: Record<string, string | number> = {}) =>
@@ -113,8 +113,14 @@ const NEW: Record<string, Item> = {
     cat: 'hat', name: 'Ушки котика', def: 'coal', palette: 'cloth',
     layers: {
       hat: ({ col }) => {
-        const ear = path('M23 38 L20 6 L48 22 Z', col) + path('M27 30 L26 14 L40 22 Z', '#FF9EBB', { stroke: 'none' });
-        return ear + mirror(ear) + line('M19 46 C22 26 40 15 60 15 C80 15 98 26 101 46', INK, 6.4) + line('M19 46 C22 26 40 15 60 15 C80 15 98 26 101 46', col, 3.6);
+        const ear =
+          path('M23 38 L20 6 L48 22 Z', col) + vol('ear', 'M23 38 L20 6 L48 22 Z', 6, 38, { glow: 0.36, shade: 0.3 }) +
+          path('M27 30 L26 14 L40 22 Z', '#FF9EBB', { stroke: 'none' }) + el('path', { d: 'M28 27 L27.4 17 L34 21', fill: 'none', stroke: '#FFFFFF', 'stroke-width': 1.2, opacity: 0.6, 'stroke-linecap': 'round' });
+        const band = 'M19 46 C22 26 40 15 60 15 C80 15 98 26 101 46';
+        return (
+          line(band, INK, 5, { opacity: 0.16, transform: 'translate(0 3)' }) +
+          ear + mirror(ear) + line(band, INK, 6.4) + line(band, col, 3.6) + line('M30 30 C38 22 48 18.5 58 18', '#FFFFFF', 1.2, { opacity: 0.45 })
+        );
       },
     },
   },
@@ -132,14 +138,21 @@ const NEW: Record<string, Item> = {
   'hat.tophat': {
     cat: 'hat', name: 'Цилиндр', def: 'coal', palette: 'cloth',
     layers: {
-      hat: ({ col }) =>
-        g(
-          path('M37 34 L39 -4 C39 -7 42 -9 45 -9 L75 -9 C78 -9 81 -7 81 -4 L83 34 Z', col) +
+      hat: ({ col }) => {
+        const body = 'M37 34 L39 -4 C39 -7 42 -9 45 -9 L75 -9 C78 -9 81 -7 81 -4 L83 34 Z';
+        const brim = 'M12 37 C12 31 34 29 60 29 C86 29 108 31 108 37 C108 43 86 45 60 45 C34 45 12 43 12 37 Z';
+        return g(
+          drop(brim, 4, 0.2) +
+            path(body, col) +
+            vol('top', body, -9, 34, { glow: 0.3, shade: 0.36 }) +
             path('M38 21 L82 21 L82.7 30 L37.4 30 Z', contrast(col), { 'stroke-width': 1.6 }) +
-            path('M12 37 C12 31 34 29 60 29 C86 29 108 31 108 37 C108 43 86 45 60 45 C34 45 12 43 12 37 Z', dark(col, 0.12)) +
+            path(brim, dark(col, 0.12)) +
+            vol('topb', brim, 29, 45, { glow: 0.3, shade: 0.36 }) +
+            el('ellipse', { cx: 60, cy: -8.4, rx: 18, ry: 1.6, fill: light(col, 0.25), opacity: 0.7 }) +
             line('M44 -4 V18', light(col, 0.3), 2, { opacity: 0.45 }),
           { transform: 'rotate(-6 60 30)' },
-        ),
+        );
+      },
     },
   },
   'hat.ushanka': {
@@ -147,12 +160,19 @@ const NEW: Record<string, Item> = {
     layers: {
       hat: ({ col }) => {
         const fur = '#F4F0FF';
-        const flap = path('M14 48 C11 62 13 76 19 86 C25 86 30 80 31 70 L32 48 Z', fur);
+        const flapD = 'M14 48 C11 62 13 76 19 86 C25 86 30 80 31 70 L32 48 Z';
+        const flap = path(flapD, fur) + vol('ushf', flapD, 48, 86, { glow: 0.2, shade: 0.26 });
+        const dome = 'M18 46 C16 22 36 7 60 7 C84 7 104 22 102 46 Z';
+        const band = 'M15 46 C15 37 30 33 60 33 C90 33 105 37 105 46 C105 55 90 57 60 57 C30 57 15 55 15 46 Z';
         return flap + mirror(flap) +
-          path('M18 46 C16 22 36 7 60 7 C84 7 104 22 102 46 Z', col) +
+          drop(band, 3.5, 0.18) +
+          path(dome, col) +
+          vol('ush', dome, 7, 46) +
           line('M60 8 V36', dark(col, 0.22), 1.4, { opacity: 0.6 }) +
-          path('M15 46 C15 37 30 33 60 33 C90 33 105 37 105 46 C105 55 90 57 60 57 C30 57 15 55 15 46 Z', fur) +
-          line('M24 42 l3 3 M36 39 l3 3 M50 38 l3 3 M66 38 l3 3 M80 39 l3 3 M93 42 l3 3', '#C9C0E0', 1.3);
+          path(band, fur) +
+          vol('ushb', band, 33, 57, { glow: 0.2, shade: 0.24 }) +
+          line('M24 42 l3 3 M36 39 l3 3 M50 38 l3 3 M66 38 l3 3 M80 39 l3 3 M93 42 l3 3 M30 49 l3 3 M44 51 l3 3 M58 51 l3 3 M72 51 l3 3 M86 49 l3 3', '#C9C0E0', 1.3) +
+          el('circle', { cx: 60, cy: 26, r: 5, fill: '#FFD45E', stroke: INK, 'stroke-width': 1.6 }) + el('path', { d: 'M60 22.6 L61 25 L63.4 25.2 L61.6 26.8 L62.2 29.2 L60 27.9 L57.8 29.2 L58.4 26.8 L56.6 25.2 L59 25 Z', fill: '#E5566B' });
       },
     },
   },
@@ -162,7 +182,9 @@ const NEW: Record<string, Item> = {
       hat: () =>
         path('M60 9 C62 2 66 -3 72 -4 C70 0 67 4 66 10 Z', STEM, { 'stroke-width': 1.8 }) +
         path('M66 4 C72 -2 82 -2 86 4 C80 8 72 8 66 4 Z', '#6FC067', { 'stroke-width': 1.6 }) +
+        drop('M16 50 C12 24 34 8 60 8 C86 8 108 24 104 50 C96 55 86 53 80 49 C72 55 48 55 40 49 C34 53 24 55 16 50 Z', 3, 0.2) +
         path('M16 50 C12 24 34 8 60 8 C86 8 108 24 104 50 C96 55 86 53 80 49 C72 55 48 55 40 49 C34 53 24 55 16 50 Z', ORANGE) +
+        vol('pump', 'M16 50 C12 24 34 8 60 8 C86 8 108 24 104 50 C96 55 86 53 80 49 C72 55 48 55 40 49 C34 53 24 55 16 50 Z', 8, 55, { glow: 0.36, shade: 0.34 }) +
         line('M40 13 C34 24 33 38 36 50 M60 9 V51 M80 13 C86 24 87 38 84 50', dark(ORANGE, 0.22), 1.6, { opacity: 0.7 }) +
         line('M28 22 C34 16 42 13 50 12', '#FFFFFF', 2.6, { opacity: 0.35 }),
     },
@@ -171,8 +193,11 @@ const NEW: Record<string, Item> = {
     cat: 'hat', name: 'Шляпа ведьмы', code: true,
     layers: {
       hat: () =>
+        drop('M8 40 C8 32 32 29 60 29 C88 29 112 32 112 40 C112 47 88 49 60 49 C32 49 8 47 8 40 Z', 4, 0.22) +
         path('M8 40 C8 32 32 29 60 29 C88 29 112 32 112 40 C112 47 88 49 60 49 C32 49 8 47 8 40 Z', '#3A2E5A') +
+        vol('witchb', 'M8 40 C8 32 32 29 60 29 C88 29 112 32 112 40 C112 47 88 49 60 49 C32 49 8 47 8 40 Z', 29, 49, { glow: 0.22, shade: 0.4 }) +
         path('M30 38 C40 28 46 6 56 -12 C60 -19 71 -24 82 -18 C73 -16 67 -10 65 0 C63 14 78 28 92 38 Z', '#4A3A6E') +
+        vol('witch', 'M30 38 C40 28 46 6 56 -12 C60 -19 71 -24 82 -18 C73 -16 67 -10 65 0 C63 14 78 28 92 38 Z', -24, 38, { glow: 0.28, shade: 0.36 }) +
         path('M33 31 C50 34 72 34 88 31 L91 37 C72 41 50 41 30 37 Z', '#9B6BFF', { 'stroke-width': 1.6 }) +
         rect(55, 30.5, 9, 8, 1.6, '#FFD45E', 1.6) +
         star5(48, 12, 0.6, '#FFD966', 0.9),
