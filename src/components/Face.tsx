@@ -3,7 +3,7 @@ import { memo, useEffect, useId, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, Stop } from 'react-native-svg';
 import { FACE_PATHS, FACE_SPOTS, faceModel, INK, type FaceKey, type FaceModel } from '../lib/face';
-import { renderLayer } from '../lib/art';
+import { artNodes, renderArt } from '../lib/art';
 import { eyeArt, isNewEye, type NewEyeStyle } from '../lib/eyes';
 import { CLOTH, SKIN } from '../lib/palette';
 
@@ -35,7 +35,7 @@ function StyledEyes({ f, style, color, skin, gid }: { f: FaceModel; style: EyeSt
   if (isNewEye(style)) {
     // стили 0.2.1 — общий рисунок с макетом (src/lib/eyes.ts)
     const c = color ?? CLOTH.coal[1];
-    return <G opacity={f.eyesOp}>{renderLayer(eyeArt(style, f, c, 'vg'), { c, skin, ids: gid }, gid)}</G>;
+    return <G opacity={f.eyesOp}>{renderArt(artNodes(eyeArt(style, f, c, 'vg')), { c, skin, ids: gid }, gid)}</G>;
   }
   const g = f.geo;
   const open = g.h > 3;
@@ -86,6 +86,7 @@ function StyledEyes({ f, style, color, skin, gid }: { f: FaceModel; style: EyeSt
   const ink = !color || color.toUpperCase() === CLOTH.coal[1].toUpperCase();
   const fill = ink ? INK : color;
   const big = style === 'sparkle' ? 1.4 : 1;
+  const wide = g.h > 7.5; // глаз открыт достаточно, чтобы внутри поместились радужка и второй блик
   const lid = g.topMid + g.h * 0.42;
   return (
     <G opacity={f.eyesOp}>
@@ -96,8 +97,19 @@ function StyledEyes({ f, style, color, skin, gid }: { f: FaceModel; style: EyeSt
             <Ellipse key={sd} cx={cx} cy={g.topMid + g.h * 0.56} rx={g.w * 0.48} ry={g.h * 0.34} fill={INK} />
           ))
         : null}
+      {/* 3.0: у тёмных глаз снизу мягкая радужка — взгляд глубже, не «пуговицы» */}
+      {ink && wide
+        ? sides.map(([sd, cx]) => (
+            <Ellipse key={`i${sd}`} cx={cx} cy={g.topMid + g.h * 0.7} rx={g.w * 0.6} ry={g.h * 0.2} fill="#8E79C4" opacity={0.6} />
+          ))
+        : null}
       <Circle cx={f.hl.lx} cy={f.hl.y} r={f.hl.r * big} fill="#FFFFFF" opacity={f.hl.op} />
       <Circle cx={f.hl.rx} cy={f.hl.y} r={f.hl.r * big} fill="#FFFFFF" opacity={f.hl.op} />
+      {wide && style !== 'sparkle' && f.s2.op <= 0
+        ? sides.map(([sd, cx]) => (
+            <Circle key={`s${sd}`} cx={cx + g.w * 0.36} cy={g.topMid + g.h * 0.72} r={Math.max(0.9, g.w * 0.17)} fill="#FFFFFF" opacity={0.75 * f.hl.op} />
+          ))
+        : null}
       {style === 'sparkle' ? (
         <G opacity={f.hl.op}>
           <Circle cx={f.s2.lx} cy={f.s2.y} r={1.5} fill="#FFFFFF" />
@@ -198,8 +210,12 @@ function FaceView({ emotion, value, size, bare, eyes, look, blink, closed: alway
           </G>
         ) : null}
         <G transform={`rotate(${f.rot} 50 56)`}>
-          <Ellipse cx={f.cheekL} cy={f.cheekY} rx={7.5} ry={4.4} fill="#FF4F86" opacity={Math.max(f.blushOp, blushMin)} />
-          <Ellipse cx={f.cheekR} cy={f.cheekY} rx={7.5} ry={4.4} fill="#FF4F86" opacity={Math.max(f.blushOp, blushMin)} />
+          {[f.cheekL, f.cheekR].map((cx) => (
+            <G key={cx} opacity={Math.max(f.blushOp, blushMin)}>
+              <Ellipse cx={cx} cy={f.cheekY} rx={9.4} ry={5.8} fill="#FF4F86" opacity={0.42} />
+              <Ellipse cx={cx} cy={f.cheekY} rx={6.2} ry={3.5} fill="#FF4F86" opacity={0.72} />
+            </G>
+          ))}
           {f.bagsOp > 0 ? (
             <G opacity={f.bagsOp}>
               <Path d={f.bagL} fill="none" stroke="#5E4A73" strokeWidth={1.4} strokeLinecap="round" />

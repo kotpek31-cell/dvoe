@@ -32,3 +32,6 @@ google-services.json
 
 # Картинки, которые собирает tools/art/build.ts
 svg/
+
+# стенд (tools/stand): собранные страницы и скриншоты
+tools/stand/out/

@@ -2,6 +2,7 @@
 // Обводка — как у чибиков (#2B2035), мягкие заливки.
 import { memo } from 'react';
 import Svg, { Circle, Ellipse, G, Path } from 'react-native-svg';
+import { T_HEAD } from '../../../lib/body';
 import type { Hand } from '../../../lib/games/rules';
 
 const INK = '#2B2035';
@@ -108,11 +109,14 @@ export const HandArt = memo(function HandArt({ hand, size, bubble = true }: { ha
 export const Soot = memo(function Soot({ size }: { size: number }) {
   return (
     <Svg width={size} height={(size * 170) / 120} viewBox="0 0 120 170">
-      <Ellipse cx={42} cy={66} rx={9} ry={6} fill={INK} opacity={0.42} />
-      <Ellipse cx={78} cy={58} rx={7} ry={5} fill={INK} opacity={0.38} />
-      <Ellipse cx={62} cy={82} rx={6} ry={4} fill={INK} opacity={0.34} />
-      <Ellipse cx={30} cy={40} rx={8} ry={5} fill={INK} opacity={0.3} />
-      <Path d="M52 10 C46 2 56 -4 52 -12 M70 12 C76 4 66 -2 72 -10" stroke="#9B93AE" strokeWidth={3} fill="none" strokeLinecap="round" opacity={0.7} />
+      {/* пятна нарисованы по лицу — рисуем в координатах головы */}
+      <G transform={T_HEAD}>
+        <Ellipse cx={42} cy={66} rx={9} ry={6} fill={INK} opacity={0.42} />
+        <Ellipse cx={78} cy={58} rx={7} ry={5} fill={INK} opacity={0.38} />
+        <Ellipse cx={62} cy={82} rx={6} ry={4} fill={INK} opacity={0.34} />
+        <Ellipse cx={30} cy={40} rx={8} ry={5} fill={INK} opacity={0.3} />
+        <Path d="M52 10 C46 2 56 -4 52 -12 M70 12 C76 4 66 -2 72 -10" stroke="#9B93AE" strokeWidth={3} fill="none" strokeLinecap="round" opacity={0.7} />
+      </G>
     </Svg>
   );
 });

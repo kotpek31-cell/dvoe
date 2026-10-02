@@ -10,12 +10,13 @@ import { Pressy, Txt } from './ui';
 
 export type Crop = 'head' | 'torso' | 'body' | 'wide';
 
-// Область рисунка чибика (координаты 120×170), которую показывает плитка
+// Область рисунка чибика (координаты 120×170), которую показывает плитка.
+// 3.0: голова меньше и выше, туловище длиннее (см. src/lib/body.ts) — области подогнаны под новое тело.
 const AREA: Record<Crop, { x0: number; x1: number; y0: number; y1: number }> = {
-  head: { x0: 6, x1: 114, y0: -6, y1: 108 },
-  torso: { x0: 0, x1: 120, y0: 14, y1: 146 },
-  body: { x0: -6, x1: 126, y0: -8, y1: 174 },
-  wide: { x0: -28, x1: 148, y0: -24, y1: 176 },
+  head: { x0: 20, x1: 100, y0: 2, y1: 82 },
+  torso: { x0: 12, x1: 108, y0: 56, y1: 152 },
+  body: { x0: -20, x1: 140, y0: 8, y1: 168 },
+  wide: { x0: -30, x1: 150, y0: -8, y1: 172 },
 };
 
 type ThumbProps = { look: Look; crop: Crop; size: number };

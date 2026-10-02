@@ -249,8 +249,9 @@ export function AbilityScene({ scene, t, reduce, caster, target, width, height, 
       return { c0: reduce ? C1 : C0, c1: C1, t0: T, t1: T };
     }
     const cx = width / 2;
-    const CL = cx - size * 0.74;
-    const TR = cx - size * 0.26;
+    // 3.0: тела стройнее — встают ближе, чтобы объятия были объятиями
+    const CL = cx - size * 0.7;
+    const TR = cx - size * 0.3;
     return reduce
       ? { c0: CL, c1: CL, t0: TR, t1: TR }
       : { c0: Math.max(-size * 0.2, CL - width * 0.3), c1: CL, t0: Math.min(width - size * 0.8, TR + width * 0.3), t1: TR };
@@ -362,8 +363,9 @@ export function AbilityScene({ scene, t, reduce, caster, target, width, height, 
   const starRing = useMemo(() => {
     if (kind !== 'mog') return [];
     // упавший смотрит влево (перевёрнут) — голова у правого края; применивший падает навзничь — у левого
-    const hx = blocked ? 15 * k : size - 15 * k;
-    const hy = 70 * k;
+    // 3.0: голова меньше, лежащий длиннее — она у самого края рамки
+    const hx = blocked ? 2 * k : size - 2 * k;
+    const hy = 86 * k;
     const from = (reduce ? 1500 : 4000) + (blocked ? (reduce ? 200 : 350) : 0);
     const to = reduce ? 2600 : 6200;
     return [0, 2.1, 4.2].map((a0) => ({

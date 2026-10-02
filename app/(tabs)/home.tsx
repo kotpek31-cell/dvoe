@@ -170,8 +170,8 @@ export default function HomeScreen() {
         arrived.current.clear();
         setMeet('go');
         const top = sceneTransform(width, height).y(534); // встречаются на одной глубине
-        setGoMe({ x: cx - sz * 0.92, y: top, id });
-        setGoPartner({ x: cx - sz * 0.08, y: top, id });
+        setGoMe({ x: cx - sz * 0.84, y: top, id });
+        setGoPartner({ x: cx - sz * 0.16, y: top, id });
         later('meet', 7000, () => setMeet(null)); // не дошли — не страшно
       } else {
         setMeet('wave');
