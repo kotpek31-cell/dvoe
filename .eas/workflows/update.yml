@@ -1,0 +1,15 @@
+# Обновление для APK без новой сборки (expo-updates, канал preview).
+# Запускает Claude через коннектор Expo (workflow_run, ветка main) — вместо «eas update» из Codespace.
+name: Обновление Android (preview)
+
+on: {}
+
+jobs:
+  publish_update:
+    name: Опубликовать обновление
+    type: update
+    environment: preview
+    params:
+      channel: preview
+      platform: android
+      message: Обновление из main
