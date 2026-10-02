@@ -79,6 +79,7 @@ export type Item = {
   anim?: 'sway' | 'flicker' | 'pulse'; // 0.2.1: качается (спина) или мерцает (слои *Fx)
   pivot?: [number, number]; // точка качания
   skin?: string; // вещь красит кожу (Франкенштейн, вампир)
+  spores?: boolean; // 0.2.2: ночью от вещи летят светящиеся споры (шляпа грибника)
   layers: Partial<Record<string, (c: Ctx) => string>>;
 };
 

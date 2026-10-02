@@ -565,7 +565,14 @@ export const STARTER_ITEMS: ItemRow[] = [
     "over": "<path d=\"M92 -2 C88 -12 92 -20 100 -22 C98 -14 99 -8 104 -2 C100 0 96 0 92 -2 Z\" fill=\"#7CC46A\" stroke=\"#2B2035\" stroke-width=\"1.5\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M95 -4 C96 -10 98 -15 100 -20\" fill=\"none\" stroke=\"#689b5d\" stroke-width=\"1\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><g transform=\"translate(78 0) scale(0.95)\"><path d=\"M-3.2 0 C-3.6 -5 -3 -9 -2.4 -11 L2.4 -11 C3 -9 3.6 -5 3.2 0 Z\" fill=\"#FFF6E6\" stroke=\"#2B2035\" stroke-width=\"1.5\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M-9 -10 C-9 -19 9 -19 9 -10 C5 -8 -5 -8 -9 -10 Z\" fill=\"#B07BFF\" stroke=\"#2B2035\" stroke-width=\"1.5\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><circle cx=\"-3.6\" cy=\"-14\" r=\"1.4\" fill=\"#FFFFFF\"></circle><circle cx=\"2.6\" cy=\"-15.4\" r=\"1.1\" fill=\"#FFFFFF\"></circle></g>"
    }
   },
-  "meta": {},
+  "meta": {
+   "anim": "sway",
+   "pivot": [
+    60,
+    40
+   ],
+   "spores": true
+  },
   "rarity": 0
  },
  {

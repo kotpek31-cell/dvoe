@@ -23,6 +23,7 @@ import { RecordsSheet } from '../src/components/room/games/RecordsSheet';
 import { ReactionBubble, ReactionIcon, REACTION_LABEL } from '../src/components/room/Reaction';
 import { RoomActor } from '../src/components/room/RoomActor';
 import { WideLand, WideSky } from '../src/components/room/WideLocation';
+import { Basket, BASKET_W, basketSlot, FlyingShroom, MushroomPatch, PluckWord } from '../src/components/scene/Mushrooms';
 import { AbilityScene, sceneKind, worldTransform } from '../src/components/scene/AbilityScene';
 import { Sheet } from '../src/components/Sheet';
 import { Button, IconButton, Pressy, Txt } from '../src/components/ui';
@@ -60,6 +61,8 @@ import type { FaceKey } from '../src/lib/face';
 import { useScreenFocused } from '../src/lib/focus';
 import { isLocationId, LOCATION_BG, locationName, type LocationId } from '../src/lib/locations';
 import { haptic, nativeDriver, useReducedMotion } from '../src/lib/motion';
+import { HAT_ID, MUSH_REGROW_MS, putMushroom, ROOM_MUSHROOMS, showHatReveal, useHunt, type MushColor } from '../src/lib/mushrooms';
+import { NightContext } from '../src/lib/night';
 import { REACTIONS, RoomLink, type Presence, type ReactionKind, type Wire } from '../src/lib/roomLink';
 import { fracX, fracY, freeSpot, makeGeo, Mover, pxX, pxY, scaleAt, type Geo } from '../src/lib/roomWorld';
 import { canAutoplay, playSound } from '../src/lib/sound';
@@ -69,7 +72,7 @@ import { C, F } from '../src/theme';
 type Phase = 'loading' | 'in' | 'full' | 'gone' | 'error';
 type RoomScene = { cast: RoomCast; scene: Scene };
 type Playing = RoomScene & { size: number; ground: number; casterEnd: number; fy: number };
-type Pose = 'jump' | 'cheer' | 'wave';
+type Pose = 'jump' | 'cheer' | 'wave' | 'sit';
 
 const IDLE_MS = 20_000; // без дела — гуляет сам
 const PING_MS = 30_000;
@@ -380,7 +383,7 @@ export default function RoomScreen() {
   const enqueueCast = useCallback((c: RoomCast) => {
     if (known.current.has(c.id)) return;
     known.current.add(c.id);
-    setQueue((q) => [...q, { cast: c, scene: { key: c.id, ability: c.ability, from: 'partner' as const, castId: c.id, at: Date.parse(c.created_at) || Date.now() } }].slice(-4));
+    setQueue((q) => [...q, { cast: c, scene: { key: c.id, ability: c.ability, from: 'partner' as const, castId: c.id, at: Date.parse(c.created_at) || Date.now(), blocked: c.blocked } }].slice(-4));
   }, []);
 
   // ---------- вход ----------
@@ -825,10 +828,91 @@ export default function RoomScreen() {
       .then((rows) => setInventory(new Set(rows.map((r) => r.item_id))))
       .catch(() => undefined);
   }, [phase]);
+  // ---------- грибы (лес) ----------
+  const hunt = useHunt();
+  const [gone, setGone] = useState<Record<number, number>>({});
+  const [plucking, setPlucking] = useState(false);
+  const [fly, setFly] = useState<{ n: number; c: MushColor; from: { x: number; y: number }; to: { x: number; y: number } } | null>(null);
+  const [chpok, setChpok] = useState<{ n: number; x: number; y: number } | null>(null);
+  const forest = loc === 'forest';
+  const mushrooms = useMemo(
+    () =>
+      ROOM_MUSHROOMS.map((m) => {
+        const p = freeSpot(geo, 'forest', pxX(geo, m.fx), pxY(geo, m.fy));
+        return { ...m, px: p.px, py: p.py, k: scaleAt(geo, fracY(geo, p.py)) };
+      }),
+    [geo],
+  );
+
   const abilities = useMemo(
     () => [...catalog.values()].filter((it) => it.cat === 'ability' && (it.source === 'free' || inventory.has(it.id))).sort((a, b) => a.sort - b.sort),
     [catalog, inventory],
   );
+
+  const basketTop = insets.top + 58;
+  const mushSize = (k: number) => Math.round(40 * geo.s * k);
+  // Нажал на гриб: бежит к нему, присаживается, срывает — гриб летит в корзинку
+  const tapMushroom = (i: number) => {
+    if (!meId || !myMover || playing || game.snap || plucking || hunt.checking || hunt.basket.length >= 5) return;
+    touch();
+    haptic.tap();
+    setFollowing(true);
+    const m = mushrooms[i];
+    const me = pxX(geo, myMover.now().x);
+    const dir: 1 | -1 = me <= m.px ? 1 : -1;
+    const tx = m.px - dir * geo.base * m.k * 0.4;
+    moveMember(meId, fracX(geo, tx), fracY(geo, m.py), true, { onArrive: () => pluck(i, dir) });
+  };
+  const pluck = (i: number, dir: 1 | -1) => {
+    const id = meRef.current;
+    if (!id) return;
+    const m = mushrooms[i];
+    setPlucking(true);
+    setPoses((p) => ({ ...p, [id]: 'sit' }));
+    setFaces((f) => ({ ...f, [id]: dir }));
+    const up = () => {
+      setPlucking(false);
+      setPoses((p) => {
+        if (p[id] !== 'sit') return p;
+        const { [id]: _, ...rest } = p;
+        return rest;
+      });
+    };
+    later('pluck', 320, () => {
+      if (gone[i] && Date.now() - gone[i] < MUSH_REGROW_MS) {
+        up();
+        return;
+      }
+      const at = Date.now();
+      playSound('pluck');
+      haptic.light();
+      setGone((g) => ({ ...g, [i]: at }));
+      later(`regrow${i}`, MUSH_REGROW_MS + 600, () => setGone((g) => (g[i] === at ? { ...g, [i]: 0 } : g)));
+      const size = mushSize(m.k);
+      const x = m.px - camRef.current;
+      const y = m.py - size * 0.4;
+      const slot = basketSlot(Math.min(4, hunt.basket.length));
+      setChpok((c) => ({ n: (c?.n ?? 0) + 1, x: x + dir * size * 0.9, y: y - size * 0.5 })); // в сторону от чибика
+      setFly((f) => ({ n: (f?.n ?? 0) + 1, c: m.c, from: { x, y }, to: { x: (width - BASKET_W) / 2 + slot.x, y: basketTop + slot.y } }));
+      later('pluckUp', 420, up);
+      later('put', 560, () => {
+        putMushroom(m.c, inventory.has(HAT_ID)).then((r) => {
+          if (r.kind === 'hat') {
+            setInventory((v) => new Set([...v, HAT_ID]));
+            showHatReveal();
+          } else if (r.kind === 'wrong') {
+            playSound('wilt');
+            showToast(r.message);
+          } else if (r.kind === 'error') {
+            showToast(r.message);
+          } else if (r.kind === 'again') {
+            playSound('ding', 0.7);
+            showToast('Полная корзинка! Шляпа грибника уже у тебя');
+          }
+        });
+      });
+    });
+  };
 
   const leave = async () => {
     setBusy('leave');
@@ -955,7 +1039,7 @@ export default function RoomScreen() {
     const from = castMember(c.from_member)?.name ?? 'Кто-то';
     const to = castMember(c.to_member)?.name ?? 'кто-то';
     const name = catalog.get(c.ability)?.name ?? 'способность';
-    return `${from} → ${to}: ${name}${c.blocked ? ' — отражено шляпой' : ''}`;
+    return `${from} → ${to}: ${name}`; // что «Мог» отразила шляпа, покажет сама сцена
   };
   const waiting = current && !playing && !sceneReady && focused ? current : null;
   const menuMember = menu ? members.find((m) => m.id === menu) : undefined;
@@ -985,12 +1069,30 @@ export default function RoomScreen() {
   const barBottom = Math.max(insets.bottom, 10) + 6;
 
   return (
+    <NightContext.Provider value={time === 'night'}>
     <View style={[styles.root, { backgroundColor: LOCATION_BG[loc][time] }]}>
       <Animated.View style={[StyleSheet.absoluteFill, { transform: world }]}>
         <WideSky id={loc} width={width} height={height} time={time} />
         <Animated.View style={{ position: 'absolute', left: 0, top: 0, width: g.worldW, height, transform: [{ translateX: Animated.multiply(camX, -1) }] }}>
           <WideLand id={loc} width={width} height={height} tiles={g.tiles} time={time} active={focused} />
           <View style={StyleSheet.absoluteFill} pointerEvents={playing ? 'none' : 'auto'} {...responder.panHandlers} accessibilityLabel="Земля: нажми — твой чибик побежит туда, проведи — осмотреться" />
+          {forest
+            ? mushrooms.map((m, i) => (
+                <MushroomPatch
+                  key={`${m.c}${i}`}
+                  color={m.c}
+                  x={m.px}
+                  y={m.py}
+                  size={mushSize(m.k)}
+                  night={time === 'night'}
+                  goneAt={gone[i] ?? 0}
+                  shake={hunt.shake}
+                  zIndex={Math.round(m.py) - 1}
+                  disabled={Boolean(playing || game.snap)}
+                  onPress={() => tapMushroom(i)}
+                />
+              ))
+            : null}
           {members.map((m) => {
             const mv = movers.current.get(m.id);
             if (!mv) return null;
@@ -1062,6 +1164,9 @@ export default function RoomScreen() {
       ) : null}
 
       <Confetti trigger={confetti} colors={SCENE_COLORS} width={width} />
+      {forest && chpok ? <PluckWord key={chpok.n} x={chpok.x} y={chpok.y} nonce={chpok.n} /> : null}
+      {forest && fly ? <FlyingShroom key={fly.n} from={fly.from} to={fly.to} color={fly.c} nonce={fly.n} size={mushSize(1)} /> : null}
+      {forest && !playing && !game.snap ? <Basket top={basketTop} width={width} /> : null}
       {clapWord ? (
         <View pointerEvents="none" style={[styles.clapWrap, { top: height * 0.3 }]}>
           <Txt weight="display" size={34} color="#FFD45E" style={styles.clap}>
@@ -1166,7 +1271,7 @@ export default function RoomScreen() {
                 setFollowing(false);
                 camTo(a.px);
               }}
-              style={[styles.arrow, a.side === 'L' ? { left: 6 } : { right: 6 }, { top: Math.min(height - barBottom - 140, Math.max(insets.top + 70, a.y)) }]}
+              style={[styles.arrow, a.side === 'L' ? { left: 6 } : { right: 6 }, { top: Math.min(height - barBottom - 140, Math.max(insets.top + 70 + (forest ? 62 : 0), a.y)) }]}
               innerStyle={[styles.arrowIn, { borderColor: a.m.bot ? C.good : C.partner }]}
               accessibilityLabel={`${a.m.name} за краем экрана. Нажми — камера поедет к нему`}
             >
@@ -1242,7 +1347,7 @@ export default function RoomScreen() {
         </View>
       ) : null}
 
-      <Toast text={toast} top={insets.top + 62} />
+      <Toast text={toast} top={insets.top + 62 + (forest && !playing && !game.snap ? 62 : 0)} />
 
       <Sheet visible={Boolean(menuMember)} onClose={() => setMenu(null)} title={menuMember ? `${menuMember.name} · ${menuMember.title}` : ''}>
         {menuMember ? (
@@ -1292,6 +1397,7 @@ export default function RoomScreen() {
         }}
       />
     </View>
+    </NightContext.Provider>
   );
 }
 

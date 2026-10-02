@@ -106,7 +106,7 @@ function rpc(uid, name, body) {
         my_wins: uid === UA ? 8 : 8,
       };
     default:
-      return null;
+      return state.rpc ? state.rpc(uid, name, body) ?? null : null; // свои ответы сценария (грибы и т. п.)
   }
 }
 
@@ -234,12 +234,16 @@ export function dropPresence(client) {
   }
 }
 
+// opts: rest(path, uid) — свой ответ REST (undefined — как обычно), path — куда открыть (по умолчанию /room), прочее — в newContext
 export async function openPhone(browser, port, uid, name, opts = {}) {
-  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, ...opts });
+  const { rest, path: startPath = '/room', ...ctxOpts } = opts;
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, ...ctxOpts });
   const session = { access_token: jwt(uid), token_type: 'bearer', expires_in: 86400, expires_at: Math.floor(Date.now() / 1000) + 86400, refresh_token: 'r-' + uid, user: user(uid, `${name}@test`) };
   await ctx.addInitScript(([s]) => {
     localStorage.setItem('sb-uvlausosjxzhytzyfduz-auth-token', s);
     localStorage.setItem('dvoe.onboarded', '1');
+    // «Что нового» и подсказка на главной не мешают сценариям (ключи — src/lib/prefs.ts)
+    for (const k of ['dvoe:whats-new-0.2.1', 'dvoe:whats-new-0.2.2', 'dvoe:hint-nudge']) localStorage.setItem(k, '1');
   }, [JSON.stringify(session)]);
   await ctx.route(/supabase\.co\/(rest|auth|functions|storage)\//, async (route) => {
     const req = route.request();
@@ -254,6 +258,10 @@ export async function openPhone(browser, port, uid, name, opts = {}) {
       const r = rpc(uid, fn, body);
       log.push([name, 'rpc', fn]);
       return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(r) });
+    }
+    if (rest) {
+      const r = rest(p, uid, req);
+      if (r !== undefined) return route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(r) });
     }
     if (p.startsWith('/rest/v1/items')) return route.fulfill({ status: 400, json: { message: 'нет' } });
     if (p.startsWith('/rest/v1/profiles')) {
@@ -271,7 +279,7 @@ export async function openPhone(browser, port, uid, name, opts = {}) {
     if (m.type() === 'error') log.push([name, 'console', m.text().slice(0, 300)]);
   });
   page.on('requestfailed', (r) => log.push([name, 'failed', r.url().slice(0, 120)]));
-  await page.goto(`http://localhost:${port}/room`);
+  await page.goto(`http://localhost:${port}${startPath}`);
   return { ctx, page, rt };
 }
 

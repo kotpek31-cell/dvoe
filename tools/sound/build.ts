@@ -373,6 +373,81 @@ function win() {
   return fade(d, 0.002, 0.15);
 }
 
+// ---------- Грибы и шляпа грибника (0.2.2) ----------
+// Сорвал гриб: влажный «чпок» — пробка вверх по частоте и щелчок (0,2 с)
+function pluck() {
+  const d = len(0.2);
+  const body = resonator(700, 300);
+  let phase = 0;
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    const f = 260 + 1100 * (1 - Math.exp(-t * 55));
+    phase += f / RATE;
+    const click = t < 0.006 ? noise() * (1 - t / 0.006) : 0;
+    d[i] = Math.sin(2 * Math.PI * phase) * Math.min(1, t * 900) * Math.exp(-t * 26) + body(click) * 9 + noise() * 0.05 * Math.exp(-t * 120);
+  }
+  return fade(d, 0.0005, 0.03);
+}
+
+// Не тот порядок: грибы вянут — нисходящий «вуу-у» с дрожью (0,7 с)
+function wilt() {
+  const d = len(0.7);
+  let phase = 0;
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    const f = 520 * Math.exp(-t * 1.6) * (1 + 0.025 * Math.sin(2 * Math.PI * 7 * t));
+    phase += f / RATE;
+    const tri = 2 * Math.abs(2 * (phase % 1) - 1) - 1;
+    d[i] = (tri * 0.7 + Math.sin(2 * Math.PI * phase * 2) * 0.2) * Math.min(1, t * 80) * Math.exp(-t * 2.4);
+  }
+  return fade(d, 0.005, 0.12);
+}
+
+// Шляпа: вихрь спор — переливы колокольчиков вверх и шорох (1,4 с)
+function magic() {
+  const d = len(1.4);
+  const air = resonator(5200, 2600);
+  const notes = [1047, 1319, 1568, 2093, 1760, 2349, 2637, 3136];
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    let v = 0;
+    notes.forEach((f, k) => {
+      const dt = t - k * 0.11;
+      if (dt >= 0) v += tone(f, dt, 5) * 0.5 + tone(f * 2.01, dt, 11) * 0.15;
+    });
+    v += air(noise()) * 3 * Math.sin(Math.PI * Math.min(1, t / 1.4)) ** 2;
+    d[i] = Math.tanh(v * 0.8);
+  }
+  return fade(d, 0.004, 0.25);
+}
+
+// Отражённый «Мог»: применивший чихает — вдох «а-а» и «пчхи» (0,9 с)
+function sneeze() {
+  const d = len(0.9);
+  const f1 = resonator(800, 160);
+  const f2 = resonator(1250, 200);
+  const hiss = resonator(4200, 2200);
+  let phase = 0;
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    let v = 0;
+    if (t < 0.48) {
+      // «а-а-а»: голос с подъёмом высоты
+      const f = 230 + 140 * (t / 0.48);
+      phase += f / RATE;
+      const saw = 2 * (phase % 1) - 1;
+      const env = Math.min(1, t * 6) * (t > 0.42 ? (0.48 - t) / 0.06 : 1);
+      v = (f1(saw) * 6 + f2(saw) * 4) * env * 0.6;
+    } else {
+      // «пчхи»: хлопок и шипение
+      const dt = t - 0.48;
+      v = (dt < 0.01 ? noise() * 2 : 0) + hiss(noise()) * 9 * Math.exp(-dt * 6) * Math.min(1, dt * 200);
+    }
+    d[i] = Math.tanh(v);
+  }
+  return fade(d, 0.005, 0.1);
+}
+
 mkdirSync(OUT, { recursive: true });
 wav('tension', tension());
 wav('hit', hit());
@@ -390,4 +465,8 @@ wav('zap', zap());
 wav('buzz', buzz());
 wav('drum', drum());
 wav('win', win());
+wav('pluck', pluck());
+wav('wilt', wilt());
+wav('magic', magic());
+wav('sneeze', sneeze());
 if (!existsSync(join(OUT, 'mog.wav')) || process.argv.includes('--mog')) wav('mog', mogVoice());

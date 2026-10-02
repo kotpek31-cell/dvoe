@@ -301,7 +301,7 @@ function forest(time: DayTime): string {
   s += g(rect(-24, -5, 48, 10, '#9C6B4E', { rx: 5, stroke: INK, 'stroke-width': 1.8 }), { transform: `translate(${x} ${y + 4}) rotate(-18)` });
   s += pth(`M${x - 16} ${y} C${x - 20} ${y - 22} ${x - 6} ${y - 30} ${x - 4} ${y - 44} C${x + 4} ${y - 34} ${x + 8} ${y - 30} ${x + 10} ${y - 38} C${x + 20} ${y - 22} ${x + 18} ${y - 6} ${x + 14} ${y} Z`, '#FF8A3D', { stroke: INK, 'stroke-width': 1.8, 'stroke-linejoin': 'round' });
   s += pth(`M${x - 8} ${y} C${x - 10} ${y - 12} ${x - 2} ${y - 18} ${x} ${y - 26} C${x + 6} ${y - 16} ${x + 10} ${y - 10} ${x + 7} ${y} Z`, '#FFE38A');
-  s += [[340, 720], [30, 760], [210, 780]].map(([mx, my]) => g(pth('M-8 0 C-8 -9 8 -9 8 0 Z', '#E5566B', { stroke: INK, 'stroke-width': 1.4 }) + rect(-2.5, 0, 5, 7, '#F4F0FF', { stroke: INK, 'stroke-width': 1.2 }) + circ(-3, -4, 1.4, '#FFFFFF') + circ(3, -2.6, 1.1, '#FFFFFF'), { transform: `translate(${mx} ${my})` })).join('');
+  // грибы растут живыми поверх рисунка — их можно сорвать (Mushrooms.tsx, 0.2.2)
   s += blanket(p.blanket, p.lines);
   return s;
 }

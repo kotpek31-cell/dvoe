@@ -29,7 +29,7 @@ const shroom = (x: number, y: number, s: number, cap: string) =>
 
 const NEW: Record<string, Item> = {
   'hat.mushroom': {
-    cat: 'hat', name: 'Шляпа грибника', code: true,
+    cat: 'hat', name: 'Шляпа грибника', code: true, anim: 'sway', pivot: [60, 40], spores: true,
     layers: {
       hat: () =>
         // нижняя сторона шляпки (пластинки) и сама шляпка

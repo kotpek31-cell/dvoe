@@ -9,6 +9,7 @@ import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { CastBanner } from '../src/components/CastBanner';
+import { HatReveal } from '../src/components/HatReveal';
 import { WhatsNew } from '../src/components/WhatsNew';
 import { AbilityProvider } from '../src/context/AbilityProvider';
 import { AuthProvider } from '../src/context/AuthProvider';
@@ -79,6 +80,7 @@ export default function RootLayout() {
           </Stack>
           <CastBanner />
           <WhatsNew />
+          <HatReveal />
           </AbilityProvider>
         </PairProvider>
       </AuthProvider>

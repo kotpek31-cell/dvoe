@@ -2,6 +2,7 @@
 // Справа внизу — кнопка способности; сцены способностей играют здесь (AbilityScene).
 // Нажатие на землю — твой чибик идёт туда. Оба в приложении — зелёная точка у партнёра и раз в 1–2 минуты
 // чибики подходят дать пять или машут издалека. Плашка с местом сверху — выбор локации.
+// 0.2.2: в «Лесу с костром» растут грибы — нажал на гриб, чибик идёт и срывает его в корзинку сверху.
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -13,12 +14,13 @@ import { Face } from '../../src/components/Face';
 import { Icon } from '../../src/components/Icon';
 import { AbilityScene, sceneKind, worldTransform } from '../../src/components/scene/AbilityScene';
 import { Location } from '../../src/components/scene/Location';
+import { Basket, BASKET_W, basketSlot, FlyingShroom, MushroomPatch, PluckWord } from '../../src/components/scene/Mushrooms';
 import { LocationSheet } from '../../src/components/LocationSheet';
 import { IconButton, Pill, Pressy, Txt } from '../../src/components/ui';
 import { Walker } from '../../src/components/Walker';
 import { useAbility } from '../../src/context/AbilityProvider';
 import { usePair, useTableVersion } from '../../src/context/PairProvider';
-import { fetchMoods, fetchStreaks, sendNudge } from '../../src/lib/api';
+import { fetchInventory, fetchMoods, fetchStreaks, sendNudge } from '../../src/lib/api';
 import { LOOKS, lookOf } from '../../src/lib/chibi';
 import { formatTime, plural, toDayKey } from '../../src/lib/dates';
 import { entryMix, mixDominant } from '../../src/lib/emotions';
@@ -31,7 +33,9 @@ import { useLoader } from '../../src/lib/hooks';
 import { openWhatsNew, useWhatsNew } from '../../src/lib/whatsNew';
 import { isLocationId, LOCATION_BG, locationName, type LocationId } from '../../src/lib/locations';
 import { haptic, useReducedMotion } from '../../src/lib/motion';
-import { canAutoplay } from '../../src/lib/sound';
+import { HAT_ID, HOME_MUSHROOMS, MUSH_REGROW_MS, putMushroom, showHatReveal, useHunt, type MushColor } from '../../src/lib/mushrooms';
+import { NightContext } from '../../src/lib/night';
+import { canAutoplay, playSound } from '../../src/lib/sound';
 import { getFlag, setFlag } from '../../src/lib/prefs';
 import { dayTimeOf, sceneTransform } from '../../src/lib/scene';
 import { C } from '../../src/theme';
@@ -85,6 +89,22 @@ export default function HomeScreen() {
   const reduce = useReducedMotion();
   const sceneT = useRef(new Animated.Value(0)).current;
   const [allowed, setAllowed] = useState<string | null>(null); // сцена, которую разрешили кнопкой «Смотреть»
+
+  // Грибы в лесу: какой сорван (когда), кто сейчас срывает, гриб в полёте к корзинке
+  const forest = loc === 'forest';
+  const hunt = useHunt();
+  const [gone, setGone] = useState<Record<number, number>>({});
+  const [plucking, setPlucking] = useState<{ i: number; dir: 1 | -1 } | null>(null);
+  const [fly, setFly] = useState<{ n: number; c: MushColor; from: { x: number; y: number }; to: { x: number; y: number } } | null>(null);
+  const [chpok, setChpok] = useState<{ n: number; x: number; y: number } | null>(null);
+  const pluckGoal = useRef<{ id: number; i: number; dir: 1 | -1 } | null>(null);
+  const [hasHat, setHasHat] = useState(false);
+  useEffect(() => {
+    if (!forest || !focused) return;
+    fetchInventory()
+      .then((rows) => setHasHat(rows.some((r) => r.item_id === HAT_ID)))
+      .catch(() => undefined);
+  }, [forest, focused]);
 
   // «Что нового» — само, один раз после обновления
   const news = useWhatsNew();
@@ -242,6 +262,64 @@ export default function HomeScreen() {
   };
   const meetPose = meet === 'five' ? 'cheer' : meet === 'wave' ? 'wave' : null;
 
+  // ---------- грибы ----------
+  const mushSize = Math.round(40 * tf.s);
+  const basketTop = insets.top + 56;
+  const below = forest ? 64 : 0; // подсказки и плашки — под корзинкой
+  const tapMushroom = (i: number) => {
+    if (meSleeps) {
+      showToast('Ты спишь — грибы подождут до утра');
+      return;
+    }
+    if (plucking || hunt.checking || hunt.basket.length >= 5) return;
+    haptic.tap();
+    setBubble(false);
+    setMeAct(null);
+    const m = HOME_MUSHROOMS[i];
+    const mx = tf.x(m.x);
+    const leftSide = mx - size * 0.88 >= minX;
+    const id = Date.now();
+    pluckGoal.current = { id, i, dir: leftSide ? 1 : -1 };
+    setGoMe({ x: leftSide ? mx - size * 0.88 : mx - size * 0.12, y: tf.y(m.y) - chibiH + 2, id });
+  };
+  const pluck = (i: number, dir: 1 | -1) => {
+    const m = HOME_MUSHROOMS[i];
+    setPlucking({ i, dir });
+    later('pluck', 320, () => {
+      if (gone[i] && Date.now() - gone[i] < MUSH_REGROW_MS) {
+        setPlucking(null); // пока шли, сорвали — вырастет снова
+        return;
+      }
+      const at = Date.now();
+      playSound('pluck');
+      haptic.light();
+      setGone((g) => ({ ...g, [i]: at }));
+      later(`regrow${i}`, MUSH_REGROW_MS + 600, () => setGone((g) => (g[i] === at ? { ...g, [i]: 0 } : g)));
+      const x = tf.x(m.x);
+      const y = tf.y(m.y) - mushSize * 0.4;
+      const slot = basketSlot(Math.min(4, hunt.basket.length));
+      setChpok((c) => ({ n: (c?.n ?? 0) + 1, x: x + dir * mushSize * 0.9, y: y - mushSize * 0.5 })); // в сторону от чибика
+      setFly((f) => ({ n: (f?.n ?? 0) + 1, c: m.c, from: { x, y }, to: { x: (width - BASKET_W) / 2 + slot.x, y: basketTop + slot.y } }));
+      later('pluckUp', 420, () => setPlucking(null));
+      later('put', 560, () => {
+        putMushroom(m.c, hasHat).then((r) => {
+          if (r.kind === 'hat') {
+            setHasHat(true);
+            showHatReveal();
+          } else if (r.kind === 'wrong') {
+            playSound('wilt');
+            showToast(r.message);
+          } else if (r.kind === 'error') {
+            showToast(r.message);
+          } else if (r.kind === 'again') {
+            playSound('ding', 0.7);
+            showToast('Полная корзинка! Шляпа грибника уже у тебя');
+          }
+        });
+      });
+    });
+  };
+
   const nameTag = (label: string, color: string, online = false) => (
     <View pointerEvents="none" style={[styles.tagWrap, { top: chibiH - 2, width: size + 80, left: -40 }]}>
       <View style={styles.tag}>
@@ -298,6 +376,7 @@ export default function HomeScreen() {
   const partnerActor = { look: partner ? partnerLook : LOOKS.girl, emotion: pFace.emotion, value: pFace.value };
 
   return (
+    <NightContext.Provider value={time === 'night'}>
     <View style={[styles.root, { backgroundColor: LOCATION_BG[loc][time] }]}>
       <Animated.View style={[StyleSheet.absoluteFill, { transform: world }]}>
         <Location id={loc} width={width} height={height} time={time} active={focused} />
@@ -325,6 +404,22 @@ export default function HomeScreen() {
         onPress={(e) => tapGround(e.nativeEvent.pageX, e.nativeEvent.pageY)}
         accessibilityLabel="Земля: нажми, и твой чибик пойдёт туда"
       />
+      {forest
+        ? HOME_MUSHROOMS.map((m, i) => (
+            <MushroomPatch
+              key={`${m.c}${i}`}
+              color={m.c}
+              x={tf.x(m.x)}
+              y={tf.y(m.y)}
+              size={mushSize}
+              night={time === 'night'}
+              goneAt={gone[i] ?? 0}
+              shake={hunt.shake}
+              zIndex={Math.round(tf.y(m.y) - chibiH)}
+              onPress={() => tapMushroom(i)}
+            />
+          ))
+        : null}
       {partner && !partnerSleeps ? (
         <Walker
           look={partnerLook}
@@ -375,11 +470,17 @@ export default function HomeScreen() {
           maxX={maxX}
           startX={minX + (maxX - minX) * 0.15}
           speed={30 * tf.s}
-          paused={!focused || meAct !== null || bubble || meet === 'five' || meet === 'wave'}
-          pose={meAct === 'wave' ? 'wave' : meAct === 'jump' ? 'jump' : meetPose ?? 'idle'}
-          face={meet === 'five' ? 1 : undefined}
+          paused={!focused || meAct !== null || bubble || meet === 'five' || meet === 'wave' || plucking !== null}
+          pose={plucking ? 'sit' : meAct === 'wave' ? 'wave' : meAct === 'jump' ? 'jump' : meetPose ?? 'idle'}
+          face={plucking ? plucking.dir : meet === 'five' ? 1 : undefined}
           goTo={goMe}
-          onArrive={onArrive('me')}
+          onArrive={(id) => {
+            const p = pluckGoal.current;
+            if (p && p.id === id) {
+              pluckGoal.current = null;
+              pluck(p.i, p.dir);
+            } else onArrive('me')();
+          }}
           label="Это ты. Нажми, чтобы отметить настроение; подержи — гардероб"
           onPress={tapMe}
           onLongPress={openWardrobe}
@@ -411,6 +512,8 @@ export default function HomeScreen() {
       ) : null}
       <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.front]}>
         <SparkPop trigger={sparks} x={width / 2} y={tf.y(534) + chibiH * 0.05} scale={tf.s} />
+        {forest && chpok ? <PluckWord key={chpok.n} x={chpok.x} y={chpok.y} nonce={chpok.n} /> : null}
+        {forest && fly ? <FlyingShroom key={fly.n} from={fly.from} to={fly.to} color={fly.c} nonce={fly.n} size={mushSize} /> : null}
       </View>
       </View>
 
@@ -437,6 +540,8 @@ export default function HomeScreen() {
         ) : null}
       </View>
 
+      {forest && !playing ? <Basket top={basketTop} width={width} /> : null}
+
       {hasOverride(override) && !playing ? (
         <View style={[styles.checkMode, { bottom: Math.max(insets.bottom, 10) + 6 + 68 + 96 }]}>
           <Icon name="settings" size={16} color={C.warn} />
@@ -452,7 +557,7 @@ export default function HomeScreen() {
       ) : null}
 
       {!partner ? (
-        <View style={[styles.card, { top: insets.top + 56 }]}>
+        <View style={[styles.card, { top: insets.top + 56 + below }]}>
           <Txt weight="heavy" size={15}>
             Пригласи партнёра
           </Txt>
@@ -475,7 +580,7 @@ export default function HomeScreen() {
           ) : null}
         </View>
       ) : hint && !partnerSleeps && !toast && !playing && !waiting ? (
-        <View style={[styles.hint, { top: insets.top + 56 }]}>
+        <View style={[styles.hint, { top: insets.top + 56 + below }]}>
           <View style={styles.hintIcon}>
             <Icon name="heart" size={18} color={C.accent} fill={C.accent} />
           </View>
@@ -496,7 +601,7 @@ export default function HomeScreen() {
       ) : null}
 
       {waiting ? (
-        <View style={[styles.watchWrap, { top: insets.top + 56 }]}>
+        <View style={[styles.watchWrap, { top: insets.top + 56 + below }]}>
           <Pressy
             onPress={() => setAllowed(waiting.key)}
             innerStyle={styles.watch}
@@ -512,9 +617,10 @@ export default function HomeScreen() {
 
       {!playing ? <AbilityButton onMessage={showToast} busy={Boolean(scene)} /> : null}
 
-      <Toast text={toast} top={insets.top + 58} />
+      <Toast text={toast} top={insets.top + 58 + below} />
       <LocationSheet visible={picker} onClose={() => setPicker(false)} current={loc} time={time} onError={showToast} />
     </View>
+    </NightContext.Provider>
   );
 }
 

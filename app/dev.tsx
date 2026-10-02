@@ -4,12 +4,15 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Switch, View } from 'react-native';
 import { Icon } from '../src/components/Icon';
+import { MushroomArt } from '../src/components/scene/Mushrooms';
 import { Button, Card, Chip, Empty, ErrorBox, Input, Pressy, Row, Screen, Segmented, showError, Txt } from '../src/components/ui';
 import { useAbility } from '../src/context/AbilityProvider';
 import { usePair } from '../src/context/PairProvider';
 import { useAccess } from '../src/lib/access';
 import {
   devCreateCode,
+  devMushroomsSet,
+  devSetMushrooms,
   devFindUser,
   devGrantItem,
   devListCodes,
@@ -35,6 +38,7 @@ import { setDevOverride, useDevOverride } from '../src/lib/devOverride';
 import { useLoader } from '../src/lib/hooks';
 import { LOCATIONS } from '../src/lib/locations';
 import { haptic } from '../src/lib/motion';
+import { MUSH_COLORS, MUSH_NAME, showHatReveal, type MushColor } from '../src/lib/mushrooms';
 import type { DayTime } from '../src/lib/scene';
 import { C, R, S } from '../src/theme';
 
@@ -334,7 +338,74 @@ function RoomCard() {
   );
 }
 
+// ---------- Порядок грибов (только владелец) ----------
+// После сохранения порядок не показывается никому — даже здесь: только «задан / не задан»
+function MushroomCard() {
+  const { data: isSet, reload } = useLoader(devMushroomsSet, []);
+  const [seq, setSeq] = useState<MushColor[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      await devSetMushrooms(seq);
+      haptic.success();
+      setSeq([]);
+      setSaved(true);
+      reload();
+    } catch (e) {
+      showError(e);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Card title="Порядок грибов" right={<Txt size={13} color={isSet ? C.good : C.warn}>{isSet ? 'задан' : 'не задан'}</Txt>}>
+      <Txt faint size={13}>
+        5 нажатий на грибы — «Сохранить». Цвета могут повторяться. После сохранения порядок не показывается никому, даже тебе.
+      </Txt>
+      <Row style={styles.mushSlots}>
+        {[0, 1, 2, 3, 4].map((i) => (
+          <View key={i} style={[styles.mushSlot, seq[i] ? styles.mushSlotFull : null]}>
+            {seq[i] ? <MushroomArt color={seq[i]} size={30} /> : <Txt faint size={13}>{i + 1}</Txt>}
+          </View>
+        ))}
+      </Row>
+      <Row style={styles.mushPick}>
+        {MUSH_COLORS.map((c) => (
+          <Pressy
+            key={c}
+            onPress={() => {
+              if (seq.length >= 5) return;
+              haptic.light();
+              setSaved(false);
+              setSeq((q) => [...q, c]);
+            }}
+            innerStyle={styles.mushBtn}
+            scaleTo={0.9}
+            accessibilityLabel={`Гриб: ${MUSH_NAME[c]}`}
+          >
+            <MushroomArt color={c} size={36} />
+          </Pressy>
+        ))}
+      </Row>
+      {saved ? (
+        <Txt size={13} color={C.good}>
+          Порядок сохранён
+        </Txt>
+      ) : null}
+      <Row>
+        <Button title="Очистить" variant="secondary" style={styles.flex} disabled={!seq.length || busy} onPress={() => setSeq([])} />
+        <Button title="Сохранить" icon="check" style={styles.flex} disabled={seq.length < 5} loading={busy} onPress={save} />
+      </Row>
+    </Card>
+  );
+}
+
 function CheckTab() {
+  const access = useAccess();
   const { partner, refresh } = usePair();
   const { rehearse } = useAbility();
   const override = useDevOverride();
@@ -382,7 +453,23 @@ function CheckTab() {
             }}
           />
         </Row>
+        <Row>
+          <Button
+            title="Мог в шляпу грибника"
+            icon="flame"
+            variant="secondary"
+            style={styles.flex}
+            onPress={() => {
+              rehearse('ability.mog', { blocked: true });
+              router.navigate('/home');
+            }}
+          />
+        </Row>
+        <Row>
+          <Button title="Шляпа: получение" icon="sparkle" variant="secondary" style={styles.flex} onPress={() => showHatReveal(true)} />
+        </Row>
       </Card>
+      {access?.role === 'owner' ? <MushroomCard /> : null}
 
       <Card title="Время и место на этом устройстве">
         <Txt faint size={13}>
@@ -600,6 +687,11 @@ export default function DevScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  mushSlots: { gap: 8, justifyContent: 'center' },
+  mushSlot: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(255,255,255,0.22)', backgroundColor: 'rgba(255,255,255,0.05)' },
+  mushSlotFull: { borderStyle: 'solid', borderColor: 'rgba(255,255,255,0.3)', backgroundColor: 'rgba(255,255,255,0.1)' },
+  mushPick: { gap: 8, justifyContent: 'center', flexWrap: 'wrap' },
+  mushBtn: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.08)' },
   between: { justifyContent: 'space-between', alignItems: 'center' },
   group: { gap: 6 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: S.sm },

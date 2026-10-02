@@ -3,13 +3,15 @@
 // сияние переливается и падает снег, мерцает гирлянда, летают голуби и чайки, крутится луч маяка.
 // 0.2.1: искры костра и светлячки, снегопад, пар от чашек, звёзды и падающая звезда, лепестки сакуры,
 // дождь и круги на лужах, облака над горами, свечение кристаллов и капли в пещере.
+// 0.2.2: ночью в пещере кристаллы по очереди вспыхивают цветами грибов — подсказка к порядку (приходит с сервера).
 import { memo, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
-import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { saw, tri } from '../../lib/anim';
 import { artNodes, renderArt } from '../../lib/art';
 import { CAFE_CUPS, CAMPFIRE, CRYSTALS, GARLAND, locationParts, locationSvg, RAIN_PUDDLES, type LocationId } from '../../lib/locations';
 import { nativeDriver, useReducedMotion } from '../../lib/motion';
+import { MUSH_HEX, useMushroomHint } from '../../lib/mushrooms';
 import { sceneTransform, type DayTime } from '../../lib/scene';
 import { Meadow } from './Meadow';
 
@@ -20,6 +22,9 @@ type Props = { id: LocationId; width: number; height: number; time: DayTime; act
 const PAINT = { c: '#888888', skin: '#FFDCC4', ids: 'loc' };
 const BIRD = 'M0 0 q6 -6 12 0 q6 -6 12 0';
 const CLOUD = 'M14 42 C3 42 1 29 12 27 C12 14 29 10 37 19 C41 6 64 4 70 17 C78 8 95 12 95 25 C108 23 116 34 107 42 Z';
+// Кристалл пещеры (как в locations.ts) — для подсказки грибов он вспыхивает цветом
+const CRYSTAL_PATHS = ['M-14 0 L-18 -26 L-10 -40 L-4 -22 L-2 0 Z', 'M-4 0 L-6 -40 L2 -60 L10 -40 L8 0 Z', 'M8 0 L12 -22 L20 -30 L22 -14 L18 0 Z'];
+const INK = '#2B2035';
 // Детерминированная «случайность» для раскладки частиц
 const rnd = (i: number, k: number) => {
   const v = Math.sin(i * 12.9898 + k * 78.233) * 43758.5453;
@@ -51,6 +56,19 @@ function LiveLocation({ id, width, height, time, active, art }: Props & { id: Ex
   const spin = useRef(new Animated.Value(0)).current; // 8 с: луч маяка
 
   const live = active && !reduce;
+
+  // Подсказка в пещере: 5 вспышек за 4,4 с, пауза, снова (вспышки — не движение, идут и при «Уменьшить движение»)
+  const hint = useMushroomHint(id === 'cave' && time === 'night' && active);
+  const showHint = Boolean(hint && id === 'cave' && time === 'night');
+  const hintV = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (!showHint || !active) return;
+    hintV.setValue(0);
+    const loop = Animated.loop(Animated.timing(hintV, { toValue: 1, duration: 8000, easing: Easing.linear, useNativeDriver: nativeDriver }));
+    loop.start();
+    return () => loop.stop();
+  }, [showHint, active, hintV]);
+
   useEffect(() => {
     if (!live) return;
     const loops = [
@@ -218,6 +236,34 @@ function LiveLocation({ id, width, height, time, active, art }: Props & { id: Ex
           </>),
       ),
     );
+    if (showHint && hint)
+      // слева направо — и по времени, и по месту порядок один
+      [0, 1, 6, 2, 3].forEach((ci, i) => {
+        const c = CRYSTALS[ci];
+        const col = MUSH_HEX[hint[i]];
+        const st = 0.04 + i * 0.11;
+        const d = 170 * c.s;
+        // свечение + сам кристалл перекрашивается в цвет гриба
+        extra.push(
+          bit(`hint${i}`, c.x - d / 2, c.y - 30 * c.s - d / 2, d, d, { opacity: hintV.interpolate({ inputRange: [0, st, st + 0.02, st + 0.07, st + 0.09, 1], outputRange: [0, 0, 1, 1, 0, 0] }) },
+            <>
+              <Defs>
+                <RadialGradient id={`hg${i}`}>
+                  <Stop offset="0" stopColor={col} stopOpacity={1} />
+                  <Stop offset="0.3" stopColor={col} stopOpacity={0.75} />
+                  <Stop offset="1" stopColor={col} stopOpacity={0} />
+                </RadialGradient>
+              </Defs>
+              <Circle cx={d / 2} cy={d / 2} r={d / 2} fill={`url(#hg${i})`} />
+              <G transform={`translate(${d / 2} ${d / 2 + 30 * c.s}) scale(${c.s})`}>
+                {CRYSTAL_PATHS.map((cp, k) => (
+                  <Path key={k} d={cp} fill={col} stroke={INK} strokeWidth={1.6} strokeLinejoin="round" />
+                ))}
+                <Path d="M2 -60 L0 -10 L-6 -40 Z M-10 -40 L-12 -12 L-18 -26 Z" fill="#FFFFFF" opacity={0.55} />
+              </G>
+            </>),
+        );
+      });
     [[100, 230], [380, 276], [170, 168]].forEach(([x, y], i) =>
       extra.push(
         bit(`dr${i}`, x - 3, y, 6, 8, {

@@ -18,6 +18,11 @@ export const SOUND_FILES = {
   buzz: require('../../assets/sounds/buzz.wav') as number,
   drum: require('../../assets/sounds/drum.wav') as number,
   win: require('../../assets/sounds/win.wav') as number,
+  // грибы и шляпа грибника
+  pluck: require('../../assets/sounds/pluck.wav') as number,
+  wilt: require('../../assets/sounds/wilt.wav') as number,
+  magic: require('../../assets/sounds/magic.wav') as number,
+  sneeze: require('../../assets/sounds/sneeze.wav') as number,
 };
 
 export type SoundName = keyof typeof SOUND_FILES;
