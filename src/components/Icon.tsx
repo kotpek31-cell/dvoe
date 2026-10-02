@@ -39,6 +39,7 @@ const PATHS = {
   undo: 'M9 6.5 4.5 11 9 15.5 M4.5 11H15a4.5 4.5 0 0 1 0 9h-3',
   shirt: 'M8.5 4 4 6.5 2.5 11l3 1.2V20h13v-7.8l3-1.2L20 6.5 15.5 4a3.5 3.5 0 0 1-7 0z',
   sort: 'M7 4v16 M3.5 16.5 7 20l3.5-3.5 M14 6h7 M14 11h5 M14 16h3',
+  wrench: 'M14.7 6.3a4 4 0 0 0-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z',
 } as const;
 
 export type IconName = keyof typeof PATHS;

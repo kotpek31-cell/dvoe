@@ -403,7 +403,7 @@ export type Access = { role: 'owner' | 'developer'; title: string } | null;
 
 export async function fetchMyAccess(): Promise<Access> {
   const { data, error } = await supabase.rpc('my_access');
-  if (error) return null; // старая база без функции — комнаты просто нет
+  check(error); // ошибку не запоминаем как «нет роли» — спросим ещё раз
   return (data as Access) ?? null;
 }
 

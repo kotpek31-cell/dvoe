@@ -433,13 +433,13 @@ function RolesTab() {
 
   return (
     <>
-      <Card title="Выдать роль">
+      <Card title="Добавить в комнату по ID">
         <Txt faint size={13}>
-          Любая роль даёт всю комнату, кроме этого раздела. Название — любое, по умолчанию «тестер».
+          ID человек видит у себя: Настройки → «Твой ID». Можно и email. Роль даёт всю комнату, кроме этого раздела; название — любое, по умолчанию «тестер».
         </Txt>
-        <Input placeholder="Email или ID" value={query} onChangeText={setQuery} autoCapitalize="none" autoCorrect={false} />
-        <Input placeholder="тестер" value={title} onChangeText={setTitle} maxLength={30} />
-        <Button title="Выдать" icon="key" onPress={give} loading={busy} disabled={!query.trim()} />
+        <Input placeholder="ID из 6 символов или email" value={query} onChangeText={setQuery} autoCapitalize="characters" autoCorrect={false} />
+        <Input placeholder="Роль (тестер)" value={title} onChangeText={setTitle} maxLength={30} />
+        <Button title="Добавить" icon="plus" onPress={give} loading={busy} disabled={!query.trim()} />
       </Card>
       {error ? <ErrorBox message={error} onRetry={reload} /> : null}
       {(data ?? []).map((r) => (
@@ -489,7 +489,7 @@ export default function DevScreen() {
       { value: 'check', label: 'Тест' },
       { value: 'stats', label: 'Цифры' },
     ];
-    if (access?.role === 'owner') list.push({ value: 'roles', label: 'Роли' });
+    if (access?.role === 'owner') list.push({ value: 'roles', label: 'Люди' });
     return list;
   }, [access]);
 

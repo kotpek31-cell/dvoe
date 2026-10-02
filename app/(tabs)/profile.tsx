@@ -1,6 +1,6 @@
 // Профиль: свой чибик и желания; можно открыть профиль партнёра и исполнить его желание
 import { router } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Chibi } from '../../src/components/Chibi';
 import { CodeSheet } from '../../src/components/CodeSheet';
@@ -15,7 +15,8 @@ import { confirmAction } from '../../src/lib/dialogs';
 import { entryMix, mixDominant } from '../../src/lib/emotions';
 import { useLoader } from '../../src/lib/hooks';
 import { openWhatsNew, useWhatsNew } from '../../src/lib/whatsNew';
-import { useAccess } from '../../src/lib/access';
+import { refreshAccess, useAccess } from '../../src/lib/access';
+import { useScreenFocused } from '../../src/lib/focus';
 import { haptic } from '../../src/lib/motion';
 import { wishStats } from '../../src/lib/report';
 import { C, S } from '../../src/theme';
@@ -35,7 +36,11 @@ export default function ProfileScreen() {
   const { me, partner } = usePair();
   const news = useWhatsNew();
   const access = useAccess();
-  const hub = access ? [...HUB, { key: 'dev', label: 'Разработка', icon: 'widget' as IconName, color: C.sleep, ring: 'rgba(155,140,255,0.4)', href: '/dev' as const }] : HUB;
+  const focused = useScreenFocused();
+  useEffect(() => {
+    if (focused && me?.id) refreshAccess(me.id);
+  }, [focused, me?.id]);
+  const hub = HUB;
   const day = todayKey();
   const version = useTableVersion('wishes', 'mood_entries', 'profiles');
   const { data, setData, refreshing, error, refresh, reload } = useLoader(async () => {
@@ -113,6 +118,11 @@ export default function ProfileScreen() {
     <Screen
       tabs
       title="Профиль"
+      right={
+        access ? (
+          <IconButton icon="wrench" label="Комната разработчиков" onPress={() => router.push('/dev')} />
+        ) : undefined
+      }
       refreshing={refreshing}
       onRefresh={refresh}
     >
