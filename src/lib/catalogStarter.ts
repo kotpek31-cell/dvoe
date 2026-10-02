@@ -552,6 +552,46 @@ export const STARTER_ITEMS: ItemRow[] = [
   "rarity": 0
  },
  {
+  "id": "hat.mushroom",
+  "cat": "hat",
+  "name": "Шляпа грибника",
+  "source": "code",
+  "palette": null,
+  "def_color": null,
+  "sort": 130,
+  "art": {
+   "layers": {
+    "hat": "<path d=\"M8 42 C26 52 94 52 112 42 C110 50 94 57 60 57 C26 57 10 50 8 42 Z\" fill=\"#F3DDBE\" stroke=\"#2B2035\" stroke-width=\"1.8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M24 49 L27 54 M38 51 L40 56 M52 52 L53 57 M68 52 L67 57 M82 51 L80 56 M96 49 L93 54\" fill=\"none\" stroke=\"#cbb7a3\" stroke-width=\"1.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M4 44 C0 14 28 -8 60 -8 C92 -8 120 14 116 44 C98 52 22 52 4 44 Z\" fill=\"#E5484D\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><ellipse cx=\"32\" cy=\"12\" rx=\"9\" ry=\"6.5\" fill=\"#FFFFFF\" stroke=\"#2B2035\" stroke-width=\"1.4\"></ellipse><ellipse cx=\"62\" cy=\"3\" rx=\"7\" ry=\"5\" fill=\"#FFFFFF\" stroke=\"#2B2035\" stroke-width=\"1.4\"></ellipse><ellipse cx=\"90\" cy=\"16\" rx=\"8\" ry=\"6\" fill=\"#FFFFFF\" stroke=\"#2B2035\" stroke-width=\"1.4\"></ellipse><ellipse cx=\"16\" cy=\"34\" rx=\"5\" ry=\"4\" fill=\"#FFFFFF\" stroke=\"#2B2035\" stroke-width=\"1.2\"></ellipse><ellipse cx=\"52\" cy=\"30\" rx=\"6\" ry=\"4.4\" fill=\"#FFFFFF\" stroke=\"#2B2035\" stroke-width=\"1.2\"></ellipse><ellipse cx=\"104\" cy=\"36\" rx=\"4.6\" ry=\"3.6\" fill=\"#FFFFFF\" stroke=\"#2B2035\" stroke-width=\"1.2\"></ellipse><path d=\"M20 18 C28 6 40 0 50 -2\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.3\"></path>",
+    "over": "<path d=\"M92 -2 C88 -12 92 -20 100 -22 C98 -14 99 -8 104 -2 C100 0 96 0 92 -2 Z\" fill=\"#7CC46A\" stroke=\"#2B2035\" stroke-width=\"1.5\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M95 -4 C96 -10 98 -15 100 -20\" fill=\"none\" stroke=\"#689b5d\" stroke-width=\"1\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><g transform=\"translate(78 0) scale(0.95)\"><path d=\"M-3.2 0 C-3.6 -5 -3 -9 -2.4 -11 L2.4 -11 C3 -9 3.6 -5 3.2 0 Z\" fill=\"#FFF6E6\" stroke=\"#2B2035\" stroke-width=\"1.5\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M-9 -10 C-9 -19 9 -19 9 -10 C5 -8 -5 -8 -9 -10 Z\" fill=\"#B07BFF\" stroke=\"#2B2035\" stroke-width=\"1.5\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><circle cx=\"-3.6\" cy=\"-14\" r=\"1.4\" fill=\"#FFFFFF\"></circle><circle cx=\"2.6\" cy=\"-15.4\" r=\"1.1\" fill=\"#FFFFFF\"></circle></g>"
+   }
+  },
+  "meta": {
+   "anim": "sway",
+   "pivot": [
+    60,
+    40
+   ],
+   "spores": true
+  },
+  "rarity": 0
+ },
+ {
+  "id": "hat.champion",
+  "cat": "hat",
+  "name": "Корона чемпиона",
+  "source": "code",
+  "palette": null,
+  "def_color": null,
+  "sort": 140,
+  "art": {
+   "layers": {
+    "hat": "<path d=\"M30 30 L24 2 L42 16 L52 -6 L60 12 L68 -6 L78 16 L96 2 L90 30 Z\" fill=\"#FFC94D\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M28 26 C48 30 72 30 92 26 L91 34 C72 38 48 38 29 34 Z\" fill=\"#E09A2E\" stroke=\"#2B2035\" stroke-width=\"1.8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><circle cx=\"24\" cy=\"2\" r=\"3.2\" fill=\"#FF6B8A\" stroke=\"#2B2035\" stroke-width=\"1.4\"></circle><circle cx=\"52\" cy=\"-6\" r=\"3.2\" fill=\"#8FA2FF\" stroke=\"#2B2035\" stroke-width=\"1.4\"></circle><circle cx=\"68\" cy=\"-6\" r=\"3.2\" fill=\"#8FA2FF\" stroke=\"#2B2035\" stroke-width=\"1.4\"></circle><circle cx=\"96\" cy=\"2\" r=\"3.2\" fill=\"#FF6B8A\" stroke=\"#2B2035\" stroke-width=\"1.4\"></circle><path d=\"M60 18 L64 24 L60 30 L56 24 Z\" fill=\"#5ED3A0\" stroke=\"#2B2035\" stroke-width=\"1.4\" stroke-linejoin=\"round\"></path><path d=\"M36 14 L40 26 M80 14 L78 24\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.3\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
   "id": "top.hoodie",
   "cat": "top",
   "name": "Худи",
@@ -1400,6 +1440,29 @@ export const STARTER_ITEMS: ItemRow[] = [
   "rarity": 0
  },
  {
+  "id": "back.champion",
+  "cat": "back",
+  "name": "Плащ чемпиона",
+  "source": "code",
+  "palette": null,
+  "def_color": null,
+  "sort": 110,
+  "art": {
+   "layers": {
+    "back": "<path d=\"M41 97 C30 110 23 131 19 156 C33 161 47 160 60 158 C73 160 87 161 101 156 C97 131 90 110 79 97 Z\" fill=\"#7A3FC4\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M21 150 C34 155 47 154 60 152 C73 154 86 155 99 150 L101 156 C87 161 73 160 60 158 C47 160 33 161 19 156 Z\" fill=\"#FFC94D\" stroke=\"#2B2035\" stroke-width=\"1.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M36 118 C32 130 29 142 28 150 M84 118 C88 130 91 142 92 150\" fill=\"none\" stroke=\"#623699\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.6\"></path>",
+    "front": "<path d=\"M46 98 C38 96 30 92 26 86 C34 88 42 91 54 96 Z\" fill=\"#FFC94D\" stroke=\"#2B2035\" stroke-width=\"1.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><g transform=\"translate(120 0) scale(-1 1)\"><path d=\"M46 98 C38 96 30 92 26 86 C34 88 42 91 54 96 Z\" fill=\"#FFC94D\" stroke=\"#2B2035\" stroke-width=\"1.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path></g><circle cx=\"60\" cy=\"101\" r=\"3.4\" fill=\"#FF6B8A\" stroke=\"#2B2035\" stroke-width=\"1.6\"></circle>"
+   }
+  },
+  "meta": {
+   "anim": "sway",
+   "pivot": [
+    60,
+    98
+   ]
+  },
+  "rarity": 0
+ },
+ {
   "id": "hand.balloon",
   "cat": "hand",
   "name": "Шарик-сердце",
@@ -1618,6 +1681,22 @@ export const STARTER_ITEMS: ItemRow[] = [
   "meta": {
    "hover": true
   },
+  "rarity": 0
+ },
+ {
+  "id": "hand.trophy",
+  "cat": "hand",
+  "name": "Кубок победителя",
+  "source": "code",
+  "palette": null,
+  "def_color": null,
+  "sort": 140,
+  "art": {
+   "layers": {
+    "handR": "<path d=\"M84 133 C78 133 77 141 84 142 M98 133 C104 133 105 141 98 142\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"4.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M84 133 C78 133 77 141 84 142 M98 133 C104 133 105 141 98 142\" fill=\"none\" stroke=\"#FFC94D\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M82 128 H100 C100 140 96 146 91 146 C86 146 82 140 82 128 Z\" fill=\"#FFC94D\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><rect x=\"88.5\" y=\"145\" width=\"5\" height=\"6\" rx=\"1.4\" fill=\"#E09A2E\" stroke=\"#2B2035\" stroke-width=\"1.5\"></rect><rect x=\"84\" y=\"150\" width=\"14\" height=\"5\" rx=\"2\" fill=\"#e3a443\" stroke=\"#2B2035\" stroke-width=\"1.6\"></rect><path d=\"M91 131.5 L92.3 134.6 L95.6 134.8 L93 136.9 L93.9 140 L91 138.3 L88.1 140 L89 136.9 L86.4 134.8 L89.7 134.6 Z\" fill=\"#FFF4C2\" stroke=\"#2B2035\" stroke-width=\"0.9\" stroke-linejoin=\"round\"></path><path d=\"M85 131 C85 136 86 140 88 142\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.45\"></path>"
+   }
+  },
+  "meta": {},
   "rarity": 0
  },
  {

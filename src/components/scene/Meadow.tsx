@@ -9,9 +9,11 @@ import { FLOWERS, PALETTES, sceneTransform, STARS, type DayTime } from '../../li
 
 const CLOUD = 'M14 42 C3 42 1 29 12 27 C12 14 29 10 37 19 C41 6 64 4 70 17 C78 8 95 12 95 25 C108 23 116 34 107 42 Z';
 
-type Props = { width: number; height: number; time: DayTime; active: boolean };
+type Props = { width: number; height: number; time: DayTime; active: boolean; part?: 'all' | 'sky' | 'land' };
 
-function MeadowView({ width, height, time, active }: Props) {
+function MeadowView({ width, height, time, active, part = 'all' }: Props) {
+  const sky = part !== 'land'; // небо, солнце, луна, облака
+  const land = part !== 'sky'; // холмы, озеро, деревья и всё живое на земле
   const p = PALETTES[time];
   const reduce = useReducedMotion();
   const tf = useMemo(() => sceneTransform(width, height), [width, height]);
@@ -55,6 +57,8 @@ function MeadowView({ width, height, time, active }: Props) {
             <Stop offset="0.57" stopColor={p.sky[2]} />
           </LinearGradient>
         </Defs>
+        {sky ? (
+          <>
         <Rect x={-400} y={-400} width={1190} height={1300} fill="url(#meadow-sky)" />
         {p.starsOp > 0 ? (
           <G opacity={p.starsOp}>
@@ -78,6 +82,10 @@ function MeadowView({ width, height, time, active }: Props) {
             <Circle cx={307} cy={123} r={2.6} fill="#E6DFC2" />
           </G>
         ) : null}
+          </>
+        ) : null}
+        {land ? (
+          <>
         <Path d="M-60 446 C40 412 92 400 140 424 C176 396 236 376 290 402 C330 384 364 390 450 404 L450 520 L-60 520 Z" fill={p.hill1} />
         <Path d="M-60 474 C60 448 120 446 180 466 C240 442 320 440 450 462 L450 520 L-60 520 Z" fill={p.hill2} />
         <G>
@@ -144,9 +152,11 @@ function MeadowView({ width, height, time, active }: Props) {
           strokeLinecap="round"
           strokeLinejoin="round"
         />
+          </>
+        ) : null}
       </Svg>
 
-      {clouds.map((c, i) => (
+      {(sky ? clouds : []).map((c, i) => (
         <Animated.View
           key={i}
           style={{
@@ -167,7 +177,7 @@ function MeadowView({ width, height, time, active }: Props) {
         </Animated.View>
       ))}
 
-      {p.lanternOp > 0 ? (
+      {land && p.lanternOp > 0 ? (
         <Animated.View
           style={{
             position: 'absolute',
@@ -186,7 +196,7 @@ function MeadowView({ width, height, time, active }: Props) {
         </Animated.View>
       ) : null}
 
-      {time === 'day'
+      {land && time === 'day'
         ? [
             { xs: [30, 150, 250, 120, 30], ys: [430, 380, 450, 500, 430], c1: '#FFD166', c2: '#FFB347', off: 0 },
             { xs: [330, 220, 300, 330, 330], ys: [560, 600, 520, 560, 560], c1: '#FF9EBB', c2: '#FF7FA6', off: 0.4 },
@@ -217,7 +227,7 @@ function MeadowView({ width, height, time, active }: Props) {
           })
         : null}
 
-      {time !== 'day'
+      {land && time !== 'day'
         ? Array.from({ length: time === 'night' ? 9 : 6 }, (_, i) => {
             const x = 20 + ((i * 97) % 350);
             const y = time === 'night' ? 470 + ((i * 61) % 250) : 540 + ((i * 53) % 200);

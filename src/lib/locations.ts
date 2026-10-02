@@ -25,6 +25,8 @@ export const locationName = (id: string | null | undefined) => LOCATIONS.find((l
 export const isLocationId = (id: unknown): id is LocationId => LOCATIONS.some((l) => l.id === id);
 
 const INK = '#2B2035';
+// Граница неба и земли в рисунке: в комнате небо одно на экран, а земля повторяется по всей ширине
+const LAND = '<!--land-->';
 type A = Record<string, string | number>;
 
 const el = (tag: string, attrs: A, children = '') =>
@@ -91,6 +93,7 @@ function aurora(time: DayTime): string {
   if (time === 'day') s += sun(92, 362, 30, '#FFE7B0', '#FFF6DE') + cloud(210, 120, 110, '#FFFFFF', 0.85) + cloud(40, 210, 80, '#FFFFFF', 0.7);
   if (time === 'evening') s += sun(300, 436, 34, '#FFB08A', '#FFD3BE');
   if (time === 'night') s += circ(320, 92, 14, '#F6F1D8', { opacity: 0.9 });
+  s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   s += pth('M-60 430 L30 356 L80 392 L150 330 L230 400 L290 352 L360 404 L450 360 L450 520 L-60 520 Z', p.back);
   s += pth('M30 356 L48 371 L40 372 L30 366 L20 373 Z M150 330 L172 349 L160 352 L150 344 L138 352 L128 350 Z M290 352 L308 367 L298 369 L290 362 L280 368 Z', '#F2F5FF', { opacity: 0.9 });
   s += pth('M-60 470 C40 440 110 446 180 462 C250 440 330 436 450 456 L450 560 L-60 560 Z', p.front);
@@ -150,6 +153,7 @@ function roof(time: DayTime): string {
   if (time === 'day') s += sun(300, 150, 34, '#FFE38A', '#FFF4C2') + cloud(30, 100, 120, '#FFFFFF', 0.95) + cloud(220, 230, 90, '#FFFFFF', 0.9);
   if (time === 'evening') s += circ(300, 400, 90, '#FFC29A', { opacity: 0.35 }) + circ(300, 410, 46, '#FF9466');
   if (time === 'night') s += moon(300, 120);
+  s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   const r = seeded(3);
   let far = '';
   let win = '';
@@ -211,6 +215,7 @@ function beach(time: DayTime): string {
   }
   if (time === 'evening') s += circ(190, 420, 100, '#FFC29A', { opacity: 0.35 }) + circ(190, 424, 48, '#FF9466');
   if (time === 'night') s += moon(92, 150);
+  s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   s += pth('M-60 420 H450 V540 H-60 Z', p.sea);
   s += pth('M-60 420 H450 V436 H-60 Z', p.seaFar);
   if (time === 'evening') s += pth('M150 436 H230 L250 530 H130 Z', '#FFB48C', { opacity: 0.35 });
@@ -280,6 +285,7 @@ function forest(time: DayTime): string {
   if (time === 'day') s += sun(300, 140, 30, '#FFE38A', '#FFF4C2') + cloud(40, 120, 110, '#FFFFFF', 0.9);
   if (time === 'evening') s += circ(110, 420, 90, '#FFC29A', { opacity: 0.35 }) + circ(110, 428, 44, '#FF9466');
   if (time === 'night') s += moon(300, 120);
+  s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   s += hill(470, 60, p.far, 21, 70);
   for (let i = 0; i < 9; i++) s += pine2(-10 + i * 50, 380 + (i % 3) * 18, 0.9 + (i % 2) * 0.2, p.mid);
   s += hill(520, 16, p.ground, 4, 90);
@@ -295,7 +301,7 @@ function forest(time: DayTime): string {
   s += g(rect(-24, -5, 48, 10, '#9C6B4E', { rx: 5, stroke: INK, 'stroke-width': 1.8 }), { transform: `translate(${x} ${y + 4}) rotate(-18)` });
   s += pth(`M${x - 16} ${y} C${x - 20} ${y - 22} ${x - 6} ${y - 30} ${x - 4} ${y - 44} C${x + 4} ${y - 34} ${x + 8} ${y - 30} ${x + 10} ${y - 38} C${x + 20} ${y - 22} ${x + 18} ${y - 6} ${x + 14} ${y} Z`, '#FF8A3D', { stroke: INK, 'stroke-width': 1.8, 'stroke-linejoin': 'round' });
   s += pth(`M${x - 8} ${y} C${x - 10} ${y - 12} ${x - 2} ${y - 18} ${x} ${y - 26} C${x + 6} ${y - 16} ${x + 10} ${y - 10} ${x + 7} ${y} Z`, '#FFE38A');
-  s += [[340, 720], [30, 760], [210, 780]].map(([mx, my]) => g(pth('M-8 0 C-8 -9 8 -9 8 0 Z', '#E5566B', { stroke: INK, 'stroke-width': 1.4 }) + rect(-2.5, 0, 5, 7, '#F4F0FF', { stroke: INK, 'stroke-width': 1.2 }) + circ(-3, -4, 1.4, '#FFFFFF') + circ(3, -2.6, 1.1, '#FFFFFF'), { transform: `translate(${mx} ${my})` })).join('');
+  // грибы растут живыми поверх рисунка — их можно сорвать (Mushrooms.tsx, 0.2.2)
   s += blanket(p.blanket, p.lines);
   return s;
 }
@@ -314,6 +320,7 @@ function snowVillage(time: DayTime): string {
   if (time === 'day') s += sun(80, 150, 28, '#FFF0C0', '#FFFFFF') + cloud(220, 140, 120, '#FFFFFF', 0.85);
   if (time === 'evening') s += circ(300, 440, 80, '#FFC29A', { opacity: 0.3 }) + circ(300, 446, 36, '#FFB08A');
   if (time === 'night') s += moon(80, 110);
+  s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   s += hill(470, 50, p.hills, 8, 80);
   const house = (x: number, y: number, w: number, wall: string, k = 1) =>
     g(
@@ -415,6 +422,7 @@ function moonBase(time: DayTime): string {
   );
   // планета с кольцом
   s += g(circ(0, 0, 18, '#FFAA6B', { stroke: INK, 'stroke-width': 1.6 }) + el('ellipse', { cx: 0, cy: 0, rx: 32, ry: 7, fill: 'none', stroke: '#FFD966', 'stroke-width': 3, transform: 'rotate(-18)' }), { transform: 'translate(70 300)' });
+  s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   s += hill(500, 30, p.ground2, 31, 120);
   s += pth('M-60 520 C80 506 240 508 450 520 L450 900 L-60 900 Z', p.ground);
   const crater = (x: number, y: number, rx: number) =>
@@ -449,6 +457,7 @@ function sakura(time: DayTime): string {
   if (time === 'day') s += sun(200, 130, 30, '#FFE38A', '#FFF4C2') + cloud(250, 200, 100, '#FFFFFF', 0.9);
   if (time === 'evening') s += circ(200, 420, 90, '#FFC29A', { opacity: 0.35 }) + circ(200, 428, 44, '#FF9466');
   if (time === 'night') s += moon(200, 120);
+  s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   s += hill(470, 40, p.far, 41, 100);
   s += pth('M-60 500 C80 488 220 490 450 500 L450 900 L-60 900 Z', p.grass);
   // ручей и мостик
@@ -493,6 +502,7 @@ function rainCity(time: DayTime): string {
   const p = RAIN[time];
   let s = sky(`sky-rain-${time}`, p.sky, [0, 0.4, 0.66]);
   s += cloud(-30, 60, 200, p.far, 0.9) + cloud(160, 30, 240, p.far, 0.85) + cloud(60, 150, 180, p.near[0], 0.5);
+  s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   const r = seeded(23);
   let far = '';
   for (let x = -20; x < 410; x += 36) far += rect(x, +(300 + r() * 80).toFixed(1), 32, 260, p.far);
@@ -531,6 +541,7 @@ function mountains(time: DayTime): string {
   if (time === 'day') s += sun(310, 120, 30, '#FFE38A', '#FFF4C2');
   if (time === 'evening') s += circ(300, 400, 90, '#FFC29A', { opacity: 0.35 }) + circ(300, 404, 42, '#FF9466');
   if (time === 'night') s += moon(310, 110);
+  s += LAND; // дальше — земля (в комнате тянется по всей площадке)
   const peak = (pts: string, cap: string, fill: string) => pth(pts, fill, { stroke: INK, 'stroke-width': 2, 'stroke-linejoin': 'round' }) + pth(cap, p.snow, { stroke: INK, 'stroke-width': 1.6, 'stroke-linejoin': 'round' });
   s += peak('M-60 470 L60 250 L150 380 L230 220 L330 360 L450 270 L450 520 L-60 520 Z', 'M60 250 L84 294 L70 288 L58 300 L44 282 Z M230 220 L258 266 L244 260 L230 272 L216 262 L208 258 Z M450 270 L420 296 L432 296 Z', p.far);
   s += peak('M-60 500 L40 360 L120 450 L200 330 L300 470 L380 380 L450 440 L450 540 L-60 540 Z', 'M40 360 L58 386 L46 384 L36 392 L26 380 Z M200 330 L222 362 L208 358 L198 368 L186 356 L180 358 Z M380 380 L396 400 L384 398 L374 404 Z', p.mid);
@@ -594,7 +605,7 @@ const BUILDERS: Record<Exclude<LocationId, 'meadow'>, (t: DayTime) => string> = 
 };
 const cache = new Map<string, string>();
 
-export function locationSvg(id: Exclude<LocationId, 'meadow'>, time: DayTime): string {
+function built(id: Exclude<LocationId, 'meadow'>, time: DayTime): string {
   const key = `${id}.${time}`;
   let s = cache.get(key);
   if (!s) {
@@ -602,6 +613,17 @@ export function locationSvg(id: Exclude<LocationId, 'meadow'>, time: DayTime): s
     cache.set(key, s);
   }
   return s;
+}
+
+export function locationSvg(id: Exclude<LocationId, 'meadow'>, time: DayTime): string {
+  return built(id, time).replace(LAND, '');
+}
+
+// Небо и земля по отдельности. В помещениях (кафе, пещера) неба нет — всё «земля».
+export function locationParts(id: Exclude<LocationId, 'meadow'>, time: DayTime): { sky: string; land: string } {
+  const s = built(id, time);
+  const at = s.indexOf(LAND);
+  return at < 0 ? { sky: '', land: s } : { sky: s.slice(0, at), land: s.slice(at + LAND.length) };
 }
 
 // Цвет за сценой (виден на краях при «прыжке» картинки) — низ неба

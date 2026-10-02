@@ -15,12 +15,15 @@ import { Pressy, Txt } from './ui';
 
 const TIME_LABEL: Record<DayTime, string> = { day: 'днём', evening: 'вечером', night: 'ночью' };
 
-export function LocationSheet({ visible, onClose, current, time, onError }: {
+export function LocationSheet({ visible, onClose, current, time, onError, onChoose, title, note }: {
   visible: boolean;
   onClose: () => void;
   current: LocationId;
   time: DayTime;
   onError: (text: string) => void;
+  onChoose?: (id: LocationId) => Promise<void>; // своё место (комната); по умолчанию — место пары
+  title?: string;
+  note?: string;
 }) {
   const { patchPair, partner } = usePair();
   const { width, height } = useWindowDimensions();
@@ -34,8 +37,12 @@ export function LocationSheet({ visible, onClose, current, time, onError }: {
     if (id === current) return onClose();
     setBusy(id);
     try {
-      await setLocation(id);
-      patchPair({ location: id });
+      if (onChoose) {
+        await onChoose(id);
+      } else {
+        await setLocation(id);
+        patchPair({ location: id });
+      }
       haptic.success();
       onClose();
     } catch (e) {
@@ -46,9 +53,9 @@ export function LocationSheet({ visible, onClose, current, time, onError }: {
   };
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="Где вы сегодня?">
+    <Sheet visible={visible} onClose={onClose} title={title ?? 'Где вы сегодня?'}>
       <Txt muted size={14}>
-        Место одно на двоих{partner ? ` — ${partner.display_name} увидит его сразу` : ''}. Сейчас {TIME_LABEL[time]}.
+        {note ?? `Место одно на двоих${partner ? ` — ${partner.display_name} увидит его сразу` : ''}.`} Сейчас {TIME_LABEL[time]}.
       </Txt>
       <ScrollView style={{ maxHeight: Math.round(height * 0.6) }} contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false}>
         {LOCATIONS.map((loc) => {

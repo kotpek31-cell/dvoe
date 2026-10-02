@@ -2,7 +2,9 @@
 // Сзади вперёд: спина, волосы сзади, ноги, тело, руки с предметом, голова, лицо, волосы спереди, шляпа, нимб.
 // Анимируется не больше 9 слоёв трансформациями на native driver — дёшево даже на слабых телефонах.
 // Стоящий чибик раз в 8–15 с сам что-то делает: оглядывается, потягивается или подпрыгивает.
+// 0.2.2: шляпа может покачиваться (meta.anim = 'sway' у шляпы), ночью от неё летят споры (meta.spores).
 import { memo, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { saw, tri } from '../lib/anim';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Ellipse, G, Path, Rect } from 'react-native-svg';
 import { renderLayer, type Paint } from '../lib/art';
@@ -11,11 +13,12 @@ import { dress, type Look, type WearCat, type Worn } from '../lib/chibi';
 import { INK, mixColor, type FaceKey } from '../lib/face';
 import { useScreenFocused } from '../lib/focus';
 import { nativeDriver, useReducedMotion } from '../lib/motion';
+import { useNight } from '../lib/night';
 import { CLOTH } from '../lib/palette';
 import { NEW_EYES } from '../lib/eyes';
 import { Face, type EyeStyle } from './Face';
 
-export type ChibiPose = 'idle' | 'walk' | 'run' | 'wave' | 'hug' | 'cheer' | 'jump' | 'fallen' | 'sleep';
+export type ChibiPose = 'idle' | 'walk' | 'run' | 'wave' | 'hug' | 'cheer' | 'jump' | 'fallen' | 'sleep' | 'sit';
 
 type Props = {
   look: Look;
@@ -88,7 +91,10 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
   const worn = dressed.worn;
   const top = worn.top;
   const hover = !sleep && ORDER.some((c) => worn[c]?.item.meta.hover);
-  const halo = Boolean(worn.hat?.item.art.layers?.over);
+  // Шляпа качается целиком (со своим верхним слоем); иначе верхний слой шляпы — нимб, он парит отдельно
+  const hatSway = !sleep && worn.hat?.item.meta.anim === 'sway';
+  const halo = Boolean(worn.hat?.item.art.layers?.over) && !hatSway;
+  const night = useNight();
   const eyeStyle: EyeStyle = EYE_STYLES.has(worn.eyes?.item.meta.style as EyeStyle) ? (worn.eyes!.item.meta.style as EyeStyle) : 'classic';
 
   // ---------- рисунок слоёв (пересобирается только при смене образа) ----------
@@ -183,12 +189,19 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
             </>
           ) : null}
           {layer('hairFront')}
-          {sleep ? null : layer('hat')}
+          {sleep || hatSway ? null : layer('hat')}
         </>
       ),
-      over: has('over') ? layer('over') : null,
+      hat: hatSway ? (
+        <>
+          {layer('hat')}
+          {layer('over')}
+        </>
+      ) : null,
+      hatPivot: (Array.isArray(worn.hat?.item.meta.pivot) ? worn.hat!.item.meta.pivot : [60, 40]) as [number, number],
+      over: has('over') && !hatSway ? layer('over') : null,
     };
-  }, [dressed, worn, top, sleep, mog, uid]);
+  }, [dressed, worn, top, sleep, mog, uid, hatSway]);
 
   // ---------- анимации ----------
   const cycle = useRef(new Animated.Value(0)).current; // шаг: 0→1 по кругу
@@ -199,12 +212,14 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
   const swayV = useRef(new Animated.Value(0)).current; // плащ, шарф, хвост
   const fx = useRef(new Animated.Value(1)).current; // мерцание огоньков
   const stretch = useRef(new Animated.Value(0)).current; // потягивается
+  const spore = useRef(new Animated.Value(0)).current; // споры над шляпой: 0→1 по кругу
   const [glance, setGlance] = useState(0); // оглядывается
 
   const animate = !still && !reduce && visible && !fallen;
   const moving = pose === 'walk' || pose === 'run';
   const floaty = hover || halo;
-  const hasSway = Boolean(art.sway);
+  const hasSway = Boolean(art.sway || art.hat);
+  const spores = animate && night && !sleep && worn.hat?.item.meta.spores === true;
   const hasFx = Boolean(art.backFx || art.handFx);
   const fxKind = art.fxKind;
   // Крылья машут, только если парение — от крыльев (не от метлы или ранца)
@@ -228,6 +243,14 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
     loops.forEach((a) => a.start());
     return () => loops.forEach((a) => a.stop());
   }, [animate, hasSway, hasFx, fxKind, moving, swayV, fx]);
+
+  useEffect(() => {
+    spore.setValue(0);
+    if (!spores) return;
+    const loop = Animated.loop(Animated.timing(spore, { toValue: 1, duration: 4200, easing: Easing.linear, useNativeDriver: nativeDriver }));
+    loop.start();
+    return () => loop.stop();
+  }, [spores, spore]);
 
   useEffect(() => {
     [cycle, breath, flap, wave, hop, stretch].forEach((v) => v.setValue(0));
@@ -322,9 +345,11 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
         })
       : '0deg';
     const tall = stretch.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
+    // сидит (в комнате — кто закрыл приложение): корпус ниже, ноги поджаты
+    const sit = pose === 'sit';
     const root = fallen
       ? [{ translateX: 47 * k }, { translateY: -40 * k }, ...around(60, 156, [{ rotate: '-90deg' }])]
-      : [{ translateY: rootY }, ...around(60, 150, [{ rotate: sway }, { scaleY: tall }])];
+      : [{ translateY: sit ? add(rootY, c(17 * k)) : rootY }, ...around(60, 150, [{ rotate: sway }, { scaleY: tall }])];
 
     // ноги
     const step = (phase: 0 | 0.5) =>
@@ -358,12 +383,13 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
 
     return {
       root,
-      legL: [{ translateY: step(0) }],
-      legR: [{ translateY: step(0.5) }],
+      legL: sit ? around(60, 124, [{ scaleY: 0.42 }]) : [{ translateY: step(0) }],
+      legR: sit ? around(60, 124, [{ scaleY: 0.42 }]) : [{ translateY: step(0.5) }],
       armL: around(PARTS.shoulderL.x, PARTS.shoulderL.y, [{ rotate: deg(armL) }]),
       armR: around(PARTS.shoulderR.x, PARTS.shoulderR.y, [{ rotate: deg(armR) }]),
       hair: around(60, 40, [{ rotate: hair }]),
       sway: around(art.pivot[0], art.pivot[1], [{ rotate: swayV.interpolate({ inputRange: [-1, 1], outputRange: moving ? ['-6deg', '6deg'] : ['-3deg', '3deg'] }) }]),
+      hat: around(art.hatPivot[0], art.hatPivot[1], [{ rotate: swayV.interpolate({ inputRange: [-1, 1], outputRange: moving ? ['-4deg', '4deg'] : ['-2.2deg', '2.2deg'] }) }]),
       wings: around(60, 104, [{ scaleX: flap.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [1, 0.86, 1, 0.86, 1] }) }]),
       halo: [
         { translateY: flap.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -1.8 * k, 0] }) },
@@ -372,7 +398,27 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
       shadow: around(60, 163, [{ scale: shadow }]),
       sleep: [{ translateY: breath.interpolate({ inputRange: [0, 1], outputRange: [0, -1.2 * k] }) }],
     };
-  }, [k, pose, moving, fallen, hover, animate, cycle, breath, flap, wave, hop, stretch, swayV, art.pivot]);
+  }, [k, pose, moving, fallen, hover, animate, cycle, breath, flap, wave, hop, stretch, swayV, art.pivot, art.hatPivot]);
+
+  // Споры: пять светящихся точек поднимаются от шляпки и гаснут
+  const sporeDots = useMemo(
+    () =>
+      spores
+        ? [0, 0.21, 0.43, 0.62, 0.81].map((off, i) => {
+            const p = saw(spore, off, 0, 1);
+            return {
+              key: i,
+              left: (22 + i * 19) * k,
+              top: (4 + (i % 2) * 8) * k,
+              r: (i % 2 ? 2.2 : 2.8) * k,
+              color: ['#C9FFB0', '#FFF4C2', '#D9C4FF'][i % 3],
+              opacity: p.interpolate({ inputRange: [0, 0.15, 0.7, 1], outputRange: [0, 0.95, 0.6, 0] }),
+              transform: [{ translateY: p.interpolate({ inputRange: [0, 1], outputRange: [0, -46 * k] }) }, { translateX: tri(spore, off * 2, -5 * k, 5 * k) }],
+            };
+          })
+        : [],
+    [spores, spore, k],
+  );
 
   const face = (
     <View style={{ position: 'absolute', left: 12.5 * k, top: 24.5 * k }}>
@@ -483,6 +529,22 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
         <Layer k={k}>{art.head}</Layer>
         {face}
         <Layer k={k}>{art.front}</Layer>
+        {art.hat ? (
+          <Moving transform={t.hat}>
+            <Layer k={k} big>
+              {art.hat}
+            </Layer>
+          </Moving>
+        ) : null}
+        {sporeDots.map((d) => (
+          <Animated.View
+            key={d.key}
+            pointerEvents="none"
+            style={{ position: 'absolute', left: d.left - d.r * 2, top: d.top - d.r * 2, width: d.r * 4, height: d.r * 4, borderRadius: d.r * 2, backgroundColor: `${d.color}40`, alignItems: 'center', justifyContent: 'center', opacity: d.opacity, transform: d.transform }}
+          >
+            <View style={{ width: d.r * 2, height: d.r * 2, borderRadius: d.r, backgroundColor: d.color }} />
+          </Animated.View>
+        ))}
         {art.over ? (
           <Moving transform={t.halo}>
             <Layer k={k} big>

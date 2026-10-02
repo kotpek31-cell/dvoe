@@ -4,6 +4,25 @@ export const SOUND_FILES = {
   tension: require('../../assets/sounds/tension.wav') as number,
   hit: require('../../assets/sounds/hit.wav') as number,
   chime: require('../../assets/sounds/chime.wav') as number,
+  clap: require('../../assets/sounds/clap.wav') as number,
+  pop: require('../../assets/sounds/pop.wav') as number,
+  // мини-игры комнаты
+  tick: require('../../assets/sounds/tick.wav') as number,
+  beep: require('../../assets/sounds/beep.wav') as number,
+  go: require('../../assets/sounds/go.wav') as number,
+  whoosh: require('../../assets/sounds/whoosh.wav') as number,
+  boom: require('../../assets/sounds/boom.wav') as number,
+  ding: require('../../assets/sounds/ding.wav') as number,
+  coin: require('../../assets/sounds/coin.wav') as number,
+  zap: require('../../assets/sounds/zap.wav') as number,
+  buzz: require('../../assets/sounds/buzz.wav') as number,
+  drum: require('../../assets/sounds/drum.wav') as number,
+  win: require('../../assets/sounds/win.wav') as number,
+  // грибы и шляпа грибника
+  pluck: require('../../assets/sounds/pluck.wav') as number,
+  wilt: require('../../assets/sounds/wilt.wav') as number,
+  magic: require('../../assets/sounds/magic.wav') as number,
+  sneeze: require('../../assets/sounds/sneeze.wav') as number,
 };
 
 export type SoundName = keyof typeof SOUND_FILES;

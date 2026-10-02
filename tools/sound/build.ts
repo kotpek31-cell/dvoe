@@ -167,8 +167,306 @@ function mogVoice() {
   return fade(d, 0.005, 0.05);
 }
 
+// «Дай пять»: хлопок ладоней (сжатый шум через резонатор) и короткий звонкий блик (0,5 с)
+function clap() {
+  const d = len(0.5);
+  const palm = resonator(1400, 900);
+  const palm2 = resonator(2600, 1400);
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    let v = 0;
+    for (const [at, k] of [[0, 1], [0.012, 0.6], [0.026, 0.35]]) {
+      const dt = t - at;
+      if (dt >= 0) v += k * Math.exp(-dt * 55) * noise();
+    }
+    v = palm(v) * 9 + palm2(v) * 5;
+    const st = t - 0.03;
+    if (st > 0) v += 0.25 * Math.sin(2 * Math.PI * 1760 * st) * Math.exp(-st * 14) + 0.12 * Math.sin(2 * Math.PI * 2637 * st) * Math.exp(-st * 18);
+    d[i] = Math.tanh(v * 1.3);
+  }
+  return fade(d, 0.001, 0.08);
+}
+
+// Реакция: мягкий «чпок» вверх (0,25 с)
+function pop() {
+  const d = len(0.25);
+  let phase = 0;
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    const f = 380 + 900 * (1 - Math.exp(-t * 30));
+    phase += f / RATE;
+    d[i] = Math.sin(2 * Math.PI * phase) * Math.min(1, t * 600) * Math.exp(-t * 18) + noise() * 0.08 * Math.exp(-t * 90);
+  }
+  return fade(d, 0.001, 0.04);
+}
+
+// ---------- Мини-игры комнаты (0.2.2) ----------
+// Синус с огибающей: удар — сразу, затухание — exp(-t·decay)
+const tone = (f: number, t: number, decay: number) => Math.sin(2 * Math.PI * f * t) * Math.exp(-t * decay);
+
+// Щелчок колеса: короткий деревянный «тк» (0,06 с)
+function tick() {
+  const d = len(0.06);
+  const wood = resonator(2200, 500);
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    d[i] = wood(noise() * Math.exp(-t * 220)) * 6 + tone(1800, t, 90) * 0.4;
+  }
+  return fade(d, 0.0005, 0.01);
+}
+
+// Отсчёт 3-2-1: мягкий «бип» (0,22 с) и «старт» — выше и длиннее, с квинтой (0,5 с)
+function beep() {
+  const d = len(0.22);
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    d[i] = (Math.sin(2 * Math.PI * 660 * t) + 0.3 * Math.sin(2 * Math.PI * 1320 * t)) * Math.min(1, t * 300) * Math.exp(-t * 9);
+  }
+  return fade(d, 0.002, 0.05);
+}
+function go() {
+  const d = len(0.5);
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    const env = Math.min(1, t * 300) * Math.exp(-t * 5);
+    d[i] = (Math.sin(2 * Math.PI * 988 * t) + 0.6 * Math.sin(2 * Math.PI * 1480 * t) + 0.25 * Math.sin(2 * Math.PI * 1976 * t)) * env;
+  }
+  return fade(d, 0.002, 0.08);
+}
+
+// Тыква летит: свист воздуха вверх-вниз (0,4 с)
+function whoosh() {
+  const d = len(0.4);
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    const p = t / 0.4;
+    const f = 500 + 1400 * Math.sin(Math.PI * p);
+    const bp = resonatorAt(f);
+    d[i] = bp(noise()) * Math.sin(Math.PI * p) ** 1.5 * 3;
+  }
+  return fade(d, 0.01, 0.05);
+}
+// резонатор с плавающей частотой — для свиста
+let rzY1 = 0;
+let rzY2 = 0;
+function resonatorAt(freq: number) {
+  const bw = 400;
+  const r = Math.exp((-Math.PI * bw) / RATE);
+  const c = 2 * r * Math.cos((2 * Math.PI * freq) / RATE);
+  return (x: number) => {
+    const y = (1 - r) * x + c * rzY1 - r * r * rzY2;
+    rzY2 = rzY1;
+    rzY1 = y;
+    return y;
+  };
+}
+
+// Тыква бахнула: «пуф» с треском и низом (1 с)
+function boom() {
+  const d = len(1.0);
+  const low = resonator(90, 120);
+  const mid = resonator(500, 700);
+  let phase = 0;
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    phase += (55 + 80 * Math.exp(-t * 10)) / RATE;
+    let v = Math.sin(2 * Math.PI * phase) * Math.exp(-t * 4) * 1.2;
+    v += low(noise()) * 14 * Math.exp(-t * 5);
+    v += mid(noise()) * 5 * Math.exp(-t * 14);
+    if (t > 0.05 && noise() > 0.995) v += noise() * Math.exp(-t * 3) * 1.4; // треск
+    d[i] = Math.tanh(v * 1.4);
+  }
+  return fade(d, 0.001, 0.25);
+}
+
+// Поймал звезду: «дзынь» двумя нотами вверх (0,45 с); золотая — три ноты и блеск (0,7 с)
+function ding() {
+  const d = len(0.45);
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    let v = tone(1568, t, 9);
+    if (t > 0.07) v += tone(2093, t - 0.07, 8);
+    d[i] = v * Math.min(1, t * 800);
+  }
+  return fade(d, 0.001, 0.08);
+}
+function coin() {
+  const d = len(0.7);
+  const notes = [0, 0.06, 0.12];
+  const freqs = [1568, 2093, 2637];
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    let v = 0;
+    notes.forEach((at, k) => {
+      const dt = t - at;
+      if (dt >= 0) v += tone(freqs[k], dt, 6) + 0.3 * tone(freqs[k] * 2.01, dt, 12);
+    });
+    v += noise() * 0.05 * Math.exp(-t * 6) * Math.sin(2 * Math.PI * 30 * t);
+    d[i] = v * Math.min(1, t * 800);
+  }
+  return fade(d, 0.001, 0.12);
+}
+
+// Тучка ударила молнией: треск электричества (0,5 с)
+function zap() {
+  const d = len(0.5);
+  const hi = resonator(3200, 1500);
+  let phase = 0;
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    phase += (120 + 40 * Math.sin(2 * Math.PI * 17 * t)) / RATE;
+    const buzz = (phase % 1) * 2 - 1;
+    const crack = Math.exp(-t * 12) * (Math.abs(noise()) > 0.7 ? 1 : 0.2);
+    d[i] = Math.tanh((buzz * 0.6 * Math.exp(-t * 6) + hi(noise()) * 6 * crack) * 1.5);
+  }
+  return fade(d, 0.001, 0.08);
+}
+
+// Фальстарт: низкий «бзз» (0,45 с)
+function buzz() {
+  const d = len(0.45);
+  let phase = 0;
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    phase += 110 / RATE;
+    const sq = (phase % 1) < 0.5 ? 1 : -1;
+    d[i] = sq * 0.5 * Math.min(1, t * 200) * (t < 0.36 ? 1 : Math.max(0, (0.45 - t) / 0.09));
+  }
+  return fade(d, 0.002, 0.03);
+}
+
+// «Камень, ножницы, бумага»: удар маленького барабана (0,25 с)
+function drum() {
+  const d = len(0.25);
+  const skin = resonator(220, 160);
+  let phase = 0;
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    phase += (140 + 120 * Math.exp(-t * 40)) / RATE;
+    d[i] = Math.sin(2 * Math.PI * phase) * Math.exp(-t * 14) + skin(noise()) * 5 * Math.exp(-t * 40);
+  }
+  return fade(d, 0.001, 0.04);
+}
+
+// Пьедестал: короткие фанфары (1,3 с)
+function win() {
+  const d = len(1.3);
+  const seq: [number, number, number][] = [
+    [0, 784, 0.16],
+    [0.16, 988, 0.16],
+    [0.32, 1175, 0.16],
+    [0.5, 1568, 0.8],
+  ];
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    let v = 0;
+    for (const [at, f, dur] of seq) {
+      const dt = t - at;
+      if (dt < 0 || dt > dur + 0.25) continue;
+      const env = Math.min(1, dt * 120) * (dt < dur ? 1 : Math.exp(-(dt - dur) * 14)) * Math.exp(-dt * 1.5);
+      // «медь»: несколько гармоник с лёгким вибрато
+      const vib = 1 + 0.004 * Math.sin(2 * Math.PI * 5.5 * dt);
+      v += (Math.sin(2 * Math.PI * f * vib * dt) + 0.5 * Math.sin(2 * Math.PI * 2 * f * vib * dt) + 0.25 * Math.sin(2 * Math.PI * 3 * f * vib * dt)) * env;
+    }
+    d[i] = Math.tanh(v * 0.7);
+  }
+  return fade(d, 0.002, 0.15);
+}
+
+// ---------- Грибы и шляпа грибника (0.2.2) ----------
+// Сорвал гриб: влажный «чпок» — пробка вверх по частоте и щелчок (0,2 с)
+function pluck() {
+  const d = len(0.2);
+  const body = resonator(700, 300);
+  let phase = 0;
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    const f = 260 + 1100 * (1 - Math.exp(-t * 55));
+    phase += f / RATE;
+    const click = t < 0.006 ? noise() * (1 - t / 0.006) : 0;
+    d[i] = Math.sin(2 * Math.PI * phase) * Math.min(1, t * 900) * Math.exp(-t * 26) + body(click) * 9 + noise() * 0.05 * Math.exp(-t * 120);
+  }
+  return fade(d, 0.0005, 0.03);
+}
+
+// Не тот порядок: грибы вянут — нисходящий «вуу-у» с дрожью (0,7 с)
+function wilt() {
+  const d = len(0.7);
+  let phase = 0;
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    const f = 520 * Math.exp(-t * 1.6) * (1 + 0.025 * Math.sin(2 * Math.PI * 7 * t));
+    phase += f / RATE;
+    const tri = 2 * Math.abs(2 * (phase % 1) - 1) - 1;
+    d[i] = (tri * 0.7 + Math.sin(2 * Math.PI * phase * 2) * 0.2) * Math.min(1, t * 80) * Math.exp(-t * 2.4);
+  }
+  return fade(d, 0.005, 0.12);
+}
+
+// Шляпа: вихрь спор — переливы колокольчиков вверх и шорох (1,4 с)
+function magic() {
+  const d = len(1.4);
+  const air = resonator(5200, 2600);
+  const notes = [1047, 1319, 1568, 2093, 1760, 2349, 2637, 3136];
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    let v = 0;
+    notes.forEach((f, k) => {
+      const dt = t - k * 0.11;
+      if (dt >= 0) v += tone(f, dt, 5) * 0.5 + tone(f * 2.01, dt, 11) * 0.15;
+    });
+    v += air(noise()) * 3 * Math.sin(Math.PI * Math.min(1, t / 1.4)) ** 2;
+    d[i] = Math.tanh(v * 0.8);
+  }
+  return fade(d, 0.004, 0.25);
+}
+
+// Отражённый «Мог»: применивший чихает — вдох «а-а» и «пчхи» (0,9 с)
+function sneeze() {
+  const d = len(0.9);
+  const f1 = resonator(800, 160);
+  const f2 = resonator(1250, 200);
+  const hiss = resonator(4200, 2200);
+  let phase = 0;
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    let v = 0;
+    if (t < 0.48) {
+      // «а-а-а»: голос с подъёмом высоты
+      const f = 230 + 140 * (t / 0.48);
+      phase += f / RATE;
+      const saw = 2 * (phase % 1) - 1;
+      const env = Math.min(1, t * 6) * (t > 0.42 ? (0.48 - t) / 0.06 : 1);
+      v = (f1(saw) * 6 + f2(saw) * 4) * env * 0.6;
+    } else {
+      // «пчхи»: хлопок и шипение
+      const dt = t - 0.48;
+      v = (dt < 0.01 ? noise() * 2 : 0) + hiss(noise()) * 9 * Math.exp(-dt * 6) * Math.min(1, dt * 200);
+    }
+    d[i] = Math.tanh(v);
+  }
+  return fade(d, 0.005, 0.1);
+}
+
 mkdirSync(OUT, { recursive: true });
 wav('tension', tension());
 wav('hit', hit());
 wav('chime', chime());
+wav('clap', clap());
+wav('pop', pop());
+wav('tick', tick());
+wav('beep', beep());
+wav('go', go());
+wav('whoosh', whoosh());
+wav('boom', boom());
+wav('ding', ding());
+wav('coin', coin());
+wav('zap', zap());
+wav('buzz', buzz());
+wav('drum', drum());
+wav('win', win());
+wav('pluck', pluck());
+wav('wilt', wilt());
+wav('magic', magic());
+wav('sneeze', sneeze());
 if (!existsSync(join(OUT, 'mog.wav')) || process.argv.includes('--mog')) wav('mog', mogVoice());

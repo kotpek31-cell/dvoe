@@ -2179,5 +2179,1062 @@ grant execute on function public.dev_test_partner_create() to authenticated;
 grant execute on function public.dev_test_partner_remove() to authenticated;
 grant execute on function public.dev_test_partner_sleep(boolean) to authenticated;
 
+-- =====================================================================
+-- 12. 0.2.2 «Комната на троих»: роль «только комната», общая комната с ботами,
+--     способности на любого, мини-игры с рекордами и наградами, грибы и шляпа грибника
+-- =====================================================================
+
+-- 12.1 Роли: третий уровень «guest» — только комната, без комнаты разработчиков
+alter table private.user_roles drop constraint if exists user_roles_role_check;
+alter table private.user_roles add constraint user_roles_role_check check (role in ('owner', 'developer', 'guest'));
+
+-- Комната разработчиков: владелец и разработчики (гостей не пускает)
+create or replace function private.require_role(p_owner_only boolean default false)
+returns uuid
+language plpgsql stable security definer set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null or not exists (
+       select 1 from private.user_roles r
+       where r.user_id = v_uid and r.role in ('owner', 'developer') and (not p_owner_only or r.role = 'owner')) then
+    raise exception 'Нет доступа' using errcode = '42501';
+  end if;
+  return v_uid;
+end;
+$$;
+
+-- Название роли по умолчанию
+create or replace function private.role_title(p_role text, p_title text)
+returns text
+language sql immutable set search_path = ''
+as $$
+  select coalesce(p_title, case p_role when 'owner' then 'владелец' when 'guest' then 'друг' else 'тестер' end)
+$$;
+
+-- Кто может войти в комнату: любая роль
+create or replace function private.room_access(p_user uuid)
+returns boolean
+language sql stable security definer set search_path = ''
+as $$
+  select exists (select 1 from private.user_roles r where r.user_id = p_user)
+$$;
+
+create or replace function private.is_dev(p_user uuid)
+returns boolean
+language sql stable security definer set search_path = ''
+as $$
+  select exists (select 1 from private.user_roles r where r.user_id = p_user and r.role in ('owner', 'developer'))
+$$;
+
+create or replace function public.my_access()
+returns jsonb
+language sql stable security definer set search_path = ''
+as $$
+  select jsonb_build_object('role', r.role, 'title', private.role_title(r.role, r.title))
+  from private.user_roles r where r.user_id = auth.uid()
+$$;
+
+-- Выдать роль (только владелец): уровень «developer» или «guest», своё название
+drop function if exists public.dev_set_role(text, text);
+create or replace function public.dev_set_role(p_query text, p_title text default null, p_level text default 'developer')
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_owner uuid := private.require_role(true);
+  v_user  uuid := private.find_user(p_query);
+  v_level text := case when p_level = 'guest' then 'guest' else 'developer' end;
+  v_title text := left(coalesce(nullif(btrim(coalesce(p_title, '')), ''), private.role_title(v_level, null)), 30);
+begin
+  if v_user is null then
+    raise exception 'Аккаунт не найден — проверь email или ID';
+  end if;
+  if v_user = v_owner then
+    raise exception 'Роль владельца так не меняется';
+  end if;
+  if private.is_bot(v_user) then
+    raise exception 'Тестовому партнёру роль не нужна';
+  end if;
+  insert into private.user_roles (user_id, role, title, granted_by) values (v_user, v_level, v_title, v_owner)
+  on conflict (user_id) do update set role = excluded.role, title = excluded.title, granted_by = excluded.granted_by
+  where private.user_roles.role <> 'owner';
+  return jsonb_build_object('user_id', v_user, 'title', v_title, 'level', v_level);
+end;
+$$;
+
+-- Снять роль (только владелец): человек заодно выходит из комнаты, его боты — тоже
+create or replace function public.dev_remove_role(p_query text)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_owner uuid := private.require_role(true);
+  v_user  uuid := private.find_user(p_query);
+begin
+  if v_user is null then
+    raise exception 'Аккаунт не найден — проверь email или ID';
+  end if;
+  if v_user = v_owner then
+    raise exception 'Роль владельца так не меняется';
+  end if;
+  delete from private.user_roles where user_id = v_user and role <> 'owner';
+  delete from public.room_members where user_id = v_user or bot_owner = v_user;
+end;
+$$;
+
+create or replace function public.dev_list_developers()
+returns jsonb
+language plpgsql stable security definer set search_path = ''
+as $$
+begin
+  perform private.require_role(true);
+  return coalesce((
+    select jsonb_agg(jsonb_build_object('user_id', r.user_id, 'role', r.role, 'email', u.email, 'short_id', p.short_id,
+                                        'title', private.role_title(r.role, r.title),
+                                        'name', p.display_name, 'since', r.created_at)
+                     order by (r.role = 'owner') desc, (r.role = 'guest'), r.created_at)
+    from private.user_roles r
+    join auth.users u on u.id = r.user_id
+    left join public.profiles p on p.id = r.user_id), '[]'::jsonb);
+end;
+$$;
+
+-- 12.2 Комната и кто в ней. Мир шире экрана: x, y — доли ширины мира и глубины земли.
+create table if not exists public.rooms (
+  id         text primary key check (id ~ '^[a-z0-9_-]{1,32}$'),
+  name       text not null check (char_length(name) between 1 and 60),
+  kind       text not null default 'dev' check (kind in ('dev', 'portal')),
+  capacity   smallint not null default 3 check (capacity between 2 and 6),
+  location   text not null default 'forest' references public.locations (id),
+  world_w    real not null default 3 check (world_w between 1 and 10),   -- ширина мира в экранах
+  world_d    real not null default 1.5 check (world_d between 1 and 4),  -- глубина земли относительно главной
+  code_fp    text,                                                       -- Портал: отпечаток кода входа
+  created_at timestamptz not null default now()
+);
+insert into public.rooms (id, name) values ('dev', 'Комната на троих') on conflict (id) do nothing;
+
+create table if not exists public.room_members (
+  id          uuid primary key default gen_random_uuid(),
+  room_id     text not null references public.rooms (id) on delete cascade,
+  user_id     uuid references auth.users (id) on delete cascade,   -- человек
+  bot_owner   uuid references auth.users (id) on delete cascade,   -- бот: кто позвал
+  bot_name    text check (char_length(bot_name) <= 30),
+  bot_look    jsonb,
+  x           real not null default 0.5 check (x between 0 and 1),
+  y           real not null default 0.5 check (y between 0 and 1),
+  seen_at     timestamptz not null default now(),                  -- последний раз на экране комнаты
+  pushed_at   timestamptz,                                         -- последний пуш ему из комнаты
+  notified_at timestamptz,                                         -- последний его пуш другим («дай пять», игра)
+  joined_at   timestamptz not null default now(),
+  check ((user_id is null) <> (bot_owner is null))
+);
+create unique index if not exists room_members_user on public.room_members (room_id, user_id) where user_id is not null;
+create index if not exists room_members_room on public.room_members (room_id, joined_at);
+create index if not exists room_members_bot_owner on public.room_members (bot_owner) where bot_owner is not null;
+
+-- Способности в комнате — отдельно от пар
+create table if not exists public.room_casts (
+  id          uuid primary key default gen_random_uuid(),
+  room_id     text not null references public.rooms (id) on delete cascade,
+  from_member uuid not null,
+  to_member   uuid not null,
+  from_user   uuid references auth.users (id) on delete cascade,   -- null — бот
+  to_user     uuid references auth.users (id) on delete cascade,
+  ability     text not null references public.items (id),
+  blocked     boolean not null default false,                      -- шляпа грибника отразила «Мог»
+  created_at  timestamptz not null default now(),
+  seen_at     timestamptz
+);
+create index if not exists room_casts_room on public.room_casts (room_id, created_at desc);
+create index if not exists room_casts_from on public.room_casts (from_member, ability, created_at desc);
+create index if not exists room_casts_to on public.room_casts (to_user, created_at desc) where seen_at is null;
+
+-- Партии мини-игр и рекорды
+create table if not exists public.room_games (
+  id          uuid primary key default gen_random_uuid(),
+  room_id     text not null references public.rooms (id) on delete cascade,
+  game        text not null check (game in ('pumpkin', 'stars', 'reaction', 'rps')),
+  host        uuid not null references auth.users (id) on delete cascade,
+  players     jsonb not null,                                      -- [{"m": участник, "u": человек или null}]
+  humans      smallint not null,
+  seed        integer not null,
+  started_at  timestamptz not null default now(),
+  finished_at timestamptz,
+  result      jsonb
+);
+create index if not exists room_games_room on public.room_games (room_id, started_at desc);
+
+create table if not exists public.game_records (
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  game       text not null check (game in ('pumpkin', 'stars', 'reaction', 'rps')),
+  played     integer not null default 0,
+  wins       integer not null default 0,
+  best       real,            -- звездопад: очки (больше — лучше), реакция: мс (меньше — лучше)
+  best_at    timestamptz,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, game)
+);
+
+-- Вещи за игры и грибы
+alter table public.inventory drop constraint if exists inventory_source_check;
+alter table public.inventory add constraint inventory_source_check check (source in ('code', 'dev', 'shop', 'game'));
+
+-- Отражённый «Мог» в паре
+alter table public.ability_casts add column if not exists blocked boolean not null default false;
+
+-- Грибы: секретный порядок (5 цветов) и попытки
+alter table private.app_config add column if not exists mushroom_seq text[];
+create table if not exists private.mushroom_attempts (
+  id         bigint generated always as identity primary key,
+  user_id    uuid not null references auth.users (id) on delete cascade,
+  ok         boolean not null default false,
+  created_at timestamptz not null default now()
+);
+create index if not exists mushroom_attempts_user on private.mushroom_attempts (user_id, created_at);
+alter table private.mushroom_attempts enable row level security;
+
+-- 12.3 Права и RLS: читать — только тем, кто в комнате; писать — только через функции
+create or replace function public.room_access()
+returns boolean
+language sql stable security definer set search_path = ''
+as $$
+  select private.room_access(auth.uid())
+$$;
+
+create or replace function public.in_room(p_room text)
+returns boolean
+language sql stable security definer set search_path = ''
+as $$
+  select exists (select 1 from public.room_members m where m.room_id = p_room and m.user_id = auth.uid())
+$$;
+
+revoke all on public.rooms, public.room_members, public.room_casts, public.room_games, public.game_records
+  from anon, authenticated;
+grant all on public.rooms, public.room_members, public.room_casts, public.room_games, public.game_records
+  to service_role;
+grant select on public.rooms, public.room_members, public.room_casts, public.room_games, public.game_records
+  to authenticated;
+
+alter table public.rooms        enable row level security;
+alter table public.room_members enable row level security;
+alter table public.room_casts   enable row level security;
+alter table public.room_games   enable row level security;
+alter table public.game_records enable row level security;
+
+drop policy if exists rooms_select on public.rooms;
+create policy rooms_select on public.rooms for select to authenticated using ((select public.room_access()));
+drop policy if exists room_members_select on public.room_members;
+create policy room_members_select on public.room_members for select to authenticated using (public.in_room(room_id));
+drop policy if exists room_casts_select on public.room_casts;
+create policy room_casts_select on public.room_casts for select to authenticated using (public.in_room(room_id));
+drop policy if exists room_games_select on public.room_games;
+create policy room_games_select on public.room_games for select to authenticated using (public.in_room(room_id));
+drop policy if exists game_records_select on public.game_records;
+create policy game_records_select on public.game_records for select to authenticated using ((select public.room_access()));
+
+-- Закрытый realtime-канал комнаты «room:<id>»: слушать и писать могут только вошедшие
+drop policy if exists room_channel_read on realtime.messages;
+create policy room_channel_read on realtime.messages for select to authenticated
+  using (realtime.topic() like 'room:%' and public.in_room(substr(realtime.topic(), 6)));
+drop policy if exists room_channel_write on realtime.messages;
+create policy room_channel_write on realtime.messages for insert to authenticated
+  with check (realtime.topic() like 'room:%' and public.in_room(substr(realtime.topic(), 6)));
+
+-- 12.4 Служебные функции комнаты
+-- Пуш одному человеку: Android (Expo) и сайт (Web Push) — как notify_partner
+create or replace function private.notify_user(p_user uuid, p_title text, p_body text, p_data jsonb default '{}'::jsonb)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_token  text;
+  v_subs   jsonb;
+  v_url    text;
+  v_secret text;
+begin
+  select up.expo_push_token into v_token from public.user_private up where up.user_id = p_user;
+  if coalesce(v_token, '') <> '' then
+    perform net.http_post(
+      url := 'https://exp.host/--/api/v2/push/send',
+      body := jsonb_build_object('to', v_token, 'title', p_title, 'body', p_body, 'data', p_data,
+                                 'sound', 'default', 'priority', 'high', 'channelId', 'default'),
+      headers := jsonb_build_object('Content-Type', 'application/json', 'Accept', 'application/json'),
+      timeout_milliseconds := 5000
+    );
+  end if;
+  select jsonb_agg(jsonb_build_object('endpoint', s.endpoint, 'p256dh', s.p256dh, 'auth', s.auth))
+    into v_subs
+  from (select * from public.web_push_subscriptions
+        where user_id = p_user order by updated_at desc limit 10) s;
+  select c.push_url, c.push_secret into v_url, v_secret from private.app_config c where c.id = 1;
+  if v_subs is not null and v_url is not null then
+    perform net.http_post(
+      url := v_url,
+      body := jsonb_build_object('title', p_title, 'body', p_body, 'data', p_data, 'subscriptions', v_subs),
+      headers := jsonb_build_object('Content-Type', 'application/json', 'x-push-secret', v_secret),
+      timeout_milliseconds := 10000
+    );
+  end if;
+exception when others then
+  raise warning 'notify_user: %', sqlerrm;
+end;
+$$;
+
+-- Пуш всем вошедшим, кого нет на экране комнаты (минуту не отмечались).
+-- Не чаще раза в 30 с на человека; тому, на кого применили способность, — всегда.
+create or replace function private.room_push(p_room text, p_from uuid, p_body text,
+                                             p_target uuid default null, p_target_body text default null,
+                                             p_data jsonb default '{}'::jsonb)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_m     public.room_members;
+  v_force boolean;
+begin
+  for v_m in
+    select * from public.room_members m
+    where m.room_id = p_room and m.user_id is not null and m.user_id <> p_from
+      and m.seen_at < now() - interval '60 seconds'
+  loop
+    v_force := p_target is not null and v_m.user_id = p_target;
+    if v_force or v_m.pushed_at is null or v_m.pushed_at < now() - interval '30 seconds' then
+      perform private.notify_user(v_m.user_id, 'Комната',
+                                  case when v_force then coalesce(p_target_body, p_body) else p_body end,
+                                  p_data || jsonb_build_object('type', 'room', 'room', p_room));
+      update public.room_members set pushed_at = now() where id = v_m.id;
+    end if;
+  end loop;
+end;
+$$;
+
+-- Кто в комнате: имя, роль, образ, место
+create or replace function private.room_members_json(p_room text)
+returns jsonb
+language sql stable security definer set search_path = ''
+as $$
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'id', m.id, 'user_id', m.user_id, 'bot', m.user_id is null, 'bot_owner', m.bot_owner,
+           'name', coalesce(p.display_name, m.bot_name, 'Бот'),
+           'role', case when m.user_id is null then 'bot' else r.role end,
+           'title', case when m.user_id is null then 'бот' else private.role_title(r.role, r.title) end,
+           'chibi', coalesce(p.chibi, m.bot_look),
+           'x', m.x, 'y', m.y, 'seen_at', m.seen_at, 'joined_at', m.joined_at)
+         order by m.joined_at), '[]'::jsonb)
+  from public.room_members m
+  left join public.profiles p on p.id = m.user_id
+  left join private.user_roles r on r.user_id = m.user_id
+  where m.room_id = p_room
+$$;
+
+-- Мой участник в комнате (или мой бот), с блокировкой строки
+create or replace function private.my_member(p_room text, p_member uuid default null)
+returns public.room_members
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+  v_m   public.room_members;
+begin
+  if p_member is null then
+    select * into v_m from public.room_members where room_id = p_room and user_id = v_uid for update;
+  else
+    select * into v_m from public.room_members
+    where id = p_member and room_id = p_room and (user_id = v_uid or bot_owner = v_uid) for update;
+  end if;
+  if v_m.id is null then
+    raise exception 'Сначала войди в комнату';
+  end if;
+  return v_m;
+end;
+$$;
+
+-- 12.5 Функции комнаты для приложения
+create or replace function public.room_state(p_room text default 'dev')
+returns jsonb
+language plpgsql stable security definer set search_path = ''
+as $$
+declare
+  v_uid  uuid := auth.uid();
+  v_room public.rooms;
+begin
+  if not private.room_access(v_uid) then
+    raise exception 'Нет доступа' using errcode = '42501';
+  end if;
+  select * into v_room from public.rooms where id = p_room;
+  if v_room.id is null then
+    raise exception 'Такой комнаты нет';
+  end if;
+  return jsonb_build_object(
+    'room', to_jsonb(v_room) - 'code_fp',
+    'members', private.room_members_json(p_room),
+    'me', (select m.id from public.room_members m where m.room_id = p_room and m.user_id = v_uid),
+    'level', (select r.role from private.user_roles r where r.user_id = v_uid));
+end;
+$$;
+
+-- Войти: мест нет — список, кто внутри
+create or replace function public.room_enter(p_room text default 'dev')
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_uid  uuid := auth.uid();
+  v_room public.rooms;
+begin
+  if not private.room_access(v_uid) then
+    raise exception 'Нет доступа' using errcode = '42501';
+  end if;
+  select * into v_room from public.rooms where id = p_room for update; -- входят по одному
+  if v_room.id is null then
+    raise exception 'Такой комнаты нет';
+  end if;
+  if exists (select 1 from public.room_members where room_id = p_room and user_id = v_uid) then
+    update public.room_members set seen_at = now() where room_id = p_room and user_id = v_uid;
+  elsif (select count(*) from public.room_members where room_id = p_room) >= v_room.capacity then
+    return jsonb_build_object('ok', false, 'error', 'full', 'message', 'Комната занята',
+                              'capacity', v_room.capacity, 'members', private.room_members_json(p_room));
+  else
+    insert into public.room_members (room_id, user_id, x, y)
+    values (p_room, v_uid, 0.42 + random() * 0.16, 0.25 + random() * 0.5);
+  end if;
+  return jsonb_build_object('ok', true) || public.room_state(p_room);
+end;
+$$;
+
+-- Выйти: освобождаю место, мои боты уходят со мной
+create or replace function public.room_leave(p_room text default 'dev')
+returns void
+language sql security definer set search_path = ''
+as $$
+  delete from public.room_members where room_id = p_room and (user_id = auth.uid() or bot_owner = auth.uid())
+$$;
+
+-- Вывести (только владелец): человека — вместе с его ботами
+create or replace function public.room_kick(p_member uuid)
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_m public.room_members;
+begin
+  perform private.require_role(true);
+  select * into v_m from public.room_members where id = p_member;
+  if v_m.id is null then
+    return;
+  end if;
+  delete from public.room_members
+  where id = p_member or (v_m.user_id is not null and room_id = v_m.room_id and bot_owner = v_m.user_id);
+end;
+$$;
+
+create or replace function public.room_set_capacity(p_capacity integer, p_room text default 'dev')
+returns integer
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  perform private.require_role(true);
+  if p_capacity not between 2 and 6 then
+    raise exception 'Мест — от 2 до 6';
+  end if;
+  update public.rooms set capacity = p_capacity where id = p_room;
+  return p_capacity;
+end;
+$$;
+
+create or replace function public.room_set_location(p_location text, p_room text default 'dev')
+returns text
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  perform private.my_member(p_room);
+  if not exists (select 1 from public.locations l where l.id = p_location) then
+    raise exception 'Такого места нет';
+  end if;
+  update public.rooms set location = p_location where id = p_room;
+  return p_location;
+end;
+$$;
+
+-- Позвать бота (владелец и разработчики): занимает место, им управляет телефон позвавшего
+create or replace function public.room_bot_add(p_room text default 'dev')
+returns uuid
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_uid  uuid := auth.uid();
+  v_room public.rooms;
+  v_name text;
+  v_n    integer;
+  v_id   uuid;
+  v_looks jsonb := '[
+    {"kind": "girl", "v": 2, "skin": 2, "hair": {"id": "hair.ponytail", "c": "pink"}, "top": {"id": "top.tee", "c": "mint"}},
+    {"kind": "boy", "v": 2, "skin": 1, "hair": {"id": "hair.vikhor", "c": "ginger"}, "top": {"id": "top.hoodie", "c": "lemon"}},
+    {"kind": "nb", "v": 2, "skin": 3, "hair": {"id": "hair.fluffy", "c": "blue"}, "top": {"id": "top.hoodie", "c": "lavender"}}
+  ]'::jsonb;
+begin
+  if not private.is_dev(v_uid) then
+    raise exception 'Ботов зовут только разработчики' using errcode = '42501';
+  end if;
+  perform private.my_member(p_room);
+  select * into v_room from public.rooms where id = p_room for update;
+  if (select count(*) from public.room_members where room_id = p_room) >= v_room.capacity then
+    raise exception 'Мест нет — сначала кто-то должен выйти';
+  end if;
+  select n into v_name from unnest(array['Тестик', 'Пончик', 'Бусинка', 'Кнопка', 'Мармелад', 'Пряник']) n
+  where not exists (select 1 from public.room_members m where m.room_id = p_room and m.bot_name = n)
+  limit 1;
+  v_n := (select count(*) from public.room_members where room_id = p_room and bot_owner is not null)::integer;
+  insert into public.room_members (room_id, bot_owner, bot_name, bot_look, x, y)
+  values (p_room, v_uid, coalesce(v_name, 'Бот'), v_looks -> (v_n % 3), 0.3 + random() * 0.4, 0.2 + random() * 0.6)
+  returning id into v_id;
+  return v_id;
+end;
+$$;
+
+create or replace function public.room_bot_remove(p_member uuid)
+returns void
+language sql security definer set search_path = ''
+as $$
+  delete from public.room_members
+  where id = p_member and bot_owner is not null
+    and (bot_owner = auth.uid() or exists (select 1 from private.user_roles r where r.user_id = auth.uid() and r.role = 'owner'))
+$$;
+
+-- Запомнить место (своё или своего бота) и отметиться «я на экране»
+create or replace function public.room_move(p_x real, p_y real, p_member uuid default null, p_room text default 'dev')
+returns void
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_m public.room_members := private.my_member(p_room, p_member);
+begin
+  update public.room_members
+  set x = least(1, greatest(0, coalesce(p_x, x))), y = least(1, greatest(0, coalesce(p_y, y))),
+      seen_at = case when user_id is not null then now() else seen_at end
+  where id = v_m.id;
+end;
+$$;
+
+-- «Я на экране комнаты» — раз в 30 с; p_away — ушёл с экрана (пуши пойдут сразу)
+create or replace function public.room_ping(p_away boolean default false, p_room text default 'dev')
+returns void
+language sql security definer set search_path = ''
+as $$
+  update public.room_members
+  set seen_at = case when p_away then now() - interval '1 hour' else now() end
+  where room_id = p_room and user_id = auth.uid()
+$$;
+
+-- Способность на любого вошедшего: любая из инвентаря, перезарядка 15 с, у пары своя
+create or replace function public.room_cast(p_target uuid, p_ability text, p_from uuid default null, p_room text default 'dev')
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_from    public.room_members := private.my_member(p_room, p_from);
+  v_to      public.room_members;
+  v_item    public.items;
+  v_last    timestamptz;
+  v_blocked boolean := false;
+  v_cast    public.room_casts;
+  v_name    text;
+  v_to_name text;
+  v_cd      constant integer := 15;
+begin
+  select * into v_to from public.room_members where id = p_target and room_id = p_room;
+  if v_to.id is null or v_to.id = v_from.id then
+    return jsonb_build_object('ok', false, 'error', 'target', 'message', 'Этого чибика уже нет в комнате');
+  end if;
+  select * into v_item from public.items where id = p_ability and cat = 'ability';
+  if v_item.id is null then
+    return jsonb_build_object('ok', false, 'error', 'unknown', 'message', 'Такой способности нет');
+  end if;
+  if v_from.user_id is null then
+    if v_item.id <> 'ability.hug' then
+      return jsonb_build_object('ok', false, 'error', 'bot', 'message', 'Боты умеют только обниматься');
+    end if;
+  elsif not private.has_item(v_from.user_id, v_item.id) then
+    return jsonb_build_object('ok', false, 'error', 'not_owned', 'message', 'Этой способности нет в инвентаре');
+  end if;
+
+  select max(c.created_at) into v_last from public.room_casts c where c.from_member = v_from.id and c.ability = v_item.id;
+  if v_last is not null and v_last > now() - make_interval(secs => v_cd) then
+    return jsonb_build_object('ok', false, 'error', 'cooldown',
+                              'wait_s', ceil(extract(epoch from (v_last + make_interval(secs => v_cd) - now())))::integer,
+                              'message', 'Способность ещё перезаряжается');
+  end if;
+
+  if v_item.id = 'ability.mog' and v_to.user_id is not null then
+    v_blocked := coalesce((select p.chibi -> 'hat' ->> 'id' from public.profiles p where p.id = v_to.user_id), '') = 'hat.mushroom';
+  end if;
+
+  insert into public.room_casts (room_id, from_member, to_member, from_user, to_user, ability, blocked)
+  values (p_room, v_from.id, v_to.id, v_from.user_id, v_to.user_id, v_item.id, v_blocked)
+  returning * into v_cast;
+
+  if v_from.user_id is not null then
+    update public.room_members set seen_at = now() where id = v_from.id;
+    select coalesce(p.display_name, 'Кто-то') into v_name from public.profiles p where p.id = v_from.user_id;
+    v_to_name := coalesce((select p.display_name from public.profiles p where p.id = v_to.user_id), v_to.bot_name, 'бот');
+    perform private.room_push(
+      p_room, v_from.user_id,
+      v_name || ' → ' || v_to_name || ': «' || v_item.name || '»' || case when v_blocked then ' — отражено шляпой' else '' end,
+      v_to.user_id,
+      case when v_blocked then 'Шляпа грибника отразила «Мог» от ' || v_name
+           else v_name || ' применяет «' || v_item.name || '» к тебе' end,
+      jsonb_build_object('kind', 'cast', 'cast_id', v_cast.id));
+  end if;
+
+  return jsonb_build_object('ok', true, 'id', v_cast.id, 'created_at', v_cast.created_at, 'cooldown_s', v_cd, 'blocked', v_blocked);
+end;
+$$;
+
+-- Сцены на меня, пропущенные за сутки
+create or replace function public.room_pending_casts(p_room text default 'dev')
+returns setof public.room_casts
+language sql stable security definer set search_path = ''
+as $$
+  select * from public.room_casts c
+  where c.room_id = p_room and c.to_user = auth.uid() and c.seen_at is null and c.created_at > now() - interval '1 day'
+  order by c.created_at
+$$;
+
+create or replace function public.room_mark_casts_seen(p_ids uuid[])
+returns integer
+language sql security definer set search_path = ''
+as $$
+  with done as (
+    update public.room_casts set seen_at = now()
+    where id = any (p_ids) and to_user = auth.uid() and seen_at is null
+    returning 1
+  )
+  select count(*)::integer from done
+$$;
+
+-- Пуш о «дай пять» и общем «дай пять» (сами сцены идут через канал комнаты)
+create or replace function public.room_notify(p_kind text, p_target uuid default null, p_room text default 'dev')
+returns boolean
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_me   public.room_members := private.my_member(p_room);
+  v_name text;
+  v_to   public.room_members;
+  v_body text;
+begin
+  if v_me.notified_at is not null and v_me.notified_at > now() - interval '10 seconds' then
+    return false;
+  end if;
+  select coalesce(p.display_name, 'Кто-то') into v_name from public.profiles p where p.id = v_me.user_id;
+  if p_kind = 'five' then
+    select * into v_to from public.room_members where id = p_target and room_id = p_room;
+    if v_to.id is null then
+      return false;
+    end if;
+    v_body := v_name || ' → ' || coalesce((select p.display_name from public.profiles p where p.id = v_to.user_id), v_to.bot_name, 'бот') || ': дай пять!';
+  elsif p_kind = 'five_all' then
+    v_body := v_name || ': все — дай пять!';
+  else
+    return false;
+  end if;
+  update public.room_members set notified_at = now(), seen_at = now() where id = v_me.id;
+  perform private.room_push(p_room, v_me.user_id, v_body, v_to.user_id, v_name || ' даёт тебе пять', jsonb_build_object('kind', p_kind));
+  return true;
+end;
+$$;
+
+-- 12.6 Мини-игры. Колесо крутит любой; игру выбирает сервер (не та же, что в прошлый раз).
+create or replace function public.room_game_start(p_players uuid[], p_room text default 'dev')
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_me      public.room_members := private.my_member(p_room);
+  v_players jsonb;
+  v_n       integer;
+  v_humans  integer;
+  v_last    text;
+  v_pool    text[];
+  v_game    text;
+  v_seed    integer := floor(random() * 2147483647)::integer;
+  v_id      uuid;
+  v_name    text;
+begin
+  if v_me.user_id is null then
+    raise exception 'Колесо крутит человек';
+  end if;
+  perform 1 from public.rooms where id = p_room for update; -- одна игра за раз
+  if exists (select 1 from public.room_games g
+             where g.room_id = p_room and g.finished_at is null and g.started_at > now() - interval '5 minutes') then
+    return jsonb_build_object('ok', false, 'error', 'busy', 'message', 'Уже идёт игра');
+  end if;
+  select jsonb_agg(jsonb_build_object('m', m.id, 'u', m.user_id) order by m.joined_at), count(*), count(m.user_id)
+    into v_players, v_n, v_humans
+  from public.room_members m
+  where m.room_id = p_room and m.id = any (p_players);
+  if v_n <> cardinality(array(select distinct unnest(p_players))) or not (v_me.id = any (p_players)) then
+    return jsonb_build_object('ok', false, 'error', 'players', 'message', 'Кто-то уже вышел из комнаты');
+  end if;
+  if v_n < 2 then
+    return jsonb_build_object('ok', false, 'error', 'alone', 'message', 'Нужно хотя бы двое — позови бота');
+  end if;
+  select g.game into v_last from public.room_games g where g.room_id = p_room order by g.started_at desc limit 1;
+  v_pool := array(select x from unnest(array['pumpkin', 'stars', 'reaction', 'rps']) x where x is distinct from v_last);
+  v_game := v_pool[1 + floor(random() * cardinality(v_pool))::integer];
+  insert into public.room_games (room_id, game, host, players, humans, seed)
+  values (p_room, v_game, v_me.user_id, v_players, v_humans, v_seed)
+  returning id into v_id;
+  update public.room_members set notified_at = now(), seen_at = now() where id = v_me.id;
+  select coalesce(p.display_name, 'Кто-то') into v_name from public.profiles p where p.id = v_me.user_id;
+  perform private.room_push(p_room, v_me.user_id, v_name || ' крутит колесо — заходи играть', null, null, jsonb_build_object('kind', 'game'));
+  return jsonb_build_object('ok', true, 'id', v_id, 'game', v_game, 'seed', v_seed, 'players', v_players);
+end;
+$$;
+
+-- Итог игры от того, кто крутил колесо. Сервер проверяет и только потом пишет рекорды и выдаёт вещи.
+-- p_result: {"places": [участники от первого места], "best": {участник: результат}}
+create or replace function public.room_game_finish(p_game uuid, p_result jsonb)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_uid     uuid := auth.uid();
+  v_g       public.room_games;
+  v_min     integer;
+  v_places  text[];
+  v_ids     text[];
+  v_winner  uuid;
+  v_counted boolean;
+  v_p       jsonb;
+  v_u       uuid;
+  v_val     real;
+  v_old     real;
+  v_new     boolean;
+  v_records jsonb := '[]'::jsonb;
+  v_rewards jsonb := '[]'::jsonb;
+  v_total   integer;
+  v_item    text;
+begin
+  select * into v_g from public.room_games where id = p_game for update;
+  if v_g.id is null or v_g.host <> v_uid then
+    raise exception 'Итог присылает тот, кто крутил колесо';
+  end if;
+  if v_g.finished_at is not null then
+    return jsonb_build_object('ok', false, 'error', 'finished', 'message', 'Игра уже закончилась');
+  end if;
+  v_min := case v_g.game when 'stars' then 30 when 'pumpkin' then 10 when 'reaction' then 10 else 6 end;
+  if now() < v_g.started_at + make_interval(secs => v_min) then
+    return jsonb_build_object('ok', false, 'error', 'too_fast', 'message', 'Слишком быстро для этой игры');
+  end if;
+
+  v_places := array(select jsonb_array_elements_text(coalesce(p_result -> 'places', '[]'::jsonb)));
+  v_ids := array(select e ->> 'm' from jsonb_array_elements(v_g.players) e);
+  if cardinality(v_places) <> cardinality(v_ids)
+     or cardinality(array(select distinct unnest(v_places))) <> cardinality(v_ids)
+     or not (v_places <@ v_ids) then
+    return jsonb_build_object('ok', false, 'error', 'result', 'message', 'Итог не сходится с игроками');
+  end if;
+  v_winner := v_places[1]::uuid;
+  v_counted := v_g.humans >= 2 and now() < v_g.started_at + interval '20 minutes';
+  update public.room_games set finished_at = now(), result = p_result where id = p_game;
+
+  if v_counted then
+    for v_p in select * from jsonb_array_elements(v_g.players) loop
+      continue when v_p ->> 'u' is null;
+      v_u := (v_p ->> 'u')::uuid;
+      v_val := case when jsonb_typeof(p_result -> 'best' -> (v_p ->> 'm')) = 'number'
+                    then (p_result -> 'best' ->> (v_p ->> 'm'))::real end;
+      if v_g.game = 'stars' and not (v_val between 0 and 300) then v_val := null; end if;
+      if v_g.game = 'reaction' and not (v_val between 80 and 5000) then v_val := null; end if;
+      if v_g.game in ('pumpkin', 'rps') then v_val := null; end if;
+      select g.best into v_old from public.game_records g where g.user_id = v_u and g.game = v_g.game;
+      v_new := v_val is not null and (v_old is null
+                                      or (v_g.game = 'stars' and v_val > v_old)
+                                      or (v_g.game = 'reaction' and v_val < v_old));
+      insert into public.game_records as r (user_id, game, played, wins, best, best_at)
+      values (v_u, v_g.game, 1, case when (v_p ->> 'm')::uuid = v_winner then 1 else 0 end,
+              v_val, case when v_val is not null then now() end)
+      on conflict (user_id, game) do update
+        set played = r.played + 1,
+            wins = r.wins + excluded.wins,
+            best = case when v_new then excluded.best else r.best end,
+            best_at = case when v_new then now() else r.best_at end,
+            updated_at = now();
+      if v_new then
+        v_records := v_records || jsonb_build_object('user_id', v_u, 'member', v_p ->> 'm', 'best', v_val);
+      end if;
+      -- награды за победы: 1 — кубок, 10 — корона, 25 — плащ
+      if (v_p ->> 'm')::uuid = v_winner then
+        select coalesce(sum(g.wins), 0) into v_total from public.game_records g where g.user_id = v_u;
+        foreach v_item in array array['hand.trophy', 'hat.champion', 'back.champion'] loop
+          continue when v_total < case v_item when 'hand.trophy' then 1 when 'hat.champion' then 10 else 25 end;
+          continue when not exists (select 1 from public.items i where i.id = v_item);
+          insert into public.inventory (user_id, item_id, source) values (v_u, v_item, 'game')
+          on conflict (user_id, item_id) do nothing;
+          if found then
+            v_rewards := v_rewards || jsonb_build_object('user_id', v_u, 'item_id', v_item);
+          end if;
+        end loop;
+      end if;
+    end loop;
+  end if;
+
+  return jsonb_build_object('ok', true, 'counted', v_counted, 'winner', v_winner, 'records', v_records, 'rewards', v_rewards);
+end;
+$$;
+
+-- Прервать игру: тот, кто крутил колесо (ушёл с экрана), или любой — если она висит дольше 5 минут
+create or replace function public.room_game_cancel(p_game uuid)
+returns void
+language sql security definer set search_path = ''
+as $$
+  update public.room_games set finished_at = now(), result = '{"cancelled": true}'::jsonb
+  where id = p_game and finished_at is null
+    and (host = auth.uid() or (public.in_room(room_id) and started_at < now() - interval '5 minutes'))
+$$;
+
+-- Рекорды всех, у кого есть доступ к комнате
+create or replace function public.room_records()
+returns jsonb
+language plpgsql stable security definer set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if not private.room_access(v_uid) then
+    raise exception 'Нет доступа' using errcode = '42501';
+  end if;
+  return jsonb_build_object(
+    'records', coalesce((
+      select jsonb_agg(jsonb_build_object('user_id', g.user_id, 'name', p.display_name, 'game', g.game,
+                                          'played', g.played, 'wins', g.wins, 'best', g.best)
+                       order by g.game, g.wins desc, g.played)
+      from public.game_records g
+      join public.profiles p on p.id = g.user_id
+      where private.room_access(g.user_id)), '[]'::jsonb),
+    'my_wins', (select coalesce(sum(g.wins), 0) from public.game_records g where g.user_id = v_uid));
+end;
+$$;
+
+create or replace function public.dev_room_reset_records()
+returns integer
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_n integer;
+begin
+  perform private.require_role(true);
+  with gone as (delete from public.game_records where true returning 1)
+  select count(*) into v_n from gone;
+  return v_n;
+end;
+$$;
+
+-- 12.7 Грибы: 5 цветов, 5 грибов по порядку, 5 попыток в сутки (по Москве)
+create or replace function private.mushroom_ok(p_seq text[])
+returns boolean
+language sql immutable set search_path = ''
+as $$
+  select cardinality(p_seq) = 5
+     and p_seq <@ array['red', 'blue', 'yellow', 'purple', 'white']
+     and array_position(p_seq, null) is null
+$$;
+
+create or replace function public.mushroom_try(p_seq text[])
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_uid   uuid := auth.uid();
+  v_today timestamptz := date_trunc('day', now() at time zone 'Europe/Moscow') at time zone 'Europe/Moscow';
+  v_seq   text[];
+  v_used  integer;
+  v_ok    boolean;
+begin
+  if v_uid is null then
+    raise exception 'Нужно войти в аккаунт';
+  end if;
+  if not private.mushroom_ok(p_seq) then
+    raise exception 'Нужно 5 грибов';
+  end if;
+  if exists (select 1 from public.inventory v where v.user_id = v_uid and v.item_id = 'hat.mushroom') then
+    return jsonb_build_object('ok', false, 'error', 'owned', 'message', 'Шляпа грибника уже у тебя');
+  end if;
+  select c.mushroom_seq into v_seq from private.app_config c where c.id = 1;
+  if v_seq is null or not exists (select 1 from public.items i where i.id = 'hat.mushroom') then
+    return jsonb_build_object('ok', false, 'error', 'not_set', 'message', 'Грибы ещё не созрели');
+  end if;
+  perform 1 from public.profiles where id = v_uid for update; -- две попытки разом не пройдут
+  select count(*) into v_used from private.mushroom_attempts a where a.user_id = v_uid and a.created_at >= v_today;
+  if v_used >= 5 then
+    return jsonb_build_object('ok', false, 'error', 'limit', 'left', 0, 'message', 'На сегодня попытки кончились — приходи завтра');
+  end if;
+  v_ok := p_seq = v_seq;
+  insert into private.mushroom_attempts (user_id, ok) values (v_uid, v_ok);
+  if not v_ok then
+    return jsonb_build_object('ok', false, 'error', 'wrong', 'left', 4 - v_used, 'message', 'Не тот порядок');
+  end if;
+  insert into public.inventory (user_id, item_id, source) values (v_uid, 'hat.mushroom', 'game')
+  on conflict (user_id, item_id) do nothing;
+  return jsonb_build_object('ok', true, 'item_id', 'hat.mushroom');
+end;
+$$;
+
+-- Подсказка для пещеры: кристаллы вспыхивают в этом порядке
+create or replace function public.mushroom_hint()
+returns text[]
+language sql stable security definer set search_path = ''
+as $$
+  select c.mushroom_seq from private.app_config c where c.id = 1 and auth.uid() is not null
+$$;
+
+-- Задать порядок (только владелец). Сам порядок назад не отдаётся.
+create or replace function public.dev_set_mushrooms(p_seq text[])
+returns boolean
+language plpgsql security definer set search_path = ''
+as $$
+begin
+  perform private.require_role(true);
+  if not private.mushroom_ok(p_seq) then
+    raise exception 'Нужно 5 грибов из 5 цветов';
+  end if;
+  update private.app_config set mushroom_seq = p_seq where id = 1;
+  return true;
+end;
+$$;
+
+create or replace function public.dev_mushrooms_set()
+returns boolean
+language plpgsql stable security definer set search_path = ''
+as $$
+begin
+  perform private.require_role(true);
+  return (select c.mushroom_seq is not null from private.app_config c where c.id = 1);
+end;
+$$;
+
+-- 12.8 «Мог» в паре: шляпа грибника на партнёре отражает его
+create or replace function public.cast_ability(p_ability text)
+returns jsonb
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  v_uid     uuid := auth.uid();
+  v_me      public.profiles;
+  v_partner public.profiles;
+  v_item    public.items;
+  v_cd      integer;
+  v_every   integer;
+  v_last    timestamptz;
+  v_push    boolean;
+  v_blocked boolean;
+  v_cast    public.ability_casts;
+  v_name    text;
+begin
+  if v_uid is null then
+    raise exception 'Нужно войти в аккаунт';
+  end if;
+  select * into v_me from public.profiles where id = v_uid for update;
+  if v_me.pair_id is not null then
+    select * into v_partner from public.profiles
+    where pair_id = v_me.pair_id and id <> v_uid
+    limit 1;
+  end if;
+  if v_partner.id is null then
+    return jsonb_build_object('ok', false, 'error', 'no_partner', 'message', 'Сначала нужна пара');
+  end if;
+
+  select * into v_item from public.items where id = p_ability and cat = 'ability';
+  if v_item.id is null then
+    return jsonb_build_object('ok', false, 'error', 'unknown', 'message', 'Такой способности нет');
+  end if;
+  if coalesce(v_me.chibi ->> 'ability', 'ability.hug') <> v_item.id then
+    return jsonb_build_object('ok', false, 'error', 'not_equipped', 'message', 'Сначала надень эту способность');
+  end if;
+  if not private.has_item(v_uid, v_item.id) then
+    return jsonb_build_object('ok', false, 'error', 'not_owned', 'message', 'Этой способности нет в инвентаре');
+  end if;
+  if v_partner.sleeping_since is not null then
+    return jsonb_build_object('ok', false, 'error', 'partner_sleeping',
+                              'message', 'Тсс, ' || v_partner.display_name || ' спит');
+  end if;
+
+  v_cd := coalesce((v_item.meta ->> 'cooldown_s')::integer, 10);
+  select max(c.created_at) into v_last
+  from public.ability_casts c
+  where c.from_user = v_uid and c.ability = v_item.id;
+  if v_last is not null and v_last > now() - make_interval(secs => v_cd) then
+    return jsonb_build_object('ok', false, 'error', 'cooldown',
+                              'wait_s', ceil(extract(epoch from (v_last + make_interval(secs => v_cd) - now())))::integer,
+                              'message', 'Способность ещё перезаряжается');
+  end if;
+
+  v_blocked := v_item.id = 'ability.mog' and coalesce(v_partner.chibi -> 'hat' ->> 'id', '') = 'hat.mushroom';
+  v_every := coalesce((v_item.meta ->> 'push_every_s')::integer, 0);
+  v_push := v_every = 0 or not exists (
+    select 1 from public.ability_casts c
+    where c.from_user = v_uid and c.ability = v_item.id and c.pushed
+      and c.created_at > now() - make_interval(secs => v_every));
+
+  insert into public.ability_casts (pair_id, from_user, to_user, ability, pushed, blocked)
+  values (v_me.pair_id, v_uid, v_partner.id, v_item.id, v_push, v_blocked)
+  returning * into v_cast;
+
+  if v_push then
+    v_name := v_me.display_name;
+    perform public.notify_partner(
+      v_uid,
+      v_item.name,
+      case
+        when v_blocked then 'Шляпа грибника отразила «Мог» от ' || v_name
+        when v_item.id = 'ability.hug' then v_name || ' обнимает тебя'
+        else v_name || ' применяет «' || v_item.name || '». Открой, чтобы увидеть'
+      end,
+      jsonb_build_object('type', 'cast', 'ability', v_item.id, 'cast_id', v_cast.id, 'blocked', v_blocked)
+    );
+  end if;
+
+  return jsonb_build_object('ok', true, 'id', v_cast.id, 'created_at', v_cast.created_at, 'cooldown_s', v_cd, 'blocked', v_blocked);
+end;
+$$;
+
+-- 12.9 Права на функции: закрытые — никому, остальные — только вошедшим (каждая проверяет доступ сама)
+revoke all on all functions in schema private from public, anon, authenticated;
+do $$
+declare f text;
+begin
+  foreach f in array array[
+    'public.my_access()', 'public.dev_set_role(text, text, text)', 'public.dev_remove_role(text)', 'public.dev_list_developers()',
+    'public.room_access()', 'public.in_room(text)', 'public.room_state(text)', 'public.room_enter(text)', 'public.room_leave(text)',
+    'public.room_kick(uuid)', 'public.room_set_capacity(integer, text)', 'public.room_set_location(text, text)',
+    'public.room_bot_add(text)', 'public.room_bot_remove(uuid)', 'public.room_move(real, real, uuid, text)',
+    'public.room_ping(boolean, text)', 'public.room_cast(uuid, text, uuid, text)', 'public.room_pending_casts(text)',
+    'public.room_mark_casts_seen(uuid[])', 'public.room_notify(text, uuid, text)', 'public.room_game_start(uuid[], text)',
+    'public.room_game_finish(uuid, jsonb)', 'public.room_game_cancel(uuid)', 'public.room_records()',
+    'public.dev_room_reset_records()', 'public.mushroom_try(text[])', 'public.mushroom_hint()',
+    'public.dev_set_mushrooms(text[])', 'public.dev_mushrooms_set()', 'public.cast_ability(text)'
+  ] loop
+    execute format('revoke execute on function %s from public, anon', f);
+    execute format('grant execute on function %s to authenticated', f);
+  end loop;
+end;
+$$;
+
+-- 12.10 Realtime: комната, кто в ней и способности приходят сразу (каждому — только его комната, по RLS)
+do $$
+declare t text;
+begin
+  foreach t in array array['rooms', 'room_members', 'room_casts'] loop
+    if not exists (select 1 from pg_publication_tables
+                   where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end;
+$$;
+
 -- Готово. Если внизу видна эта строка — схема применена целиком.
-select 'Схема «Двое» 0.2 применена' as "Готово";
+select 'Схема «Двое» 0.2.2 применена' as "Готово";

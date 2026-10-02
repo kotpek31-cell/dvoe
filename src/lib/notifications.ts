@@ -104,6 +104,8 @@ export function routeForNotification(data: Record<string, unknown> | undefined):
       return '/stats';
     case 'score':
       return '/day-score';
+    case 'room':
+      return '/room';
     default:
       return '/home';
   }

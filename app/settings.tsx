@@ -8,7 +8,7 @@ import * as ScreenSleep from '../modules/screen-sleep';
 import { Button, Card, Input, Pressy, Row, Screen, showError, Txt } from '../src/components/ui';
 import { useAuth } from '../src/context/AuthProvider';
 import { usePair } from '../src/context/PairProvider';
-import { leavePair, updateMyProfile } from '../src/lib/api';
+import { isDevRole, leavePair, updateMyProfile } from '../src/lib/api';
 import { confirmAction, notify } from '../src/lib/dialogs';
 import { isExpoGo } from '../src/lib/env';
 import { isHealthKitSupported, requestSleepAccess } from '../src/lib/healthkit';
@@ -49,7 +49,7 @@ export default function SettingsScreen() {
     taps.current = [...taps.current.filter((t) => now - t < 4000), now];
     if (taps.current.length < 7) return;
     taps.current = [];
-    if (access) {
+    if (isDevRole(access)) {
       haptic.success();
       router.push('/dev');
     } else if (session?.user.id) {

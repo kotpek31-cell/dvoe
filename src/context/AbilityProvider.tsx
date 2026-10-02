@@ -20,6 +20,7 @@ export type Scene = {
   castId?: string;
   at: number; // когда применили (мс)
   dry?: boolean; // «вхолостую» из комнаты разработчиков: только у себя, без записи и пуша
+  blocked?: boolean; // «Мог» отразила шляпа грибника
 };
 
 type CastOutcome = { ok: true } | { ok: false; message: string };
@@ -29,7 +30,7 @@ type AbilityValue = {
   finishScene: () => void;
   dismissScene: () => void; // закрыли плашку — не показываем
   cast: (ability: string) => Promise<CastOutcome>;
-  rehearse: (ability: string) => void;
+  rehearse: (ability: string, opts?: { blocked?: boolean }) => void;
   cooldowns: Record<string, number>; // способность → до какого момента перезарядка (мс)
   homeVisible: boolean;
   setHomeVisible: (v: boolean) => void;
@@ -56,7 +57,7 @@ export function AbilityProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const incoming = useCallback(
-    (c: AbilityCast) => enqueue({ key: c.id, ability: c.ability, from: 'partner', castId: c.id, at: Date.parse(c.created_at) || Date.now() }),
+    (c: AbilityCast) => enqueue({ key: c.id, ability: c.ability, from: 'partner', castId: c.id, at: Date.parse(c.created_at) || Date.now(), blocked: c.blocked === true }),
     [enqueue],
   );
 
@@ -143,7 +144,7 @@ export function AbilityProvider({ children }: { children: React.ReactNode }) {
         const res = await castAbility(ability);
         if (res.ok) {
           setCooldowns((c) => ({ ...c, [ability]: Date.now() + res.cooldown_s * 1000 }));
-          enqueue({ key: res.id, ability, from: 'me', castId: res.id, at: Date.now() });
+          enqueue({ key: res.id, ability, from: 'me', castId: res.id, at: Date.now(), blocked: res.blocked });
           return { ok: true };
         }
         if (res.error === 'cooldown' && res.wait_s) setCooldowns((c) => ({ ...c, [ability]: Date.now() + res.wait_s! * 1000 }));
@@ -155,8 +156,8 @@ export function AbilityProvider({ children }: { children: React.ReactNode }) {
     [partner, enqueue],
   );
 
-  const rehearse = useCallback((ability: string) => {
-    enqueue({ key: `dry-${Date.now()}`, ability, from: 'me', at: Date.now(), dry: true });
+  const rehearse = useCallback((ability: string, opts: { blocked?: boolean } = {}) => {
+    enqueue({ key: `dry-${Date.now()}`, ability, from: 'me', at: Date.now(), dry: true, blocked: opts.blocked });
   }, [enqueue]);
 
   const value = useMemo<AbilityValue>(
