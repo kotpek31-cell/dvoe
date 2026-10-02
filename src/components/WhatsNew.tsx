@@ -1,4 +1,4 @@
-// «Что нового» в 0.2.1: 4 яркие карточки, листаются вбок; на каждой картинка и 1–2 строки, внизу «Понятно».
+// «Что нового» в 0.2.2: загадка про грибы и ходьба вглубь, за ними — карточки 0.2.1. Яркие карточки, листаются вбок; на каждой картинка и 1–2 строки, внизу «Понятно».
 // Тексты хранятся в приложении. Картинки собраны из чибиков, иконок и маленькой локации — без файлов.
 import { useRef, useState, type ReactNode } from 'react';
 import { Modal, ScrollView, StyleSheet, useWindowDimensions, View, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
@@ -8,6 +8,7 @@ import { closeWhatsNew, useWhatsNew } from '../lib/whatsNew';
 import { C, R, S } from '../theme';
 import { Chibi } from './Chibi';
 import { Location } from './scene/Location';
+import { MushroomArt } from './scene/Mushrooms';
 import { Button, Txt } from './ui';
 
 type Card = { title: string; text: string; tint: string; art: (w: number, h: number, me: Look) => ReactNode };
@@ -25,7 +26,42 @@ const scene = (id: 'forest' | 'sakura', time: 'night' | 'day') => (w: number, h:
 
 const PUMPKIN: Look = { ...LOOKS.nb, hair: { id: 'hair.fluffy', c: 'ginger' }, eyes: { id: 'eyes.happy' }, hat: { id: 'hat.pumpkin' }, top: { id: 'top.pumpkin' }, bottom: { id: 'bottom.pants', c: 'coal' }, hand: { id: 'hand.jack' } };
 
+// грибы вразброс, не в ряд — порядок не подсказываем
+const SHROOMS = [
+  { c: 'blue', x: 0.18, y: 0.7, s: 0.2 },
+  { c: 'white', x: 0.47, y: 0.8, s: 0.26 },
+  { c: 'red', x: 0.74, y: 0.66, s: 0.17 },
+] as const;
+
 const CARDS: Card[] = [
+  {
+    title: 'В лесу что-то выросло',
+    text: 'Говорят, грибы любят порядок.',
+    tint: '#B07BFF',
+    art: (w, h) => (
+      <View style={{ width: w, height: h }}>
+        {scene('forest', 'night')(w, h)}
+        {SHROOMS.map((m) => (
+          <View key={m.c} style={{ position: 'absolute', left: m.x * w - (m.s * h) / 2, top: m.y * h - m.s * h }}>
+            <MushroomArt color={m.c} size={m.s * h} glow={0.6} />
+          </View>
+        ))}
+      </View>
+    ),
+  },
+  {
+    title: 'Ходи во все стороны',
+    text: 'Нажми на землю ближе или дальше — чибик пойдёт туда: вдали меньше, рядом крупнее.',
+    tint: C.me,
+    art: (w, h, me) => (
+      <View style={[styles.center, styles.row, { gap: w * 0.08 }]}>
+        <View style={{ marginBottom: h * 0.28 }}>
+          <Chibi look={me} emotion="calm" value={60} pose="idle" size={h * 0.36} still />
+        </View>
+        <Chibi look={me} emotion="joy" value={80} pose="idle" size={h * 0.62} still />
+      </View>
+    ),
+  },
   {
     title: 'Хэллоуин',
     text: 'Костюмы тыквы, вампира, ведьмы и Франкенштейна — за секретные коды (Профиль → «Коды»). Некоторые достанутся только одному человеку во всём приложении.',
@@ -86,7 +122,7 @@ export function WhatsNew() {
       <View style={styles.backdrop}>
         <View style={[styles.card, { width: cardW }]}>
           <Txt weight="display" size={13} color={C.muted} style={styles.kicker}>
-            ЧТО НОВОГО В 0.2.1
+            ЧТО НОВОГО
           </Txt>
           <ScrollView
             ref={scroll}
