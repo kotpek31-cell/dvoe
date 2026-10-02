@@ -2,17 +2,18 @@
 // Нажатие — применить; по краю бежит кольцо перезарядки и видно, сколько осталось.
 // Долгое нажатие — панель быстрой смены. Партнёр спит — кнопка неактивна: «Тсс, {имя} спит».
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Share, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Animated, Easing, Share, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import { useAbility } from '../context/AbilityProvider';
 import { usePair } from '../context/PairProvider';
 import { abilityInfo, cooldownMs, leftLabel } from '../lib/abilities';
 import { fetchInventory, updateMyProfile } from '../lib/api';
 import { useCatalog } from '../lib/catalog';
 import { DEFAULT_ABILITY, lookOf, lookToChibi } from '../lib/chibi';
-import { haptic } from '../lib/motion';
+import { useScreenFocused } from '../lib/focus';
+import { haptic, nativeDriver, useReducedMotion } from '../lib/motion';
 import { prepareSounds } from '../lib/sound';
 import { C, R, S } from '../theme';
 import { Icon } from './Icon';
@@ -54,6 +55,26 @@ export function AbilityButton({ onMessage, busy }: { onMessage: (text: string) =
   const total = cooldownMs(equipped, catalog);
   const sleeping = Boolean(partner?.sleeping_since);
   const name = partner?.display_name ?? 'Партнёр';
+
+  // Готова к применению — от кнопки расходится мягкое кольцо: «нажми меня»
+  const reduce = useReducedMotion();
+  const focused = useScreenFocused();
+  const pulse = useRef(new Animated.Value(0)).current;
+  const ready = Boolean(me && partner) && !sleeping && left <= 0;
+  useEffect(() => {
+    if (!ready || reduce || !focused) {
+      pulse.setValue(0);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 1, duration: 1700, easing: Easing.out(Easing.quad), useNativeDriver: nativeDriver }),
+        Animated.delay(1100),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [ready, reduce, focused, pulse]);
 
   useEffect(() => {
     prepareSounds(equipped === 'ability.mog' ? ['mog', 'tension', 'hit'] : ['chime']);
@@ -151,8 +172,34 @@ export function AbilityButton({ onMessage, busy }: { onMessage: (text: string) =
                 : `Применить «${catalog.get(equipped)?.name ?? 'способность'}». Подержи, чтобы сменить`
           }
         >
-          <View style={[styles.button, { borderColor: cooling || sleeping ? C.glassBorder : `${info.color}88` }]}>
+          {ready ? (
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.pulse,
+                {
+                  borderColor: info.color,
+                  opacity: pulse.interpolate({ inputRange: [0, 0.15, 1], outputRange: [0, 0.55, 0] }),
+                  transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.42] }) }],
+                },
+              ]}
+            />
+          ) : null}
+          <View
+            style={[
+              styles.button,
+              { borderColor: cooling || sleeping ? C.glassBorder : `${info.color}AA` },
+              ready ? { boxShadow: `0px 10px 24px rgba(8,4,20,0.4), 0px 0px 18px ${info.color}55, inset 0px 1px 0px rgba(255,255,255,0.2)` } : null,
+            ]}
+          >
             <Svg width={SIZE} height={SIZE} style={StyleSheet.absoluteFill} pointerEvents="none">
+              <Defs>
+                <RadialGradient id="abGlow" cx={SIZE / 2} cy={SIZE / 2 - 4} r={SIZE / 2} gradientUnits="userSpaceOnUse">
+                  <Stop offset="0" stopColor={info.color} stopOpacity={dim ? 0.1 : 0.42} />
+                  <Stop offset="1" stopColor={info.color} stopOpacity={0} />
+                </RadialGradient>
+              </Defs>
+              <Circle cx={SIZE / 2} cy={SIZE / 2} r={SIZE / 2 - 2} fill="url(#abGlow)" />
               {cooling ? (
                 <>
                   <Circle cx={SIZE / 2} cy={SIZE / 2} r={RING} stroke="rgba(255,255,255,0.14)" strokeWidth={3.5} fill="none" />
@@ -279,8 +326,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(28,23,48,0.78)',
     borderWidth: 1.5,
-    boxShadow: '0px 10px 24px rgba(8,4,20,0.4)',
+    boxShadow: '0px 10px 24px rgba(8,4,20,0.4), inset 0px 1px 0px rgba(255,255,255,0.12)',
   },
+  pulse: { position: 'absolute', left: 0, top: 0, width: SIZE, height: SIZE, borderRadius: SIZE / 2, borderWidth: 2 },
   left: {
     position: 'absolute',
     right: 0,

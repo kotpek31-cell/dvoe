@@ -5,6 +5,25 @@ import { faceModel, faceParams, FACE_PATHS, FACE_SPOTS, INK, type FaceKey } from
 // ---------- цвета (общие с приложением: src/lib/palette.ts) ----------
 import { CLOTH, HAIR, SKIN } from '../../src/lib/palette.ts';
 import { eyeArt, isNewEye } from '../../src/lib/eyes.ts';
+// Тело и стиль 3.0 — те же файлы, что рисуют чибика в приложении
+import {
+  armArt,
+  armBase,
+  FEET_Y,
+  handShift,
+  headArt,
+  legArt,
+  legTransform,
+  mogArt,
+  neckArt,
+  SHOE_SPLIT,
+  shoeTopTransform,
+  SHOULDER,
+  T_HEAD,
+  T_TORSO,
+  type Sleeve,
+} from '../../src/lib/body.ts';
+import { styledArt, type Zone } from '../../src/lib/artStyle.ts';
 export { CLOTH, HAIR, SKIN };
 
 function rgb(h: string): number[] {
@@ -643,8 +662,131 @@ function face(look: Look, o: Opts, skin: string): string {
   return g(out, { transform: 'translate(12.5 24.5) scale(0.95)' });
 }
 
-// ---------- сам чибик (группа в координатах 120×170) ----------
+// ---------- стиль 3.0 для макетов ----------
+// Как в приложении (src/lib/art.tsx): сначала стиль (мягкий контур, объём), потом краска токенов.
+// id градиентов у каждого слоя свои — на одной странице макета много чибиков.
+const styled = (src: string, zone: Zone = 'body'): string => {
+  if (!src) return '';
+  const tag = uid('z');
+  return styledArt(src, zone)
+    .replace(/id="sv(\d+)"/g, `id="${tag}_$1"`)
+    .replace(/url\(#sv(\d+)\)/g, `url(#${tag}_$1)`);
+};
+const paintArt = (src: string, c: string, skin: string): string =>
+  src.replace(/@(c|skin)((?:\|[dlk][0-9.]*)*)/g, (_m, base: string, ops: string) => {
+    let hex = base === 'c' ? c : skin;
+    ops
+      .split('|')
+      .filter(Boolean)
+      .forEach((op) => {
+        if (op === 'k') hex = contrast(hex);
+        else hex = mix(hex, op[0] === 'd' ? INK : '#FFFFFF', Math.min(1, Math.max(0, parseFloat(op.slice(1)) || 0)));
+      });
+    return hex;
+  });
+
+// ---------- сам чибик 3.0 (группа в координатах 120×170; сборка — как в src/components/Chibi.tsx) ----------
 export function chibi(look: Look, o: Opts = {}): string {
+  const items = (['back', 'hair', 'hat', 'face', 'top', 'bottom', 'shoes', 'hand'] as const)
+    .map((k) => look[k] as Slot | null | undefined)
+    .filter(Boolean) as Slot[];
+  const skin = items.map((s) => ITEMS[s.id]?.skin).find(Boolean) ?? SKIN[look.skin] ?? SKIN[1];
+  const ANIMATED = new Set(['back', 'backFx', 'handFx']);
+  const layer = (name: string, zone: Zone = 'body', extra: Partial<Ctx> = {}) =>
+    items
+      .map((s) => {
+        const it = ITEMS[s.id];
+        const fn = it?.layers[name];
+        if (!fn) return '';
+        const art = styled(fn({ col: colorOf(s), skin, ...extra }), zone);
+        if (!it.anim || !ANIMATED.has(name) || (name === 'back' && it.anim !== 'sway')) return art;
+        const [px, py] = it.pivot ?? [60, 100];
+        return g(art, { class: `a-${it.anim}`, style: `transform-origin:${px}px ${py}px;transform-box:view-box` });
+      })
+      .join('');
+  const base = (src: string, zone: Zone = 'body', c = skin) => paintArt(styled(src, zone), c, skin);
+  const top = ITEMS[look.top.id];
+  const covers = Boolean(top?.coversBottom);
+  const bottom = covers ? null : look.bottom ? ITEMS[look.bottom.id] : null;
+  const bottomCol = colorOf(look.bottom);
+  const hover = items.some((s) => ITEMS[s.id]?.hover);
+  const pose = o.pose ?? 'idle';
+
+  // ноги: штанина вещи тянется под длинную ногу; у обуви подошва на месте, голенище тянется вверх
+  const leg = (side: 'L' | 'R') => {
+    const L = side === 'L' ? P.legL : P.legR;
+    let s = bottom?.layers.leg ? g(styled(bottom.layers.leg({ col: bottomCol, skin, x: L.x })), { transform: legTransform(side) }) : base(legArt(side));
+    const sh = ITEMS[look.shoes.id];
+    if (sh?.layers.shoe) {
+      const ct = uid('st');
+      const cb = uid('sb');
+      const shoe = () => styled(sh.layers.shoe!({ col: colorOf(look.shoes), skin, side, x: L.x }));
+      s +=
+        el(
+          'defs',
+          {},
+          el('clipPath', { id: ct }, el('rect', { x: -40, y: -60, width: 200, height: SHOE_SPLIT + 60 })) +
+            el('clipPath', { id: cb }, el('rect', { x: -40, y: SHOE_SPLIT, width: 200, height: 80 })),
+        ) +
+        g(g(shoe(), { 'clip-path': `url(#${ct})` }), { transform: shoeTopTransform(side) }) +
+        g(shoe(), { 'clip-path': `url(#${cb})` });
+    }
+    const lift = pose === 'run' ? (side === 'L' ? -5 : 1) : 0;
+    return g(s, lift ? { transform: `translate(0 ${lift})` } : {});
+  };
+
+  // руки
+  const sleeveCol = top?.sleeveColor ? CLOTH[top.sleeveColor][1] : colorOf(look.top);
+  const sleeve: Sleeve = !top ? 'none' : top.sleeve === 'short' ? 'short' : 'full';
+  const arm = (side: 'L' | 'R') => {
+    let rot = 0;
+    if (pose === 'wave' && side === 'R') rot = -112;
+    if (pose === 'hug') rot = side === 'L' ? 70 : -70;
+    if (pose === 'cheer') rot = side === 'L' ? 140 : -140;
+    if (pose === 'run') rot = side === 'L' ? -28 : 30;
+    const [limb, hand] = armArt(side, sleeve, typeof top?.cuff === 'string' ? top.cuff : null);
+    let s = base(limb, 'body', sleeveCol);
+    let held = layer(side === 'L' ? 'handL' : 'handR');
+    if (side === 'R') held += layer('handFx');
+    if (held) s += g(held, { transform: handShift(side) });
+    s += base(hand);
+    const pivot = `${SHOULDER[side].x} ${SHOULDER[side].y}`;
+    return g(g(s, { transform: armBase(side) }), rot ? { transform: `rotate(${rot} ${pivot})` } : {});
+  };
+
+  const back = layer('back') + layer('backFx');
+  let body = '';
+  if (back) body += g(back, { transform: T_TORSO });
+  const hairBack = layer('hairBack', 'head');
+  if (hairBack) body += g(hairBack, { transform: T_HEAD });
+  body += leg('L') + leg('R');
+  body += g((bottom?.layers.under ? styled(bottom.layers.under({ col: bottomCol, skin })) : '') + layer('body') + layer('front'), { transform: T_TORSO });
+  body += base(neckArt);
+  body += arm('L') + arm('R');
+  // голова: меньше прежней, всё, что на ней, рисуется в её координатах
+  body += g(
+    base(headArt, 'head') +
+      face(look, o, skin) +
+      layer('mask', 'head') +
+      (o.mog ? base(mogArt, 'head') : '') +
+      layer('hairFront', 'head') +
+      layer('hat', 'head') +
+      layer('over', 'head'),
+    { transform: T_HEAD },
+  );
+
+  const lift = hover ? -9 : 0;
+  let inner = g(body, lift ? { transform: `translate(0 ${lift})` } : {});
+  if (pose === 'run') inner = g(inner, { transform: `rotate(8 60 ${FEET_Y})` });
+  if (pose === 'fallen') inner = g(inner, { transform: `translate(47 -40) rotate(-90 60 ${FEET_Y})` });
+  const shadow = o.noShadow
+    ? ''
+    : el('ellipse', { cx: 60, cy: hover ? 160 : FEET_Y, rx: hover ? 19 : 25, ry: hover ? 3.4 : 4.8, fill: '#1B1426', opacity: hover ? 0.16 : 0.24 });
+  return shadow + inner;
+}
+
+// Прежний чибик 2.0 (тело 0.2, чёрный контур) — оставлен для сравнения «до и после» в макетах
+export function chibiClassic(look: Look, o: Opts = {}): string {
   const items = (['back', 'hair', 'hat', 'face', 'top', 'bottom', 'shoes', 'hand'] as const)
     .map((k) => look[k] as Slot | null | undefined)
     .filter(Boolean) as Slot[];

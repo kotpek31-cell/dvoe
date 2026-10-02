@@ -38,7 +38,7 @@ export function CastBanner() {
         { top: insets.top + 8, opacity: y, transform: [{ translateY: y.interpolate({ inputRange: [0, 1], outputRange: [-80, 0] }) }] },
       ]}
     >
-      <View style={styles.card} accessibilityRole="alert">
+      <View style={[styles.card, { borderColor: `${info.color}66` }]} accessibilityRole="alert">
         <View style={[styles.icon, { backgroundColor: `${info.color}33` }]}>
           <Icon name={info.icon} size={20} color={info.color} fill={info.color} strokeWidth={1.6} />
         </View>
@@ -72,8 +72,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(28,23,48,0.96)',
     borderWidth: 1,
     borderColor: C.glassBorder,
-    boxShadow: '0px 12px 30px rgba(8,4,20,0.45)',
+    boxShadow: '0px 12px 30px rgba(8,4,20,0.45), inset 0px 1px 0px rgba(255,255,255,0.14)',
   },
   icon: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-  watch: { height: 36, paddingHorizontal: 14, borderRadius: 18, backgroundColor: C.accent, justifyContent: 'center' },
+  watch: {
+    height: 36,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    backgroundColor: C.accent,
+    justifyContent: 'center',
+    boxShadow: '0px 6px 14px rgba(255,107,138,0.3), inset 0px 1.5px 0px rgba(255,255,255,0.4)',
+  },
 });

@@ -16,8 +16,18 @@ const BLOBS: Blob[] = [
   { color: '#4D7CFE', opacity: 0.3, size: 1.2, x: 0.38, y: 2.1, dx: -0.14, dy: -0.12, scale: 1.1 },
 ];
 
+// Звёздная пыль поверх пятен (3.0): неподвижные точки, место — доли ширины и высоты экрана.
+// Числа посчитаны один раз (без случайности), чтобы на каждом экране небо было одно и то же.
+const DUST = Array.from({ length: 34 }, (_, i) => {
+  const a = Math.sin(i * 12.9898) * 43758.5453;
+  const b = Math.sin(i * 78.233 + 4.1) * 24634.6345;
+  const c = Math.sin(i * 39.425 + 1.7) * 13758.137;
+  const f = (n: number) => n - Math.floor(n);
+  return { x: f(a), y: f(b), r: 0.5 + f(c) * 0.9, o: 0.1 + f(a + b) * 0.3 };
+});
+
 export function Aurora({ paused = false }: { paused?: boolean }) {
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const reduce = useReducedMotion();
   const t = useRef(new Animated.Value(0)).current;
 
@@ -65,6 +75,11 @@ export function Aurora({ paused = false }: { paused?: boolean }) {
           </Animated.View>
         );
       })}
+      <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
+        {DUST.map((d, i) => (
+          <Circle key={i} cx={d.x * width} cy={d.y * height} r={d.r} fill="#FFFFFF" opacity={d.o} />
+        ))}
+      </Svg>
     </View>
   );
 }
