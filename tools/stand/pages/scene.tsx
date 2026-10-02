@@ -21,7 +21,14 @@ function Page() {
   return (
     <NightContext.Provider value={time === 'night'}>
       <View style={{ flex: 1, backgroundColor: LOCATION_BG[id][time], overflow: 'hidden' }}>
-        <Location id={id} width={width} height={height} time={time} active variant={variant} />
+        {q.get('part') === 'split' ? (
+          <>
+            <Location id={id} width={width} height={height} time={time} active part="sky" />
+            <Location id={id} width={width} height={height} time={time} active part="land" variant={variant} />
+          </>
+        ) : (
+          <Location id={id} width={width} height={height} time={time} active variant={variant} />
+        )}
         {q.get('chibi') === '0' ? null : (
           <>
             <View style={{ position: 'absolute', left: tf.x(60), top: tf.y(520) }}>

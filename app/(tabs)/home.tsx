@@ -9,7 +9,7 @@ import { Animated, Pressable, Share, StyleSheet, useWindowDimensions, View } fro
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AbilityButton } from '../../src/components/AbilityButton';
 import { Chibi } from '../../src/components/Chibi';
-import { HeartsBurst, Snore, SparkPop, Toast } from '../../src/components/Effects';
+import { HeartsBurst, Ripple, Snore, SparkPop, Toast } from '../../src/components/Effects';
 import { Face } from '../../src/components/Face';
 import { Icon } from '../../src/components/Icon';
 import { AbilityScene, sceneKind, worldTransform } from '../../src/components/scene/AbilityScene';
@@ -82,6 +82,7 @@ export default function HomeScreen() {
   const [goPartner, setGoPartner] = useState<{ x: number; y?: number; id: number } | null>(null);
   const [meet, setMeet] = useState<'go' | 'five' | 'wave' | null>(null);
   const [sparks, setSparks] = useState(0);
+  const [tap, setTap] = useState({ n: 0, x: 0, y: 0 }); // круг на земле в точке касания
   const arrived = useRef(new Set<string>());
   const [partnerAct, setPartnerAct] = useState(false);
   const [heartsP, setHeartsP] = useState(0);
@@ -283,6 +284,7 @@ export default function HomeScreen() {
     haptic.tap();
     setBubble(false);
     setMeAct(null);
+    setTap((t) => ({ n: t.n + 1, x: pageX, y: pageY }));
     setGoMe({ x: pageX - size / 2, y: pageY - chibiH, id: Date.now() });
   };
   const meetPose = meet === 'five' ? 'cheer' : meet === 'wave' ? 'wave' : null;
@@ -433,6 +435,7 @@ export default function HomeScreen() {
         onPress={(e) => tapGround(e.nativeEvent.pageX, e.nativeEvent.pageY)}
         accessibilityLabel="Земля: нажми, и твой чибик пойдёт туда"
       />
+      <Ripple trigger={tap.n} x={tap.x} y={tap.y} scale={tf.s} color={time === 'day' ? '#FFFFFF' : '#FFE9B8'} />
       {forest
         ? HOME_MUSHROOMS.map((m, i) => (
             <MushroomPatch
