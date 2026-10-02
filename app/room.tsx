@@ -4,6 +4,7 @@
 // место в долях мира, пиксели каждый телефон считает сам. Каждым чибиком «управляет» один телефон —
 // человеком его владелец, ботом — тот, кто позвал. Он же запоминает место в базе (room_move) по прибытии.
 // Способности — room_cast на сервере; сцену видят все (вставка в room_casts приходит каждому).
+// Мини-игры — src/lib/games: колесо крутит любой, игру ведёт его телефон, остальные получают снимки через канал.
 // «Назад» — остаёшься в комнате (у других — сидит полупрозрачный), «Выйти» — освобождаешь место.
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -13,6 +14,12 @@ import { Chibi } from '../src/components/Chibi';
 import { Confetti, SparkPop, Toast } from '../src/components/Effects';
 import { Icon, type IconName } from '../src/components/Icon';
 import { LocationSheet } from '../src/components/LocationSheet';
+import { actorGame } from '../src/components/room/games/actorGame';
+import { GameHud } from '../src/components/room/games/GameHud';
+import { GameWorld } from '../src/components/room/games/GameWorld';
+import { Podium } from '../src/components/room/games/Podium';
+import { PreGame } from '../src/components/room/games/PreGame';
+import { RecordsSheet } from '../src/components/room/games/RecordsSheet';
 import { ReactionBubble, ReactionIcon, REACTION_LABEL } from '../src/components/room/Reaction';
 import { RoomActor } from '../src/components/room/RoomActor';
 import { WideLand, WideSky } from '../src/components/room/WideLocation';
@@ -47,6 +54,7 @@ import {
 import { useCatalog } from '../src/lib/catalog';
 import { lookOf, type Look } from '../src/lib/chibi';
 import { useDevOverride } from '../src/lib/devOverride';
+import { useRoomGame } from '../src/lib/games/useRoomGame';
 import { errorMessage } from '../src/lib/env';
 import type { FaceKey } from '../src/lib/face';
 import { useScreenFocused } from '../src/lib/focus';
@@ -247,7 +255,7 @@ export default function RoomScreen() {
 
   // Пошёл: у себя сразу, остальным — через канал (только тем, кем управляю)
   const moveMember = useCallback(
-    (id: string, fx: number, fy: number, run: boolean, opts: { send?: boolean; snap?: boolean; onArrive?: () => void } = {}) => {
+    (id: string, fx: number, fy: number, run: boolean, opts: { send?: boolean; force?: boolean; snap?: boolean; onArrive?: () => void } = {}) => {
       const mv = movers.current.get(id);
       if (!mv) return;
       const mine = ownedRef.current.has(id);
@@ -263,7 +271,8 @@ export default function RoomScreen() {
       } else {
         dur = mv.go(fx, fy, run, arrive, reduce);
       }
-      if (mine && opts.send !== false) link.current?.send({ t: 'move', m: id, x: mv.state.to.x, y: mv.state.to.y, run, snap: opts.snap });
+      // force — ведущий игры гонит чужого бота
+      if ((mine || opts.force) && opts.send !== false) link.current?.send({ t: 'move', m: id, x: mv.state.to.x, y: mv.state.to.y, run, snap: opts.snap });
       if (id === meRef.current && followRef.current) camTo(pxX(geoRef.current, mv.state.to.x), Math.max(dur, 300), dur > 0);
     },
     [persist, bump, reduce, camTo],
@@ -397,6 +406,26 @@ export default function RoomScreen() {
     if (userId) enter();
   }, [userId, enter]);
 
+  // ---------- мини-игры ----------
+  // Объявлено до канала: при уходе с экрана уборка игры («прервана») идёт раньше, чем закроется канал
+  const game = useRoomGame({
+    meId,
+    members,
+    membersRef,
+    presentRef,
+    isOnline,
+    send: (w) => link.current?.send(w),
+    geoRef,
+    loc,
+    movers,
+    moveMember,
+    camCenter: () => camRef.current + geoRef.current.width / 2,
+    toast: showToast,
+  });
+  const gameRef = useRef(game);
+  gameRef.current = game;
+  const [records, setRecords] = useState(false);
+
   // Канал и база — пока экран открыт и я в комнате
   const myBots = useMemo(() => members.filter((m) => m.bot && m.bot_owner === userId).map((m) => m.id), [members, userId]);
   const myBotsRef = useRef(myBots);
@@ -416,6 +445,7 @@ export default function RoomScreen() {
     let reloadTimer: ReturnType<typeof setTimeout> | undefined;
     const l = new RoomLink({
       onWire: (w: Wire) => {
+        if (gameRef.current.onWire(w)) return;
         if (w.t === 'move') {
           if (!movers.current.has(w.m)) return;
           if (w.snap) movers.current.get(w.m)!.snap(w.x, w.y);
@@ -433,7 +463,10 @@ export default function RoomScreen() {
         }
       },
       onPresence: setPresent,
-      onJoin: () => setTimeout(sendHello, 300),
+      onJoin: () => {
+        setTimeout(sendHello, 300);
+        gameRef.current.onJoin();
+      },
       onRoom: (r) => setRoom((cur) => (cur ? { ...cur, ...r } : cur)),
       onMembers: (deleted) => {
         if (deleted && deleted === meRef.current) {
@@ -512,7 +545,7 @@ export default function RoomScreen() {
   useEffect(() => {
     if (phase !== 'in' || !focused || !linkOk) return;
     const t = setInterval(() => {
-      if (playing || five.current) return;
+      if (playing || five.current || gameRef.current.snap) return;
       const n = Date.now();
       const me = meRef.current;
       const mv = me ? movers.current.get(me) : undefined;
@@ -550,7 +583,7 @@ export default function RoomScreen() {
   // ---------- сцены способностей ----------
   const current = queue[0] ?? null;
   const castMember = (id: string) => members.find((m) => m.id === id);
-  const sceneReady = Boolean(current && focused && !playing && (allowed === current.scene.key || canAutoplay() || current.cast.from_member === meId));
+  const sceneReady = Boolean(current && focused && !playing && !game.snap && (allowed === current.scene.key || canAutoplay() || current.cast.from_member === meId));
   useEffect(() => {
     if (!sceneReady || !current) return;
     const target = movers.current.get(current.cast.to_member);
@@ -600,12 +633,17 @@ export default function RoomScreen() {
 
   const goTo = (pageX: number, pageY: number) => {
     if (!meId || playing) return;
+    const gs = game.snap;
+    if (gs) {
+      if (gs.phase !== 'play' || gs.st?.g !== 'stars' || !gs.players.includes(meId) || gs.st.out.includes(meId)) return;
+      if (game.toLocal(gs.st.stun[meId] ?? 0) > Date.now()) return; // оглушило
+    }
     const g = geo;
     if (pageY < g.farPx - g.base * 0.4) return; // нажали в небо
     touch();
     haptic.tap();
     const want = freeSpot(g, loc, pageX, Math.min(g.nearPx, Math.max(g.farPx, pageY)));
-    setFollowing(true);
+    if (!gs) setFollowing(true); // в игре камера стоит на арене
     moveMember(meId, fracX(g, want.px), fracY(g, want.py), true);
   };
 
@@ -626,6 +664,7 @@ export default function RoomScreen() {
           });
         },
         onPanResponderMove: (_e, gs) => {
+          if (gameRef.current.snap) return; // в игре камера стоит на арене
           if (!pan.current.moved && Math.abs(gs.dx) < 8) return;
           if (!pan.current.moved) {
             pan.current.moved = true;
@@ -650,6 +689,49 @@ export default function RoomScreen() {
     setFollowing(true);
     camTo(pxX(geo, myMover.now().x));
   };
+
+  // Игра началась — камера на арену, меню закрыть; кончилась — камера снова за мной
+  const gameId = game.snap?.id;
+  const hadGame = useRef(false);
+  useEffect(() => {
+    const gs = gameRef.current.snap;
+    if (gs) {
+      hadGame.current = true;
+      if (gameRef.current.active) {
+        setMenu(null);
+        setReactOpen(false);
+        setPicker(false);
+        setFollowing(false);
+        camTo(pxX(geoRef.current, gs.cx), 700);
+      }
+      return;
+    }
+    if (hadGame.current) {
+      hadGame.current = false;
+      backToMe();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameId, Boolean(game.snap)]);
+
+  // Нажали на чибика во время игры: тыква — передать, звездопад — бежать туда
+  const tapInGame = (m: RoomMember) => {
+    const gs = game.snap;
+    const st = gs?.st;
+    if (!gs || gs.phase !== 'play' || !st || !meId) return;
+    if (st.g === 'pumpkin') {
+      if (st.holder === meId && st.phase === 'hold' && m.id !== meId && st.alive.includes(m.id)) {
+        haptic.light();
+        game.act({ k: 'pass', to: m.id });
+      }
+      return;
+    }
+    if (st.g === 'stars') {
+      const p = movers.current.get(m.id)?.now();
+      if (p) goTo(pxX(geo, p.x), pxY(geo, p.y));
+    }
+  };
+  const nameOf = (id: string) => (id === meId ? 'Ты' : (members.find((x) => x.id === id)?.name ?? 'Кто-то'));
+  const colorOf = (id: string) => (id === meId ? C.me : members.find((x) => x.id === id)?.bot ? C.good : C.partner);
 
   const giveFive = (target: RoomMember) => {
     if (!meId || !myMover) return;
@@ -897,7 +979,7 @@ export default function RoomScreen() {
   const bar: { key: string; icon: IconName; label: string; onPress: () => void; accent?: boolean }[] = [
     { key: 'r', icon: 'smile', label: 'Реакции', onPress: () => setReactOpen((v) => !v) },
     { key: 'f', icon: 'hand', label: 'Все — пять', onPress: fiveAll },
-    { key: 'p', icon: 'wheel', label: 'Играть', onPress: () => showToast('Игры появятся совсем скоро'), accent: true },
+    { key: 'p', icon: 'wheel', label: game.starting ? '…' : 'Играть', onPress: game.play, accent: true },
     { key: 'm', icon: 'pin', label: 'Место', onPress: () => setPicker(true) },
   ];
   const barBottom = Math.max(insets.bottom, 10) + 6;
@@ -916,34 +998,50 @@ export default function RoomScreen() {
             const r = reacts[m.id];
             const online = isOnline(m);
             const hidden = Boolean(playing && (playing.cast.from_member === m.id || playing.cast.to_member === m.id));
-            const pose = poses[m.id] ?? (r ? 'wave' : null);
+            const ga = actorGame(game.snap, m.id, game.toLocal, g.base, reduce);
+            const playingNow = Boolean(game.active && game.snap?.players.includes(m.id));
+            const pose = ga?.pose ?? poses[m.id] ?? (r ? 'wave' : null);
             return (
               <RoomActor
                 key={m.id}
                 mover={mv}
                 geo={g}
                 look={lookOf({ chibi: m.chibi })}
-                emotion={pose || r ? 'joy' : 'calm'}
-                value={pose || r ? 80 : 40}
+                emotion={ga?.emotion ?? (pose || r ? 'joy' : 'calm')}
+                value={ga?.value ?? (pose || r ? 80 : 40)}
                 pose={pose}
                 face={faces[m.id]}
                 label={`${m.name} · ${m.title}`}
                 dot={isMe ? C.me : m.bot ? C.good : C.partner}
-                online={online}
+                online={online || playingNow}
                 hidden={hidden}
+                faded={ga?.faded}
+                cover={ga?.cover}
                 a11y={isMe ? 'Это ты. Нажми — реакции' : `${m.name}. Нажми — дай пять и способности`}
                 onPress={() => {
                   if (playing) return;
+                  if (game.snap) {
+                    tapInGame(m);
+                    return;
+                  }
                   haptic.light();
                   touch();
                   if (isMe) setReactOpen((v) => !v);
                   else setMenu(m.id);
                 }}
-                over={r ? <ReactionBubble key={r.n} kind={r.k} nonce={r.n} size={Math.round(40 * Math.max(0.9, g.s))} /> : null}
+                over={
+                  ga?.over || r ? (
+                    <>
+                      {ga?.over}
+                      {r ? <ReactionBubble key={r.n} kind={r.k} nonce={r.n} size={Math.round(40 * Math.max(0.9, g.s))} /> : null}
+                    </>
+                  ) : null
+                }
               />
             );
           })}
           <SparkPop trigger={sparks.n} x={sparks.x} y={sparks.y} scale={g.s * 1.2} />
+          {game.snap ? <GameWorld snap={game.snap} toLocal={game.toLocal} geo={g} loc={loc} movers={movers.current} colorOf={colorOf} reduce={reduce} /> : null}
         </Animated.View>
       </Animated.View>
 
@@ -970,6 +1068,53 @@ export default function RoomScreen() {
             Хлоп!
           </Txt>
         </View>
+      ) : null}
+
+      {/* мини-игра: колесо и отсчёт, игра, пьедестал */}
+      {game.snap?.phase === 'wheel' ? (
+        <PreGame
+          key={game.snap.id}
+          snap={game.snap}
+          toLocal={game.toLocal}
+          spinText={game.snap.host === meId ? 'Колесо крутишь ты' : `Колесо крутит ${nameOf(game.snap.host)}`}
+          who={game.snap.players.map((id) => ({ id, name: nameOf(id), color: colorOf(id), note: game.snap!.bots.includes(id) ? 'бот' : 'играет' }))}
+          width={width}
+          top={insets.top}
+          reduce={reduce}
+        />
+      ) : null}
+      {game.snap && (game.snap.phase === 'play' || game.snap.phase === 'end') ? (
+        <GameHud
+          snap={game.snap}
+          toLocal={game.toLocal}
+          meId={meId}
+          nameOf={nameOf}
+          colorOf={colorOf}
+          width={width}
+          height={height}
+          top={insets.top}
+          bottom={insets.bottom}
+          reduce={reduce}
+          act={game.act}
+        />
+      ) : null}
+      {game.snap?.phase === 'podium' ? (
+        <Podium
+          key={game.snap.id}
+          snap={game.snap}
+          meId={meId}
+          userId={userId}
+          members={members}
+          catalog={catalog}
+          width={width}
+          height={height}
+          top={insets.top}
+          bottom={insets.bottom}
+          busy={game.starting}
+          onClose={game.close}
+          onAgain={game.play}
+          onRecords={() => setRecords(true)}
+        />
       ) : null}
 
       {/* верх: назад, кто и где, выйти */}
@@ -1013,7 +1158,7 @@ export default function RoomScreen() {
         </View>
       ) : null}
 
-      {!playing
+      {!playing && !game.snap
         ? arrows.map((a) => (
             <Pressy
               key={a.m.id}
@@ -1035,9 +1180,15 @@ export default function RoomScreen() {
           ))
         : null}
 
-      {/* справа над панелью: к себе, позвать бота */}
-      {!playing ? (
+      {/* справа над панелью: рекорды, позвать бота, к себе */}
+      {!playing && !game.snap ? (
         <View style={[styles.side, { bottom: barBottom + 76 }]} pointerEvents="box-none">
+          <Pressy onPress={() => setRecords(true)} innerStyle={styles.sideBtn} scaleTo={0.94} accessibilityLabel="Рекорды комнаты">
+            <Icon name="trophy" size={18} color="#FFD45E" />
+            <Txt weight="heavy" size={12.5}>
+              Рекорды
+            </Txt>
+          </Pressy>
           {isDevRole(access) && members.length < (room?.capacity ?? 3) ? (
             <Pressy onPress={addBot} innerStyle={styles.sideBtn} scaleTo={0.94} accessibilityLabel="Позвать бота">
               <Icon name="bot" size={18} color={C.good} />
@@ -1057,7 +1208,7 @@ export default function RoomScreen() {
         </View>
       ) : null}
 
-      {reactOpen && !playing ? (
+      {reactOpen && !playing && !game.snap ? (
         <View style={[styles.reactCard, { bottom: barBottom + 76 }]}>
           {REACTIONS.map((k) => (
             <Pressy
@@ -1078,7 +1229,7 @@ export default function RoomScreen() {
       ) : null}
 
       {/* нижняя панель */}
-      {!playing ? (
+      {!playing && !game.snap ? (
         <View style={[styles.bar, { bottom: barBottom }]}>
           {bar.map((b) => (
             <Pressy key={b.key} onPress={b.onPress} style={styles.barItem} innerStyle={[styles.barIn, b.accent ? styles.barAccent : null]} scaleTo={0.92} accessibilityLabel={b.label}>
@@ -1124,6 +1275,8 @@ export default function RoomScreen() {
           </View>
         ) : null}
       </Sheet>
+
+      <RecordsSheet visible={records} onClose={() => setRecords(false)} userId={userId} initial={game.snap?.game} />
 
       <LocationSheet
         visible={picker}

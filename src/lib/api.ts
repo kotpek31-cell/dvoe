@@ -19,6 +19,7 @@ import type {
 } from '../types';
 import { atTime } from './dates';
 import { legacyIntensity, mixDominant, type MoodMix } from './emotions';
+import { GAME_IDS, type GameId } from './games/rules';
 import type { RangeData } from './report';
 import { supabase } from './supabase';
 
@@ -579,6 +580,41 @@ export const roomMarkCastsSeen = (ids: string[]) => (ids.length ? rpc<number>('r
 export const roomNotify = (kind: 'five' | 'five_all', target: string | null = null) =>
   rpc<boolean>('room_notify', { p_kind: kind, p_target: target, p_room: ROOM_ID });
 export const devRoomResetRecords = () => rpc<void>('dev_room_reset_records');
+
+// Мини-игры: колесо крутит любой, игру выбирает сервер; итог присылает ведущий (тот, кто крутил)
+export type GameStartReply =
+  | { ok: true; id: string; game: GameId; seed: number; players: { m: string; u: string | null }[] }
+  | { ok: false; error: string; message: string };
+export async function roomGameStart(players: string[]): Promise<GameStartReply> {
+  const res = ((await rpc<Record<string, unknown>>('room_game_start', { p_players: players, p_room: ROOM_ID })) ?? {});
+  if (res.ok === true && typeof res.id === 'string' && GAME_IDS.includes(res.game as GameId)) {
+    return { ok: true, id: res.id, game: res.game as GameId, seed: Number(res.seed) || 1, players: Array.isArray(res.players) ? (res.players as { m: string; u: string | null }[]) : [] };
+  }
+  return { ok: false, error: typeof res.error === 'string' ? res.error : 'unknown', message: typeof res.message === 'string' ? res.message : 'Не получилось' };
+}
+
+export type GameFinishReply =
+  | { ok: true; counted: boolean; records: { member: string; best: number }[]; rewards: { user_id: string; item_id: string }[] }
+  | { ok: false; error: string; message: string };
+export async function roomGameFinish(id: string, places: string[], best: Record<string, number>): Promise<GameFinishReply> {
+  const res = ((await rpc<Record<string, unknown>>('room_game_finish', { p_game: id, p_result: { places, best } })) ?? {});
+  if (res.ok === true) {
+    return {
+      ok: true,
+      counted: res.counted === true,
+      records: Array.isArray(res.records) ? (res.records as { member: string; best: number }[]) : [],
+      rewards: Array.isArray(res.rewards) ? (res.rewards as { user_id: string; item_id: string }[]) : [],
+    };
+  }
+  return { ok: false, error: typeof res.error === 'string' ? res.error : 'unknown', message: typeof res.message === 'string' ? res.message : 'Итог не сохранился' };
+}
+export const roomGameCancel = (id: string) => rpc<void>('room_game_cancel', { p_game: id });
+
+export type GameRecord = { user_id: string; name: string | null; game: GameId; played: number; wins: number; best: number | null };
+export async function roomRecords(): Promise<{ records: GameRecord[]; my_wins: number }> {
+  const res = await rpc<{ records?: GameRecord[]; my_wins?: number }>('room_records');
+  return { records: res?.records ?? [], my_wins: Number(res?.my_wins) || 0 };
+}
 
 export async function roomCast(target: string, ability: string, from: string | null = null): Promise<RoomCastResult> {
   const res = ((await rpc<Record<string, unknown>>('room_cast', { p_target: target, p_ability: ability, p_from: from, p_room: ROOM_ID })) ?? {});

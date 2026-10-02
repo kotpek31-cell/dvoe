@@ -25,10 +25,12 @@ type Props = {
   onPress: () => void;
   onLongPress?: () => void;
   a11y: string;
-  over?: ReactNode; // облачко реакции, искры
+  over?: ReactNode; // облачко реакции, искры, тыква над головой
+  cover?: ReactNode; // поверх чибика (сажа после взрыва) — масштабируется вместе с ним
+  faded?: boolean; // выбыл из игры
 };
 
-export const RoomActor = memo(function RoomActor({ mover, geo, look, emotion, value, pose, face, label, dot, online, hidden, onPress, onLongPress, a11y, over }: Props) {
+export const RoomActor = memo(function RoomActor({ mover, geo, look, emotion, value, pose, face, label, dot, online, hidden, onPress, onLongPress, a11y, over, cover, faded }: Props) {
   const st = useSyncExternalStore(mover.subscribe, mover.getState, mover.getState);
   const size = geo.base;
   const h = Math.round((size * 170) / 120);
@@ -48,10 +50,15 @@ export const RoomActor = memo(function RoomActor({ mover, geo, look, emotion, va
     >
       <Animated.View
         pointerEvents="box-none"
-        style={{ width: size, height: h, opacity: online ? 1 : 0.55, transform: [{ translateY: h / 2 }, { scale }, { translateY: -h / 2 }] }}
+        style={{ width: size, height: h, opacity: online && !faded ? 1 : 0.55, transform: [{ translateY: h / 2 }, { scale }, { translateY: -h / 2 }] }}
       >
         <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={450} accessibilityRole="button" accessibilityLabel={a11y} style={{ width: size, height: h }}>
           <Chibi look={look} emotion={emotion} value={value} pose={p} size={size} flip={flip} eyesClosed={!online && !walking} />
+          {cover ? (
+            <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.cover]}>
+              {cover}
+            </View>
+          ) : null}
         </Pressable>
       </Animated.View>
       <Animated.View pointerEvents="none" style={[styles.over, { left: size / 2 - 120, transform: [{ translateY: headY }] }]}>
@@ -72,6 +79,7 @@ export const RoomActor = memo(function RoomActor({ mover, geo, look, emotion, va
 
 const styles = StyleSheet.create({
   feet: { position: 'absolute' },
+  cover: { zIndex: 50 }, // слои чибика со своим zIndex не должны перекрыть
   over: { position: 'absolute', width: 240, top: 0, height: 0 },
   overInner: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', gap: 2 },
   tag: {

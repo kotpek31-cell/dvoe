@@ -1,9 +1,11 @@
 // Связь комнаты.
 // 1) Закрытый канал «room:<id>» (config.private): пускает только вошедших — проверяет сервер (политики на realtime.messages).
-//    Движения, реакции и «дай пять» — broadcast, в базу не пишутся. Кто на экране комнаты — presence.
+//    Движения, реакции, «дай пять» и ходы мини-игр — broadcast, в базу не пишутся. Кто на экране комнаты — presence.
 // 2) Изменения в базе (по RLS — только своя комната): комната (место, лимит), кто вошёл и вышел, способности.
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { ROOM_ID, type RoomCast, type RoomInfo } from './api';
+import type { GameSnap } from './games/host';
+import type { Action } from './games/rules';
 import { supabase } from './supabase';
 
 export type ReactionKind = 'heart' | 'laugh' | 'wow' | 'fire' | 'tear' | 'star';
@@ -13,7 +15,9 @@ export type Wire =
   | { t: 'move'; m: string; x: number; y: number; run?: boolean; snap?: boolean }
   | { t: 'react'; m: string; k: ReactionKind }
   | { t: 'five'; id: string; a: string; b: string; ax: number; ay: number; bx: number; by: number }
-  | { t: 'fiveAll'; id: string; from: string; spots: Record<string, [number, number]> };
+  | { t: 'fiveAll'; id: string; from: string; spots: Record<string, [number, number]> }
+  | { t: 'g'; s: GameSnap } // мини-игра: снимок от ведущего
+  | { t: 'gi'; id: string; m: string; a: Action }; // ход игрока — ведущему
 
 export type Presence = { m: string; bots: string[] };
 
