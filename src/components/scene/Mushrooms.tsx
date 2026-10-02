@@ -12,7 +12,7 @@ import { Txt } from '../ui';
 export function MushroomArt({ color, size, glow = 0 }: { color: MushColor; size: number; glow?: number }) {
   const hex = MUSH_HEX[color];
   const white = color === 'white';
-  const gid = `mg${color}`;
+  const gid = `mg${color}${Math.round(glow * 100)}`; // в браузере id общие на страницу: у разного свечения — разные
   // Стиль 3.0: контур — тёмный оттенок шляпки, объём — градиентом
   const edge = mixColor(hex, INK, white ? 0.38 : 0.5);
   return (

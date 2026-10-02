@@ -75,11 +75,13 @@ export function Aurora({ paused = false }: { paused?: boolean }) {
           </Animated.View>
         );
       })}
-      <Svg width={width} height={height} style={StyleSheet.absoluteFill}>
-        {DUST.map((d, i) => (
-          <Circle key={i} cx={d.x * width} cy={d.y * height} r={d.r} fill="#FFFFFF" opacity={d.o} />
-        ))}
-      </Svg>
+      {/* точки — обычными View: Svg на весь экран занял бы на Android лишнюю картинку размером с экран */}
+      {DUST.map((d, i) => (
+        <View
+          key={`d${i}`}
+          style={{ position: 'absolute', left: d.x * width - d.r, top: d.y * height - d.r, width: d.r * 2, height: d.r * 2, borderRadius: d.r, backgroundColor: '#FFFFFF', opacity: d.o }}
+        />
+      ))}
     </View>
   );
 }

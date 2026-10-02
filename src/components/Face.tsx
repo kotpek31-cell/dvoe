@@ -210,12 +210,14 @@ function FaceView({ emotion, value, size, bare, eyes, look, blink, closed: alway
           </G>
         ) : null}
         <G transform={`rotate(${f.rot} 50 56)`}>
-          {[f.cheekL, f.cheekR].map((cx) => (
-            <G key={cx} opacity={Math.max(f.blushOp, blushMin)}>
-              <Ellipse cx={cx} cy={f.cheekY} rx={9.4} ry={5.8} fill="#FF4F86" opacity={0.42} />
-              <Ellipse cx={cx} cy={f.cheekY} rx={6.2} ry={3.5} fill="#FF4F86" opacity={0.72} />
-            </G>
-          ))}
+          {/* румянец в два слоя; прозрачность — на самих овалах (группа с opacity на Android рисуется через отдельную картинку) */}
+          {[f.cheekL, f.cheekR].flatMap((cx) => {
+            const b = Math.max(f.blushOp, blushMin);
+            return [
+              <Ellipse key={`${cx}a`} cx={cx} cy={f.cheekY} rx={9.4} ry={5.8} fill="#FF4F86" opacity={0.42 * b} />,
+              <Ellipse key={`${cx}b`} cx={cx} cy={f.cheekY} rx={6.2} ry={3.5} fill="#FF4F86" opacity={0.72 * b} />,
+            ];
+          })}
           {f.bagsOp > 0 ? (
             <G opacity={f.bagsOp}>
               <Path d={f.bagL} fill="none" stroke="#5E4A73" strokeWidth={1.4} strokeLinecap="round" />

@@ -198,7 +198,23 @@ export function restyle(nodes: ArtNode[], zone: Zone): ArtNode[] {
     return { tag: node.tag, attrs, children: node.children.map(walk) };
   };
 
-  const out = nodes.map(walk);
+  // Локации: прозрачность группы переносим на сами фигуры. На Android react-native-svg рисует <g opacity>
+  // через отдельную картинку размером со весь рисунок (у локации — весь экран, мегабайты памяти на каждую группу),
+  // а прозрачность одной фигуры — просто краска. Разница видна только там, где фигуры внутри группы перекрываются.
+  const flat = (list: ArtNode[], k: number): ArtNode[] =>
+    list.map((n) => {
+      if (KEEP.has(n.tag)) return n;
+      const own = parseFloat(n.attrs.opacity ?? '1');
+      const o = k * (Number.isNaN(own) ? 1 : own);
+      if (n.tag === 'g') {
+        const attrs = { ...n.attrs };
+        delete attrs.opacity;
+        return { tag: 'g', attrs, children: flat(n.children, o) };
+      }
+      return o === 1 ? n : { ...n, attrs: { ...n.attrs, opacity: String(r2(o)) } };
+    });
+
+  const out = (zone === 'scene' ? flat(nodes, 1) : nodes).map(walk);
   return defs.length ? [{ tag: 'defs', attrs: {}, children: defs }, ...out] : out;
 }
 

@@ -134,23 +134,30 @@ export function Pressy({
 }
 
 // Заливка-градиент под содержимым кнопки (3.0): свет сверху, тень снизу. Родителю нужен overflow: 'hidden'.
+// Цвета сверху вниз: блик по кромке, свет, основной, тень, тёмная кромка снизу
 const FILLS = {
-  accent: ['#FF93AB', '#FF6B8A', '#EE4F78'],
-  good: ['#86E8BC', '#5ED3A0', '#3DBB87'],
+  accent: ['#FFC2D0', '#FF93AB', '#FF6B8A', '#EE4F78', '#D93F69'],
+  good: ['#C4F6DE', '#86E8BC', '#5ED3A0', '#3DBB87', '#2FA474'],
 } as const;
 export function GradFill({ kind }: { kind: keyof typeof FILLS }) {
   const c = FILLS[kind];
+  // Обёртка без отступов: на телефоне 100% у абсолютного ребёнка считается от области внутри отступов кнопки,
+  // и без обёртки правый край кнопки остался бы без градиента.
   return (
-    <Svg pointerEvents="none" style={StyleSheet.absoluteFill} width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
-      <Defs>
-        <LinearGradient id={`uiFill-${kind}`} x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={c[0]} />
-          <Stop offset="0.5" stopColor={c[1]} />
-          <Stop offset="1" stopColor={c[2]} />
-        </LinearGradient>
-      </Defs>
-      <Rect x={0} y={0} width={100} height={100} fill={`url(#uiFill-${kind})`} />
-    </Svg>
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id={`uiFill-${kind}`} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={c[0]} />
+            <Stop offset="0.07" stopColor={c[1]} />
+            <Stop offset="0.5" stopColor={c[2]} />
+            <Stop offset="0.93" stopColor={c[3]} />
+            <Stop offset="1" stopColor={c[4]} />
+          </LinearGradient>
+        </Defs>
+        <Rect x={0} y={0} width={100} height={100} fill={`url(#uiFill-${kind})`} />
+      </Svg>
+    </View>
   );
 }
 
@@ -515,8 +522,8 @@ const styles = StyleSheet.create({
   button: { minHeight: 52, borderRadius: R.pill, paddingHorizontal: S.xl, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   buttonSmall: { minHeight: 40, paddingHorizontal: S.lg },
   buttonBorder: { borderWidth: 1, borderColor: C.glassBorder, boxShadow: EDGE },
-  buttonGlow: { boxShadow: `0px 10px 24px rgba(255,107,138,0.34), ${EDGE_STRONG}, inset 0px -2px 0px rgba(150,24,66,0.28)` },
-  buttonGlowGood: { boxShadow: `0px 10px 24px rgba(94,211,160,0.26), ${EDGE_STRONG}, inset 0px -2px 0px rgba(18,96,62,0.28)` },
+  buttonGlow: { boxShadow: '0px 10px 24px rgba(255,107,138,0.34)' },
+  buttonGlowGood: { boxShadow: '0px 10px 24px rgba(94,211,160,0.26)' },
   buttonRow: { flexDirection: 'row', alignItems: 'center', gap: S.sm },
   chip: {
     minHeight: 44,

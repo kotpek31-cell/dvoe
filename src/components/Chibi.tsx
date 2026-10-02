@@ -59,6 +59,9 @@ type Props = {
   mog?: boolean; // тени-скулы для сцены «Мог»
   eyesClosed?: boolean;
   still?: boolean; // без анимаций: плитки, превью
+  // Что рисовать (плитки гардероба): 'head' — без тени, ног, рук и спины, 'upper' — без тени, 'legs' — без головы и спины.
+  // Каждый слой — отдельная картинка в памяти; то, что плитка всё равно обрезает, не рисуем.
+  part?: 'all' | 'head' | 'upper' | 'legs';
 };
 
 // Холст слоя чуть больше рамки 120×170; у крыльев, нимба и предметов в руках — большой,
@@ -106,7 +109,7 @@ function Moving({ transform, children }: { transform: object[]; children: ReactN
 type Num = Animated.AnimatedInterpolation<number> | Animated.AnimatedAddition<number> | Animated.Value;
 const deg = (n: Num) => n.interpolate({ inputRange: [-360, 360], outputRange: ['-360deg', '360deg'] });
 
-function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog = false, eyesClosed = false, still = false }: Props) {
+function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog = false, eyesClosed = false, still = false, part = 'all' }: Props) {
   const reduce = useReducedMotion();
   const visible = useScreenFocused();
   const catalog = useCatalog();
@@ -546,24 +549,29 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
     );
   }
 
+  const bust = part === 'head';
+  const noHead = part === 'legs';
+  const noBack = bust || noHead;
   return (
     <View pointerEvents="none" style={{ width: w, height: h, transform: [{ scaleX: flip ? -1 : 1 }] }}>
-      <Moving transform={t.shadow}>
-        <Layer k={k}>
-          {/* тень — прямо под подошвами (низ обуви — 156,5), а не ниже: иначе чибик будто висит над ней */}
-          <Ellipse cx={60} cy={hover ? 160 : FEET_Y} rx={hover ? 19 : 25} ry={hover ? 3.4 : 4.8} fill="#1B1426" opacity={hover ? 0.16 : 0.24} />
-          {hover ? null : <Ellipse cx={60} cy={FEET_Y} rx={16} ry={2.8} fill="#1B1426" opacity={0.16} />}
-        </Layer>
-      </Moving>
+      {part === 'all' || noHead ? (
+        <Moving transform={t.shadow}>
+          <Layer k={k}>
+            {/* тень — прямо под подошвами (низ обуви — 156,5), а не ниже: иначе чибик будто висит над ней */}
+            <Ellipse cx={60} cy={hover ? 160 : FEET_Y} rx={hover ? 19 : 25} ry={hover ? 3.4 : 4.8} fill="#1B1426" opacity={hover ? 0.16 : 0.24} />
+            {hover ? null : <Ellipse cx={60} cy={FEET_Y} rx={16} ry={2.8} fill="#1B1426" opacity={0.16} />}
+          </Layer>
+        </Moving>
+      ) : null}
       <Moving transform={t.root}>
-        {art.sway ? (
+        {noBack ? null : art.sway ? (
           <Moving transform={t.sway}>
             <Layer k={k} big>
               {art.sway}
             </Layer>
           </Moving>
         ) : null}
-        {art.back ? (
+        {noBack ? null : art.back ? (
           flapWings ? (
             <Moving transform={t.wings}>
               <Layer k={k} big>
@@ -576,44 +584,53 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
             </Layer>
           )
         ) : null}
-        {art.backFx ? (
+        {art.backFx && !noBack ? (
           <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: fx }]}>
             <Layer k={k} big>
               {art.backFx}
             </Layer>
           </Animated.View>
         ) : null}
-        {art.hairBack ? (
+        {art.hairBack && !noHead ? (
           <Moving transform={t.head}>
             <Moving transform={t.hair}>
               <HeadLayer k={k}>{art.hairBack}</HeadLayer>
             </Moving>
           </Moving>
         ) : null}
-        <Moving transform={t.legL}>
-          <Layer k={k}>{art.legL}</Layer>
-        </Moving>
-        <Moving transform={t.legR}>
-          <Layer k={k}>{art.legR}</Layer>
-        </Moving>
+        {bust ? null : (
+          <>
+            <Moving transform={t.legL}>
+              <Layer k={k}>{art.legL}</Layer>
+            </Moving>
+            <Moving transform={t.legR}>
+              <Layer k={k}>{art.legR}</Layer>
+            </Moving>
+          </>
+        )}
         <Layer k={k}>{art.body}</Layer>
-        <Moving transform={t.armL}>
-          <Layer k={k} big={art.handL}>
-            {art.armL}
-          </Layer>
-        </Moving>
-        <Moving transform={t.armR}>
-          <Layer k={k} big={art.handR}>
-            {art.armR}
-          </Layer>
-          {art.handFx ? (
-            <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: fx }]}>
-              <Layer k={k} big>
-                {art.handFx}
+        {bust ? null : (
+          <>
+            <Moving transform={t.armL}>
+              <Layer k={k} big={art.handL}>
+                {art.armL}
               </Layer>
-            </Animated.View>
-          ) : null}
-        </Moving>
+            </Moving>
+            <Moving transform={t.armR}>
+              <Layer k={k} big={art.handR}>
+                {art.armR}
+              </Layer>
+              {art.handFx ? (
+                <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: fx }]}>
+                  <Layer k={k} big>
+                    {art.handFx}
+                  </Layer>
+                </Animated.View>
+              ) : null}
+            </Moving>
+          </>
+        )}
+        {noHead ? null : (
         <Moving transform={t.head}>
           <HeadLayer k={k}>{art.head}</HeadLayer>
           {face}
@@ -644,6 +661,7 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
             </Moving>
           ) : null}
         </Moving>
+        )}
       </Moving>
     </View>
   );

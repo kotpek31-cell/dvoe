@@ -7,7 +7,7 @@
 // 3.0: рисунок — в мягком стиле с объёмом (artStyle.ts); небо живое везде: ночью мерцают звёзды и изредка падает
 // звезда, над лугом плывут облака; на лугу — бабочки, светлячки, пыльца в солнечном свете.
 import { memo, useEffect, useMemo, useRef, type ReactNode } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Platform, StyleSheet, View, type ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { saw, tri } from '../../lib/anim';
 import { renderArt } from '../../lib/art';
@@ -158,6 +158,10 @@ function SkyLife({ id, width, height, time, active, side }: { id: LocationId; wi
   );
 }
 
+// В браузере рисунок локации — отдельный слой: живые детали поверх (звёзды, светлячки, облака) двигаются каждый кадр,
+// и без этого браузер заново закрашивал бы под ними куски сложного рисунка с градиентами (заметно на iPhone).
+const WEB_LAYER = (Platform.OS === 'web' ? { willChange: 'transform' } : null) as unknown as ViewStyle | null;
+
 function DrawnLocation({ id, width, height, time, active, part = 'all', variant = 0 }: Props) {
   const art = useMemo(() => {
     const svg = part === 'all' ? locationSvg(id, time) : locationParts(id, time, variant)[part];
@@ -168,9 +172,11 @@ function DrawnLocation({ id, width, height, time, active, part = 'all', variant 
   if (part === 'sky') {
     return (
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Svg width={width} height={height} viewBox="0 0 390 844" preserveAspectRatio="xMidYMax slice" style={StyleSheet.absoluteFill} pointerEvents="none">
-          {art}
-        </Svg>
+        <View style={[StyleSheet.absoluteFill, WEB_LAYER]} pointerEvents="none">
+          <Svg width={width} height={height} viewBox="0 0 390 844" preserveAspectRatio="xMidYMax slice" style={StyleSheet.absoluteFill} pointerEvents="none">
+            {art}
+          </Svg>
+        </View>
         <SkyLife id={id} width={width} height={height} time={time} active={active} side={false} />
       </View>
     );
@@ -496,9 +502,11 @@ function LiveLocation({ id, width, height, time, active, art, variant = 0, part 
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <Svg width={width} height={height} viewBox="0 0 390 844" preserveAspectRatio="xMidYMax slice" style={StyleSheet.absoluteFill}>
-        {art}
-      </Svg>
+      <View style={[StyleSheet.absoluteFill, WEB_LAYER]}>
+        <Svg width={width} height={height} viewBox="0 0 390 844" preserveAspectRatio="xMidYMax slice" style={StyleSheet.absoluteFill}>
+          {art}
+        </Svg>
+      </View>
       {part === 'all' ? <SkyLife id={id} width={width} height={height} time={time} active={active} side={side} /> : null}
 
       {auroraBands.map((b, i) => (
