@@ -6,6 +6,7 @@
 import { writeFileSync } from 'node:fs';
 import { ITEMS, CAT_ORDER } from './chibi.ts';
 import './items2.ts';
+import './items3.ts';
 
 const LEG_X = { L: 47, R: 62 } as const;
 const SIDED = new Set(['leg', 'shoe']);
