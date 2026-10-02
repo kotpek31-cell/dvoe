@@ -22,6 +22,11 @@ import {
   devTestPartnerCreate,
   devTestPartnerRemove,
   devTestPartnerSleep,
+  devRoomResetRecords,
+  isDevRole,
+  roomKick,
+  roomSetCapacity,
+  roomState,
   type DevUser,
 } from '../src/lib/api';
 import { syncCatalog, useCatalog, type ItemRow } from '../src/lib/catalog';
@@ -260,6 +265,75 @@ const TIMES: { value: DayTime | 'auto'; label: string }[] = [
   { value: 'night', label: 'Ночь' },
 ];
 
+// ---------- Комната на троих ----------
+function RoomCard() {
+  const access = useAccess();
+  const owner = access?.role === 'owner';
+  const { data, error, reload } = useLoader(roomState, []);
+  const [busy, setBusy] = useState<string | null>(null);
+
+  const run = async (key: string, fn: () => Promise<unknown>) => {
+    setBusy(key);
+    try {
+      await fn();
+      haptic.success();
+      reload();
+    } catch (e) {
+      showError(e);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const cap = data?.room.capacity ?? 3;
+  const members = data?.members ?? [];
+  return (
+    <Card title="Комната на троих" right={<Txt faint size={13}>{members.length} из {cap}</Txt>}>
+      <Txt faint size={13}>
+        Общая площадка для своих: гуляете, даёте пять, применяете способности. Вход и через плитку «Комната» в профиле.
+      </Txt>
+      <Button title="Войти" icon="door" onPress={() => router.push('/room')} />
+      {error ? <ErrorBox message={error} onRetry={reload} /> : null}
+      {owner ? (
+        <Row style={styles.between}>
+          <Txt weight="heavy" size={15}>
+            Мест
+          </Txt>
+          <Row>
+            <Button title="−" small variant="secondary" disabled={cap <= 2} loading={busy === 'cap-'} onPress={() => run('cap-', () => roomSetCapacity(cap - 1))} />
+            <Txt weight="display" size={18}>
+              {cap}
+            </Txt>
+            <Button title="+" small variant="secondary" disabled={cap >= 6} loading={busy === 'cap+'} onPress={() => run('cap+', () => roomSetCapacity(cap + 1))} />
+          </Row>
+        </Row>
+      ) : null}
+      {members.map((m) => (
+        <Row key={m.id} style={styles.between}>
+          <View style={styles.flex}>
+            <Txt weight="heavy" size={14} numberOfLines={1}>
+              {m.name} · {m.title}
+            </Txt>
+            <Txt muted size={12}>
+              {m.bot ? 'бот' : Date.now() - Date.parse(m.seen_at) < 60_000 ? 'на экране комнаты' : 'не на экране'}
+            </Txt>
+          </View>
+          {owner ? <Button title="Вывести" small variant="danger" loading={busy === m.id} onPress={() => run(m.id, () => roomKick(m.id))} /> : null}
+        </Row>
+      ))}
+      {owner ? (
+        <Button
+          title="Сбросить рекорды"
+          icon="undo"
+          variant="secondary"
+          loading={busy === 'records'}
+          onPress={() => confirmAction('Сбросить рекорды комнаты?', 'Победы и лучшие результаты обнулятся у всех. Полученные вещи останутся.', 'Сбросить', () => run('records', devRoomResetRecords), true)}
+        />
+      ) : null}
+    </Card>
+  );
+}
+
 function CheckTab() {
   const { partner, refresh } = usePair();
   const { rehearse } = useAbility();
@@ -281,6 +355,7 @@ function CheckTab() {
 
   return (
     <>
+      <RoomCard />
       <Card title="Способности вхолостую">
         <Txt faint size={13}>
           Сцена только у тебя: без записи, пуша и перезарядки.
@@ -414,12 +489,13 @@ function RolesTab() {
   const { data, error, reload } = useLoader(devListRoles, []);
   const [query, setQuery] = useState('');
   const [title, setTitle] = useState('');
+  const [level, setLevel] = useState<'developer' | 'guest'>('developer');
   const [busy, setBusy] = useState(false);
 
   const give = async () => {
     setBusy(true);
     try {
-      await devSetRole(query, title);
+      await devSetRole(query, title, level);
       haptic.success();
       setQuery('');
       setTitle('');
@@ -435,10 +511,18 @@ function RolesTab() {
     <>
       <Card title="Добавить в комнату по ID">
         <Txt faint size={13}>
-          ID человек видит у себя: Настройки → «Твой ID». Можно и email. Роль даёт всю комнату, кроме этого раздела; название — любое, по умолчанию «тестер».
+          ID человек видит у себя: Настройки → «Твой ID». Можно и email. «Разработчик» — вся комната разработчиков, кроме этого раздела; «Только комната» — только общая комната, без выдачи вещей и кодов. Название — любое.
         </Txt>
         <Input placeholder="ID из 6 символов или email" value={query} onChangeText={setQuery} autoCapitalize="characters" autoCorrect={false} />
-        <Input placeholder="Роль (тестер)" value={title} onChangeText={setTitle} maxLength={30} />
+        <Segmented
+          options={[
+            { value: 'developer', label: 'Разработчик' },
+            { value: 'guest', label: 'Только комната' },
+          ]}
+          value={level}
+          onChange={setLevel}
+        />
+        <Input placeholder={level === 'guest' ? 'Роль (друг)' : 'Роль (тестер)'} value={title} onChangeText={setTitle} maxLength={30} />
         <Button title="Добавить" icon="plus" onPress={give} loading={busy} disabled={!query.trim()} />
       </Card>
       {error ? <ErrorBox message={error} onRetry={reload} /> : null}
@@ -450,7 +534,7 @@ function RolesTab() {
                 {r.name ?? r.email} · {r.title}
               </Txt>
               <Txt muted size={13}>
-                {r.email} · {r.short_id ?? ''}
+                {r.role === 'guest' ? 'только комната' : r.role === 'owner' ? 'владелец' : 'разработчик'} · {r.short_id ?? r.email}
               </Txt>
             </View>
             {r.role !== 'owner' ? (
@@ -459,7 +543,7 @@ function RolesTab() {
                 small
                 variant="danger"
                 onPress={() =>
-                  confirmAction('Снять роль?', `${r.name ?? r.email} потеряет доступ к комнате.`, 'Снять', () =>
+                  confirmAction('Снять роль?', `${r.name ?? r.email} потеряет доступ и выйдет из общей комнаты.`, 'Снять', () =>
                     devRemoveRole(r.short_id ?? r.email).then(reload).catch(showError),
                   true)
                 }
@@ -493,10 +577,11 @@ export default function DevScreen() {
     return list;
   }, [access]);
 
-  if (!access) {
+  if (!access || !isDevRole(access)) {
     return (
       <Screen title="Комната" back background>
-        <Empty text="Сюда можно только с ролью." />
+        <Empty text="Сюда можно только с ролью разработчика." />
+        {access ? <Button title="В общую комнату" icon="door" onPress={() => router.replace('/room')} /> : null}
       </Screen>
     );
   }

@@ -15,7 +15,7 @@ import { CLOTH } from '../lib/palette';
 import { NEW_EYES } from '../lib/eyes';
 import { Face, type EyeStyle } from './Face';
 
-export type ChibiPose = 'idle' | 'walk' | 'run' | 'wave' | 'hug' | 'cheer' | 'jump' | 'fallen' | 'sleep';
+export type ChibiPose = 'idle' | 'walk' | 'run' | 'wave' | 'hug' | 'cheer' | 'jump' | 'fallen' | 'sleep' | 'sit';
 
 type Props = {
   look: Look;
@@ -322,9 +322,11 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
         })
       : '0deg';
     const tall = stretch.interpolate({ inputRange: [0, 1], outputRange: [1, 1.04] });
+    // сидит (в комнате — кто закрыл приложение): корпус ниже, ноги поджаты
+    const sit = pose === 'sit';
     const root = fallen
       ? [{ translateX: 47 * k }, { translateY: -40 * k }, ...around(60, 156, [{ rotate: '-90deg' }])]
-      : [{ translateY: rootY }, ...around(60, 150, [{ rotate: sway }, { scaleY: tall }])];
+      : [{ translateY: sit ? add(rootY, c(17 * k)) : rootY }, ...around(60, 150, [{ rotate: sway }, { scaleY: tall }])];
 
     // ноги
     const step = (phase: 0 | 0.5) =>
@@ -358,8 +360,8 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
 
     return {
       root,
-      legL: [{ translateY: step(0) }],
-      legR: [{ translateY: step(0.5) }],
+      legL: sit ? around(60, 124, [{ scaleY: 0.42 }]) : [{ translateY: step(0) }],
+      legR: sit ? around(60, 124, [{ scaleY: 0.42 }]) : [{ translateY: step(0.5) }],
       armL: around(PARTS.shoulderL.x, PARTS.shoulderL.y, [{ rotate: deg(armL) }]),
       armR: around(PARTS.shoulderR.x, PARTS.shoulderR.y, [{ rotate: deg(armR) }]),
       hair: around(60, 40, [{ rotate: hair }]),

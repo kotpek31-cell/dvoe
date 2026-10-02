@@ -8,12 +8,14 @@ import { Animated, Easing, StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import { saw, tri } from '../../lib/anim';
 import { artNodes, renderArt } from '../../lib/art';
-import { CAFE_CUPS, CAMPFIRE, CRYSTALS, GARLAND, locationSvg, RAIN_PUDDLES, type LocationId } from '../../lib/locations';
+import { CAFE_CUPS, CAMPFIRE, CRYSTALS, GARLAND, locationParts, locationSvg, RAIN_PUDDLES, type LocationId } from '../../lib/locations';
 import { nativeDriver, useReducedMotion } from '../../lib/motion';
 import { sceneTransform, type DayTime } from '../../lib/scene';
 import { Meadow } from './Meadow';
 
-type Props = { id: LocationId; width: number; height: number; time: DayTime; active: boolean };
+// part: в комнате небо рисуется одно на экран ('sky'), а земля с живыми деталями — плитками по всей площадке ('land')
+export type LocationPart = 'all' | 'sky' | 'land';
+type Props = { id: LocationId; width: number; height: number; time: DayTime; active: boolean; part?: LocationPart };
 
 const PAINT = { c: '#888888', skin: '#FFDCC4', ids: 'loc' };
 const BIRD = 'M0 0 q6 -6 12 0 q6 -6 12 0';
@@ -24,11 +26,25 @@ const rnd = (i: number, k: number) => {
   return v - Math.floor(v);
 };
 
-function DrawnLocation({ id, width, height, time, active }: Props & { id: Exclude<LocationId, 'meadow'> }) {
+function DrawnLocation({ id, width, height, time, active, part = 'all' }: Props & { id: Exclude<LocationId, 'meadow'> }) {
+  const art = useMemo(() => {
+    const svg = part === 'all' ? locationSvg(id, time) : locationParts(id, time)[part];
+    return renderArt(artNodes(svg), PAINT, `${id}${time}${part}`);
+  }, [id, time, part]);
+  if (part === 'sky') {
+    return (
+      <Svg width={width} height={height} viewBox="0 0 390 844" preserveAspectRatio="xMidYMax slice" style={StyleSheet.absoluteFill} pointerEvents="none">
+        {art}
+      </Svg>
+    );
+  }
+  return <LiveLocation id={id} width={width} height={height} time={time} active={active} art={art} />;
+}
+
+function LiveLocation({ id, width, height, time, active, art }: Props & { id: Exclude<LocationId, 'meadow'>; art: ReactNode }) {
   const reduce = useReducedMotion();
   const tf = useMemo(() => sceneTransform(width, height), [width, height]);
   const s = tf.s;
-  const art = useMemo(() => renderArt(artNodes(locationSvg(id, time)), PAINT, `${id}${time}`), [id, time]);
 
   const slow = useRef(new Animated.Value(0)).current; // 30 с: птицы, снег, сияние
   const blink = useRef(new Animated.Value(0)).current; // 2,4 с: мерцание
@@ -344,7 +360,7 @@ function DrawnLocation({ id, width, height, time, active }: Props & { id: Exclud
 }
 
 function LocationView(props: Props) {
-  if (props.id === 'meadow') return <Meadow width={props.width} height={props.height} time={props.time} active={props.active} />;
+  if (props.id === 'meadow') return <Meadow width={props.width} height={props.height} time={props.time} active={props.active} part={props.part} />;
   return <DrawnLocation {...props} id={props.id} />;
 }
 

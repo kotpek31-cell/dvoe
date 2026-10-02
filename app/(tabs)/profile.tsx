@@ -8,7 +8,7 @@ import { HeartsBurst } from '../../src/components/Effects';
 import { Icon, type IconName } from '../../src/components/Icon';
 import { Button, Card, Empty, ErrorBox, IconButton, Input, Pressy, Row, Screen, Segmented, showError, Txt } from '../../src/components/ui';
 import { usePair, useTableVersion } from '../../src/context/PairProvider';
-import { addWish, deleteWish, fetchMoods, fetchWishes, setWishDone } from '../../src/lib/api';
+import { addWish, deleteWish, fetchMoods, fetchWishes, isDevRole, setWishDone } from '../../src/lib/api';
 import { lookOf } from '../../src/lib/chibi';
 import { dayKeyOf, formatDayShort, relativeDay, todayKey } from '../../src/lib/dates';
 import { confirmAction } from '../../src/lib/dialogs';
@@ -25,7 +25,7 @@ import type { Profile, Wish } from '../../src/types';
 type Who = 'me' | 'partner';
 
 // Круглые плитки под карточкой: всё второстепенное собрано здесь
-const HUB: { key: string; label: string; icon: IconName; color: string; ring: string; href?: '/wardrobe' | '/settings' | '/dev' }[] = [
+const HUB: { key: string; label: string; icon: IconName; color: string; ring: string; href?: '/wardrobe' | '/settings' | '/dev' | '/room' }[] = [
   { key: 'wardrobe', label: 'Гардероб', icon: 'hanger', color: C.partner, ring: 'rgba(255,158,187,0.4)', href: '/wardrobe' },
   { key: 'codes', label: 'Коды', icon: 'key', color: C.warn, ring: 'rgba(255,194,102,0.4)' },
   { key: 'news', label: 'Что нового', icon: 'gift', color: C.good, ring: 'rgba(94,211,160,0.4)' },
@@ -40,7 +40,11 @@ export default function ProfileScreen() {
   useEffect(() => {
     if (focused && me?.id) refreshAccess(me.id);
   }, [focused, me?.id]);
-  const hub = HUB;
+  // Плитка «Комната» — всем, у кого есть роль (и «только комната» тоже)
+  const hub = useMemo(
+    () => (access ? [...HUB.slice(0, 3), { key: 'room', label: 'Комната', icon: 'door' as IconName, color: C.sleep, ring: 'rgba(155,140,255,0.4)', href: '/room' as const }, HUB[3]] : HUB),
+    [access],
+  );
   const day = todayKey();
   const version = useTableVersion('wishes', 'mood_entries', 'profiles');
   const { data, setData, refreshing, error, refresh, reload } = useLoader(async () => {
@@ -119,7 +123,7 @@ export default function ProfileScreen() {
       tabs
       title="Профиль"
       right={
-        access ? (
+        isDevRole(access) ? (
           <IconButton icon="wrench" label="Комната разработчиков" onPress={() => router.push('/dev')} />
         ) : undefined
       }

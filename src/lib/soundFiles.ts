@@ -4,6 +4,8 @@ export const SOUND_FILES = {
   tension: require('../../assets/sounds/tension.wav') as number,
   hit: require('../../assets/sounds/hit.wav') as number,
   chime: require('../../assets/sounds/chime.wav') as number,
+  clap: require('../../assets/sounds/clap.wav') as number,
+  pop: require('../../assets/sounds/pop.wav') as number,
 };
 
 export type SoundName = keyof typeof SOUND_FILES;

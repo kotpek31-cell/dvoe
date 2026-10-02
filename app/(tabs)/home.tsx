@@ -70,8 +70,8 @@ export default function HomeScreen() {
   const [bubble, setBubble] = useState(false);
   const [meAct, setMeAct] = useState<'wave' | 'jump' | 'love' | null>(null);
   const [picker, setPicker] = useState(false);
-  const [goMe, setGoMe] = useState<{ x: number; id: number } | null>(null);
-  const [goPartner, setGoPartner] = useState<{ x: number; id: number } | null>(null);
+  const [goMe, setGoMe] = useState<{ x: number; y?: number; id: number } | null>(null);
+  const [goPartner, setGoPartner] = useState<{ x: number; y?: number; id: number } | null>(null);
   const [meet, setMeet] = useState<'go' | 'five' | 'wave' | null>(null);
   const [sparks, setSparks] = useState(0);
   const arrived = useRef(new Set<string>());
@@ -141,8 +141,9 @@ export default function HomeScreen() {
         const sz = Math.round(104 * sceneTransform(width, height).s);
         arrived.current.clear();
         setMeet('go');
-        setGoMe({ x: cx - sz * 0.92, id });
-        setGoPartner({ x: cx - sz * 0.08, id });
+        const top = sceneTransform(width, height).y(534); // встречаются на одной глубине
+        setGoMe({ x: cx - sz * 0.92, y: top, id });
+        setGoPartner({ x: cx - sz * 0.08, y: top, id });
         later('meet', 7000, () => setMeet(null)); // не дошли — не страшно
       } else {
         setMeet('wave');
@@ -168,6 +169,9 @@ export default function HomeScreen() {
   const chibiH = Math.round((size * 170) / 120);
   const minX = Math.max(8, tf.x(16));
   const maxX = Math.min(width - size - 8, tf.x(270));
+  // Ходят и вглубь: верх чибика от дальнего края луга до ближнего (над нижней панелью)
+  const minTop = tf.y(498);
+  const maxTop = tf.y(590);
 
   if (!me) return <View style={styles.root} />;
 
@@ -229,12 +233,12 @@ export default function HomeScreen() {
     act === 'wave' || act === 'jump' ? { emotion: 'joy' as FaceKey, value: 80 } : act === 'love' ? { emotion: 'love' as FaceKey, value: 72 } : face;
 
   // Нажали на пустую землю — идём туда
-  const tapGround = (pageX: number) => {
+  const tapGround = (pageX: number, pageY: number) => {
     if (meSleeps) return;
     haptic.tap();
     setBubble(false);
     setMeAct(null);
-    setGoMe({ x: pageX - size / 2, id: Date.now() });
+    setGoMe({ x: pageX - size / 2, y: pageY - chibiH, id: Date.now() });
   };
   const meetPose = meet === 'five' ? 'cheer' : meet === 'wave' ? 'wave' : null;
 
@@ -318,7 +322,7 @@ export default function HomeScreen() {
       <View style={[StyleSheet.absoluteFill, playing ? styles.hidden : null]} pointerEvents={playing ? 'none' : 'box-none'}>
       <Pressable
         style={[styles.ground, { top: tf.y(505) }]}
-        onPress={(e) => tapGround(e.nativeEvent.pageX)}
+        onPress={(e) => tapGround(e.nativeEvent.pageX, e.nativeEvent.pageY)}
         accessibilityLabel="Земля: нажми, и твой чибик пойдёт туда"
       />
       {partner && !partnerSleeps ? (
@@ -328,6 +332,8 @@ export default function HomeScreen() {
           value={pFace.value}
           size={size}
           top={tf.y(520)}
+          minTop={minTop}
+          maxTop={maxTop}
           minX={minX}
           maxX={maxX}
           startX={minX + (maxX - minX) * 0.85}
@@ -363,6 +369,8 @@ export default function HomeScreen() {
           value={mFace.value}
           size={size}
           top={tf.y(548)}
+          minTop={minTop}
+          maxTop={maxTop}
           minX={minX}
           maxX={maxX}
           startX={minX + (maxX - minX) * 0.15}
@@ -401,7 +409,9 @@ export default function HomeScreen() {
           <HeartsBurst trigger={heartsM} x={size / 2} y={chibiH * 0.36} scale={tf.s} />
         </Walker>
       ) : null}
-      <SparkPop trigger={sparks} x={width / 2} y={tf.y(520) + chibiH * 0.05} scale={tf.s} />
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.front]}>
+        <SparkPop trigger={sparks} x={width / 2} y={tf.y(534) + chibiH * 0.05} scale={tf.s} />
+      </View>
       </View>
 
       <View style={[styles.topBar, { top: insets.top + 8 }, playing ? styles.hidden : null]} pointerEvents="box-none">
@@ -511,6 +521,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#6FB7F5', overflow: 'hidden' },
   hidden: { opacity: 0 },
+  front: { zIndex: 5000 },
   ground: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   online: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.good, marginLeft: 2 },
   checkMode: {

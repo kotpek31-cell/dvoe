@@ -167,8 +167,43 @@ function mogVoice() {
   return fade(d, 0.005, 0.05);
 }
 
+// «Дай пять»: хлопок ладоней (сжатый шум через резонатор) и короткий звонкий блик (0,5 с)
+function clap() {
+  const d = len(0.5);
+  const palm = resonator(1400, 900);
+  const palm2 = resonator(2600, 1400);
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    let v = 0;
+    for (const [at, k] of [[0, 1], [0.012, 0.6], [0.026, 0.35]]) {
+      const dt = t - at;
+      if (dt >= 0) v += k * Math.exp(-dt * 55) * noise();
+    }
+    v = palm(v) * 9 + palm2(v) * 5;
+    const st = t - 0.03;
+    if (st > 0) v += 0.25 * Math.sin(2 * Math.PI * 1760 * st) * Math.exp(-st * 14) + 0.12 * Math.sin(2 * Math.PI * 2637 * st) * Math.exp(-st * 18);
+    d[i] = Math.tanh(v * 1.3);
+  }
+  return fade(d, 0.001, 0.08);
+}
+
+// Реакция: мягкий «чпок» вверх (0,25 с)
+function pop() {
+  const d = len(0.25);
+  let phase = 0;
+  for (let i = 0; i < d.length; i++) {
+    const t = i / RATE;
+    const f = 380 + 900 * (1 - Math.exp(-t * 30));
+    phase += f / RATE;
+    d[i] = Math.sin(2 * Math.PI * phase) * Math.min(1, t * 600) * Math.exp(-t * 18) + noise() * 0.08 * Math.exp(-t * 90);
+  }
+  return fade(d, 0.001, 0.04);
+}
+
 mkdirSync(OUT, { recursive: true });
 wav('tension', tension());
 wav('hit', hit());
 wav('chime', chime());
+wav('clap', clap());
+wav('pop', pop());
 if (!existsSync(join(OUT, 'mog.wav')) || process.argv.includes('--mog')) wav('mog', mogVoice());

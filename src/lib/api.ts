@@ -399,7 +399,9 @@ export async function setLocation(id: string): Promise<void> {
 // ---------- Комната разработчиков (0.2) ----------
 // Каждую функцию сервер проверяет по роли; без роли ответ — «Нет доступа».
 
-export type Access = { role: 'owner' | 'developer'; title: string } | null;
+// guest — «только комната»: без гаечного ключа, но с плиткой «Комната» в профиле
+export type Access = { role: 'owner' | 'developer' | 'guest'; title: string } | null;
+export const isDevRole = (a: Access) => a?.role === 'owner' || a?.role === 'developer';
 
 export async function fetchMyAccess(): Promise<Access> {
   const { data, error } = await supabase.rpc('my_access');
@@ -487,8 +489,8 @@ export async function devListRoles(): Promise<DevRole[]> {
   return (data ?? []) as DevRole[];
 }
 
-export async function devSetRole(query: string, title: string): Promise<void> {
-  const { error } = await supabase.rpc('dev_set_role', { p_query: query.trim(), p_title: title.trim() || null });
+export async function devSetRole(query: string, title: string, level: 'developer' | 'guest' = 'developer'): Promise<void> {
+  const { error } = await supabase.rpc('dev_set_role', { p_query: query.trim(), p_title: title.trim() || null, p_level: level });
   check(error);
 }
 
@@ -511,4 +513,82 @@ export async function devTestPartnerRemove(): Promise<number> {
 export async function devTestPartnerSleep(on: boolean): Promise<void> {
   const { error } = await supabase.rpc('dev_test_partner_sleep', { p_on: on });
   check(error);
+}
+
+// ---------- Комната на троих (0.2.2) ----------
+// Всё проверяет сервер: кто вошёл, лимит мест, инвентарь, перезарядка. Движения и реакции идут через
+// закрытый канал комнаты (src/lib/room.ts) и в базу не пишутся — сюда только итоговое место.
+
+export const ROOM_ID = 'dev';
+
+export type RoomInfo = { id: string; name: string; kind: string; capacity: number; location: string; world_w: number; world_d: number };
+export type RoomMember = {
+  id: string;
+  user_id: string | null;
+  bot: boolean;
+  bot_owner: string | null;
+  name: string;
+  role: 'owner' | 'developer' | 'guest' | 'bot';
+  title: string;
+  chibi: unknown;
+  x: number;
+  y: number;
+  seen_at: string;
+  joined_at: string;
+};
+export type RoomState = { room: RoomInfo; members: RoomMember[]; me: string | null; level: string | null };
+export type RoomEnter =
+  | ({ ok: true } & RoomState)
+  | { ok: false; error: 'full'; message: string; capacity: number; members: RoomMember[] };
+
+export type RoomCast = {
+  id: string;
+  room_id: string;
+  from_member: string;
+  to_member: string;
+  from_user: string | null;
+  to_user: string | null;
+  ability: string;
+  blocked: boolean;
+  created_at: string;
+  seen_at: string | null;
+};
+export type RoomCastResult =
+  | { ok: true; id: string; created_at: string; cooldown_s: number; blocked: boolean }
+  | { ok: false; error: string; message: string; wait_s?: number };
+
+async function rpc<T>(name: string, args: Record<string, unknown> = {}): Promise<T> {
+  const { data, error } = await supabase.rpc(name, args);
+  check(error);
+  return data as T;
+}
+
+export const roomState = () => rpc<RoomState>('room_state', { p_room: ROOM_ID });
+export const roomEnter = () => rpc<RoomEnter>('room_enter', { p_room: ROOM_ID });
+export const roomLeave = () => rpc<void>('room_leave', { p_room: ROOM_ID });
+export const roomKick = (member: string) => rpc<void>('room_kick', { p_member: member });
+export const roomSetCapacity = (n: number) => rpc<number>('room_set_capacity', { p_capacity: n, p_room: ROOM_ID });
+export const roomSetLocation = (id: string) => rpc<string>('room_set_location', { p_location: id, p_room: ROOM_ID });
+export const roomBotAdd = () => rpc<string>('room_bot_add', { p_room: ROOM_ID });
+export const roomBotRemove = (member: string) => rpc<void>('room_bot_remove', { p_member: member });
+export const roomMove = (x: number, y: number, member: string | null) =>
+  rpc<void>('room_move', { p_x: x, p_y: y, p_member: member, p_room: ROOM_ID });
+export const roomPing = (away = false) => rpc<void>('room_ping', { p_away: away, p_room: ROOM_ID });
+export const roomPendingCasts = () => rpc<RoomCast[]>('room_pending_casts', { p_room: ROOM_ID }).then((r) => r ?? []);
+export const roomMarkCastsSeen = (ids: string[]) => (ids.length ? rpc<number>('room_mark_casts_seen', { p_ids: ids }) : Promise.resolve(0));
+export const roomNotify = (kind: 'five' | 'five_all', target: string | null = null) =>
+  rpc<boolean>('room_notify', { p_kind: kind, p_target: target, p_room: ROOM_ID });
+export const devRoomResetRecords = () => rpc<void>('dev_room_reset_records');
+
+export async function roomCast(target: string, ability: string, from: string | null = null): Promise<RoomCastResult> {
+  const res = ((await rpc<Record<string, unknown>>('room_cast', { p_target: target, p_ability: ability, p_from: from, p_room: ROOM_ID })) ?? {});
+  if (res.ok === true) {
+    return { ok: true, id: String(res.id), created_at: String(res.created_at), cooldown_s: Number(res.cooldown_s) || 15, blocked: res.blocked === true };
+  }
+  return {
+    ok: false,
+    error: typeof res.error === 'string' ? res.error : 'unknown',
+    message: typeof res.message === 'string' ? res.message : 'Не получилось',
+    wait_s: typeof res.wait_s === 'number' ? res.wait_s : undefined,
+  };
 }
