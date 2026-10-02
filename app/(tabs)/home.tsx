@@ -647,7 +647,7 @@ export default function HomeScreen() {
 
       {!playing && stick && !meSleeps ? (
         <Joystick
-          size={Math.round(Math.min(100, width * 0.25))}
+          size={Math.round(Math.min(88, width * 0.22))}
           onSteer={onSteer}
           onRelease={() => setSteer(null)}
           style={{ left: 16, bottom: Math.max(insets.bottom, 10) + 6 + 68 + 14 }}

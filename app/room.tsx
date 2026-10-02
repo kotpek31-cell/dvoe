@@ -844,9 +844,8 @@ export default function RoomScreen() {
         },
         onPanResponderRelease: () => {
           if (pan.current.multi) {
-            // щипок кончился: ближе к обзору — весь мир, иначе — обычный вид
-            const fit = fitZoom();
-            zoomToRef.current(zoomRef.current < (1 + fit) / 2 ? fit : 1);
+            // щипок кончился: почти без отдаления — обычный вид (камера снова за мной), иначе — как оставили
+            if (zoomRef.current > 0.9) zoomToRef.current(1, true);
             setTick((n) => n + 1);
             return;
           }
@@ -1265,7 +1264,7 @@ export default function RoomScreen() {
     { key: 'play', icon: 'wheel', label: game.starting ? 'Крутим…' : 'Играть', color: C.accent, onPress: () => (closeMenu(), game.play()) },
     { key: 'five', icon: 'hand', label: 'Все — пять', onPress: () => (closeMenu(), fiveAll()) },
     { key: 'people', icon: 'users', label: 'Кто здесь', onPress: () => (closeMenu(), setPeople(true)) },
-    { key: 'zoom', icon: zoomed ? 'zoomIn' : 'zoomOut', label: zoomed ? 'Ближе' : 'Обзор', hide: g.worldW <= g.width + 1, onPress: () => (closeMenu(), zoomed ? zoomTo(1, true) : zoomTo(fitZoom())) },
+    { key: 'zoom', icon: zoomed ? 'zoomIn' : 'zoomOut', label: zoomed ? 'Ближе' : 'Обзор', hide: g.worldW <= g.width + 1, onPress: () => (closeMenu(), zoomed ? zoomTo(1, true) : zoomTo(Math.max(fitZoom(), 0.5))) },
     { key: 'place', icon: 'pin', label: 'Место', onPress: () => (closeMenu(), setPicker(true)) },
     { key: 'records', icon: 'trophy', label: 'Рекорды', color: '#FFD45E', onPress: () => (closeMenu(), setRecords(true)) },
     { key: 'bot', icon: 'bot', label: busy === 'bot' ? 'Зовём…' : 'Позвать бота', color: C.good, hide: !isDevRole(access) || members.length >= (room?.capacity ?? 3), onPress: () => (closeMenu(), addBot()) },
@@ -1433,7 +1432,7 @@ export default function RoomScreen() {
 
       {/* джойстик — слева внизу; кнопки сверху, внизу больше ничего нет: ходить ничто не мешает */}
       {stickOn ? (
-        <Joystick size={stickSize} onSteer={onSteer} onRelease={onSteerEnd} style={{ left: 16, bottom: stickBottom }} />
+        <Joystick size={stickSize} onSteer={onSteer} onRelease={onSteerEnd} style={{ left: 16, bottom: stickBottom + (game.snap ? 46 : 0) }} />
       ) : null}
 
       {menuOpen && !playing ? <Pressable style={StyleSheet.absoluteFill} onPress={closeMenu} accessibilityLabel="Закрыть меню" /> : null}
