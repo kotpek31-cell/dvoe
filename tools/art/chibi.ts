@@ -4,6 +4,7 @@ import { faceModel, faceParams, FACE_PATHS, FACE_SPOTS, INK, type FaceKey } from
 
 // ---------- цвета (общие с приложением: src/lib/palette.ts) ----------
 import { CLOTH, HAIR, SKIN } from '../../src/lib/palette.ts';
+import { eyeArt, isNewEye } from '../../src/lib/eyes.ts';
 export { CLOTH, HAIR, SKIN };
 
 function rgb(h: string): number[] {
@@ -36,7 +37,7 @@ export function el(tag: string, attrs: A, children = ''): string {
     .join(' ');
   return `<${tag}${a ? ' ' + a : ''}>${children}</${tag}>`;
 }
-const SW = 2.2;
+export const SW = 2.2;
 export const path = (d: string, fill: string, o: A = {}) =>
   d ? el('path', { d, fill, stroke: INK, 'stroke-width': SW, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', ...o }) : '';
 export const line = (d: string, color: string, w: number, o: A = {}) =>
@@ -46,7 +47,7 @@ let uidN = 0;
 export const uid = (p: string) => `${p}${++uidN}`;
 
 // ---------- постоянные детали ----------
-const P = {
+export const P = {
   legL: { x: 47, y: 124, w: 11, h: 24 },
   legR: { x: 62, y: 124, w: 11, h: 24 },
   shoeL: 'M44 150 C44 145 47.5 143.5 52.5 143.5 C57.5 143.5 60 146 60 150.5 C60 154.5 57 156.5 52 156.5 C47 156.5 44 154.5 44 150 Z',
@@ -57,14 +58,14 @@ const P = {
   collar: 'M47 99.5 C49 106 56 107 60 102 C64 107 71 106 73 99.5 C68 98 52 98 47 99.5 Z',
   bowLoops: 'M0 0 C-4 -7 -12 -8 -12 -1 C-12 6 -4 5 0 0 Z M0 0 C4 -7 12 -8 12 -1 C12 6 4 5 0 0 Z',
 };
-const HOODIE = 'M40 104 C40 99 47 96 60 96 C73 96 80 99 80 104 L84 128 C85 134 81 137 76 137 L44 137 C39 137 35 134 36 128 Z';
-const DRESS = 'M41 103 C41 98.5 48 96 60 96 C72 96 79 98.5 79 103 L86 133 C87 138 83 140 78 140 L42 140 C37 140 33 138 34 133 Z';
+export const HOODIE = 'M40 104 C40 99 47 96 60 96 C73 96 80 99 80 104 L84 128 C85 134 81 137 76 137 L44 137 C39 137 35 134 36 128 Z';
+export const DRESS = 'M41 103 C41 98.5 48 96 60 96 C72 96 79 98.5 79 103 L86 133 C87 138 83 140 78 140 L42 140 C37 140 33 138 34 133 Z';
 
 // ---------- вещи ----------
 export type Cat = 'hair' | 'eyes' | 'hat' | 'face' | 'top' | 'bottom' | 'shoes' | 'back' | 'hand';
 export type Slot = { id: string; c?: string };
-type Ctx = { col: string; skin: string; side?: 'L' | 'R'; x?: number };
-type Item = {
+export type Ctx = { col: string; skin: string; side?: 'L' | 'R'; x?: number };
+export type Item = {
   cat: Cat;
   name: string;
   def?: string; // цвет по умолчанию
@@ -75,16 +76,19 @@ type Item = {
   cuff?: string; // манжеты на рукавах
   coversBottom?: boolean;
   hover?: boolean;
+  anim?: 'sway' | 'flicker' | 'pulse'; // 0.2.1: качается (спина) или мерцает (слои *Fx)
+  pivot?: [number, number]; // точка качания
+  skin?: string; // вещь красит кожу (Франкенштейн, вампир)
   layers: Partial<Record<string, (c: Ctx) => string>>;
 };
 
-const BOY_FRONT =
+export const BOY_FRONT =
   'M15 66 C11 38 30 17 60 17 C90 17 109 38 105 66 C102 58 98 52 93 49 C92 54 89 57 85 58 C85 52 82 47 77 45 C75 51 70 55 63 55 C65 50 64 46 61 43 C57 50 50 55 41 55 C44 51 45 47 44 44 C38 48 34 54 31 58 C30 53 28 50 26 49 C21 53 17 59 15 66 Z';
-const GIRL_FRONT =
+export const GIRL_FRONT =
   'M15 70 C11 38 32 16 60 16 C88 16 109 38 105 70 C103 63 101 58 98 54 C94 58 89 58 85 55 C82 59 76 60 71 57 C67 61 62 61 58 58 C54 61 48 61 45 57 C41 60 36 59 32 55 C28 58 23 58 21 54 C18 59 16 64 15 70 Z';
-const NB_FRONT =
+export const NB_FRONT =
   'M15 70 C11 38 32 16 60 16 C88 16 109 38 105 70 C103 62 100 55 95 50 C88 55 76 54 68 44 C66 50 62 53 60 53 C58 53 54 50 52 44 C44 54 32 55 25 50 C20 55 17 62 15 70 Z';
-const shine = (d: string) => line(d, '#FFFFFF', 2.6, { opacity: 0.3 });
+export const shine = (d: string) => line(d, '#FFFFFF', 2.6, { opacity: 0.3 });
 
 export const ITEMS: Record<string, Item> = {
   // ----- причёски -----
@@ -482,7 +486,10 @@ function face(look: Look, o: Opts, skin: string): string {
     { transform: `rotate(${f.rot} 50 56)` },
   );
   // глаза
-  if (f.eyesOp > 0) {
+  if (f.eyesOp > 0 && isNewEye(style)) {
+    out += g(eyeArt(style, f, eyeCol, uid('ey')), { opacity: f.eyesOp, transform: `rotate(${f.rot} 50 56)` });
+  }
+  if (f.eyesOp > 0 && !isNewEye(style)) {
     const cx0 = 50 + (o.look ?? 0);
     const edx = p.edx * 1.1;
     const w = p.ew * k;
@@ -573,15 +580,22 @@ function face(look: Look, o: Opts, skin: string): string {
 
 // ---------- сам чибик (группа в координатах 120×170) ----------
 export function chibi(look: Look, o: Opts = {}): string {
-  const skin = SKIN[look.skin] ?? SKIN[1];
   const items = (['back', 'hair', 'hat', 'face', 'top', 'bottom', 'shoes', 'hand'] as const)
     .map((k) => look[k] as Slot | null | undefined)
     .filter(Boolean) as Slot[];
+  const skin = items.map((s) => ITEMS[s.id]?.skin).find(Boolean) ?? SKIN[look.skin] ?? SKIN[1];
+  // Живые слои (качание, мерцание) в макете помечены классом — их оживляет CSS страницы
+  const ANIMATED = new Set(['back', 'backFx', 'handFx']);
   const layer = (name: string, extra: Partial<Ctx> = {}) =>
     items
       .map((s) => {
-        const fn = ITEMS[s.id]?.layers[name];
-        return fn ? fn({ col: colorOf(s), skin, ...extra }) : '';
+        const it = ITEMS[s.id];
+        const fn = it?.layers[name];
+        if (!fn) return '';
+        const art = fn({ col: colorOf(s), skin, ...extra });
+        if (!it.anim || !ANIMATED.has(name) || (name === 'back' && it.anim !== 'sway')) return art;
+        const [px, py] = it.pivot ?? [60, 100];
+        return g(art, { class: `a-${it.anim}`, style: `transform-origin:${px}px ${py}px;transform-box:view-box` });
       })
       .join('');
   const top = ITEMS[look.top.id];
@@ -619,6 +633,7 @@ export function chibi(look: Look, o: Opts = {}): string {
     else s += el('rect', { x, y: 100, width: 11, height: 24, rx: 5.5, fill: sleeveCol, stroke: INK, 'stroke-width': SW });
     if (top?.cuff && top.sleeve !== 'short') s += el('rect', { x: x - 0.4, y: 117.5, width: 11.8, height: 5.5, rx: 2.6, fill: top.cuff, stroke: INK, 'stroke-width': 1.6 });
     s += layer(side === 'L' ? 'handL' : 'handR');
+    if (side === 'R') s += layer('handFx');
     s += el('circle', { cx: hx, cy: 126, r: 5.2, fill: skin, stroke: INK, 'stroke-width': 2 });
     const pivot = side === 'L' ? '39 103' : '81 103';
     return g(g(s, { transform: base }), rot ? { transform: `rotate(${rot} ${pivot})` } : {});
@@ -626,6 +641,7 @@ export function chibi(look: Look, o: Opts = {}): string {
 
   let body = '';
   body += layer('back');
+  body += layer('backFx');
   body += layer('hairBack');
   body += leg('L') + leg('R');
   body += bottom?.layers.under ? bottom.layers.under({ col: bottomCol, skin }) : '';
