@@ -8,21 +8,26 @@
 
 **Версия 0.1.1 (выпущена 1 октября 2026):** вкладки Главная / Настроение / Сон / Мы / Итоги / Профиль; онбординг (чибик → уведомления → доступ к сну на Android); главная «Луг у озера» (день/вечер/ночь), чибики гуляют, спят, когда человек спит, показывают настроение; «Думаю о тебе» — нажать на чибика партнёра; настроение — ползунки-смесь эмоций с лицами (0–100); желания в профиле (новые + исполненные, пуш о новом желании); вопрос дня, благодарности, оценка дня; итоги; аврора + стекло + анимации; пуши на iPhone (Web Push) и Android (FCM); Android-виджет с лицом настроения. Воды больше нет (таблица water_logs осталась, не используется). Чибики: мальчик / девочка / небинарный (по умолчанию небинарный).
 
+**Версия 0.2 «Гардероб и способности» (выпущена 2 октября 2026: сайт + APK 0.2.0; ждёт проверки на телефонах обоих):** чибики 2.0 из вещей каталога (позы, крылья с парением); гардероб = инвентарь (Внешность · Одежда · Предметы · Способности, 10 цветов, примерка); секретные коды (обычные и Core, только сервер); способности «Объятия» и «Мог» — кнопка справа внизу на главной, сцены у обоих (realtime), звуки, пуши, пропущенные сцены; 4 локации (луг, северное сияние, крыша, пляж) × день/вечер/ночь, выбор места на пару; касания на главной (бег по нажатию на землю, зелёная точка «партнёр в приложении», «дай пять»); комната разработчиков (гаечный ключ в профиле: выдача вещей, коды, проверка вхолостую, тестовый партнёр-бот, цифры, люди и роли по ID); нижняя панель «Капсула с подписью»; «Что нового»; иконки «Ладошки»; автообновление Android (expo-updates). Подробности и решения — `docs/PROGRESS_0.2.md`, ТЗ — https://claude.ai/code/artifact/9270f9e1-2d1e-4088-8974-3adcdc146939
+
 ## 2. Инфраструктура
 - **Сайт:** https://kotpek31-cell.github.io/dvoe/ — GitHub Actions (`.github/workflows/web.yml`) при каждом push в `main`. Pages кэширует до 10 мин (проверять с `?v=N`).
 - **Репозиторий:** github.com/kotpek31-cell/dvoe (ПУБЛИЧНЫЙ — никаких секретов и секретных кодов в коде).
-- **Android:** EAS Build, аккаунт Expo `gaster45`, профиль `preview` → APK, ставится поверх. Пакет `com.gaster.dvoe` — НЕ менять. `app.json`: сохранять `extra.eas.projectId` (43ca4251-00ac-42e8-b36b-8c8b99dd6d0f) и `owner`.
+- **Android:** EAS Build, аккаунт Expo `gaster45`, профиль `preview` → APK, ставится поверх. GitHub-репозиторий подключён к Expo — APK собирает Claude через коннектор Expo (`build_run`, ветка `main`), без Codespace. Автообновление: expo-updates, канал `preview`, `runtimeVersion` = версия приложения; JS-исправления — `eas update --channel preview` (новый APK — только при новых нативных модулях или смене версии). Пакет `com.gaster.dvoe` — НЕ менять. `app.json`: сохранять `extra.eas.projectId` (43ca4251-00ac-42e8-b36b-8c8b99dd6d0f) и `owner`.
 - **Supabase:** проект «Dvoe», ref `uvlausosjxzhytzyfduz`, eu-north-1, URL `https://uvlausosjxzhytzyfduz.supabase.co` (`.co`!). Ключ publishable в `.env` (закоммичен намеренно). Confirm email выключен.
-- **Firebase:** проект `dvoe-19c34`, ключ FCM V1 загружен в Expo → Credentials. `google-services.json` лежит ТОЛЬКО в корне Codespace (в .gitignore, не в .easignore). TODO: перенести его в EAS env var (тип File, `GOOGLE_SERVICES_JSON`), чтобы APK можно было собирать без Codespace — `app.config.js` уже поддерживает.
-- **Codespace** probable-space-pancake: секрет `EXPO_TOKEN`, там запускается `eas build`.
+- **Firebase:** проект `dvoe-19c34`, ключ FCM V1 загружен в Expo → Credentials. `google-services.json` — в EAS env var `GOOGLE_SERVICES_JSON` (File, Secret, окружения preview и production; профиль preview в eas.json берёт окружение preview), в репозиторий НЕ класть. В логе сборки проверять шаг `processReleaseGoogleServices`.
+- **Codespace** probable-space-pancake: секрет `EXPO_TOKEN`; нужен для `eas update` (и как запасной путь для `eas build`).
 - **Коннекторы Claude (подключены):** GitHub Integration (репозиторий `dvoe`), Supabase (SQL, функции, логи), Expo (сборки, логи). Облачные сессии Claude — на репозитории `dvoe`; кредиты $100 до 5 ноября 2026.
 
 ## 3. Стек и устройство
 Expo SDK 57 (RN 0.86, React 19.2), Expo Router, supabase-js v2, react-native-svg, RN Animated, шрифты Nunito + Unbounded (@expo-google-fonts). Платформенные файлы `*.web.ts` / `*.android.tsx` / `*.ios.ts` — нативное не должно попадать в веб-бандл.
-- Вкладки: `app/(tabs)/` home, mood, sleep, us, stats, profile + своя панель `src/components/TabBar.tsx`. Прочие экраны: sign-in, pair, onboarding, day-score, questions, settings.
-- Графика: `src/lib/face.ts` — параметрический генератор лиц (эмоция 0→100), он же рисует лицо чибика и виджета. `src/components/Chibi.tsx` — чибик слоями SVG (волосы сзади, ноги, тело, руки, голова, лицо, чёлка), анимация слоёв трансформациями. `src/lib/chibi.ts` — описания видов. `src/components/scene/Meadow.tsx` — локация.
+- Вкладки: `app/(tabs)/` home, mood, sleep, us, stats, profile + своя панель `src/components/TabBar.tsx` (Б3: островки, активный — капсула). Прочие экраны: sign-in, pair, onboarding, day-score, questions, settings, wardrobe, dev (комната разработчиков).
+- Графика: `src/lib/face.ts` — параметрический генератор лиц (эмоция 0→100), он же рисует лицо чибика и виджета. `src/components/Chibi.tsx` — чибик слоями SVG (волосы сзади, ноги, тело, руки, голова, лицо, чёлка), анимация слоёв трансформациями. `src/lib/chibi.ts` — образ (`Look`) из вещей каталога, `src/lib/catalog.ts` — каталог (база `items` → кэш → встроенный `catalogStarter.ts`), `src/lib/art.tsx` — SVG-строка слоя → react-native-svg. Исходники рисунков и генераторы — `tools/art/` (`node tools/art/catalog.ts` пересобирает catalog.sql и catalogStarter.ts; `icons.ts` + `icons-png.cjs` — иконки), звуки — `tools/sound/build.ts`.
+- Локации: `src/lib/locations.ts` (рисунок SVG-строкой × день/вечер/ночь) + `src/components/scene/Location.tsx` (живые детали; луг — `Meadow.tsx`). Новая локация = функция в locations.ts + строка в `public.locations`.
+- Способности: `src/context/AbilityProvider.tsx` (применение, перезарядка, realtime, очередь сцен), `src/components/AbilityButton.tsx`, `scene/AbilityScene.tsx` (таймлайн сцен), `CastBanner.tsx`; звук — `src/lib/sound.ts` (expo-audio) / `sound.web.ts` (Web Audio, разблокировка касанием).
+- Роли: `src/lib/access.ts` (`my_access`), подмена времени/места для проверки — `src/lib/devOverride.ts`.
 - Сон Android: `modules/screen-sleep` (Kotlin, UsageStatsManager). iPhone — кнопки «Иду спать / Проснулся».
-- БД: `supabase/schema.sql` — идемпотентный, строгий RLS, явные GRANT. `profiles.chibi` (jsonb, `{"kind": ...}` — сюда же пойдёт гардероб), `mood_entries.emotions` (jsonb {эмоция: 0–100}; в emotion/intensity — главная эмоция для старых версий).
+- БД: `supabase/schema.sql` — идемпотентный, строгий RLS, явные GRANT; разделы 10–11 — 0.2 (items, inventory, ability_casts, локации, закрытая схема `private`: роли, коды-отпечатки, тестовые боты; `profiles.short_id` — ID из 6 символов). `profiles.chibi` (jsonb, образ v2: `{"kind","v":2,"skin","hair":{"id","c"},…,"ability"}`; старый `{"kind"}` тоже понимается), `mood_entries.emotions` (jsonb {эмоция: 0–100}; в emotion/intensity — главная эмоция для старых версий).
 - Пуши: `notify_partner` в базе → pg_net → Expo Push API (Android) и → Edge Function `push` (Web Push, RFC 8291 + VAPID на WebCrypto). Ключи VAPID и `push_secret` в `private.app_config`, функция читает их ключом сервера и сама создаёт VAPID при первом запуске. У функции ВЫКЛЮЧЕНА проверка JWT. Адреса подписок — только Apple/Google/Mozilla/Microsoft.
 - `src/lib/focus.ts` — `useScreenFocused` (анимации на скрытых экранах стоят).
 
@@ -31,7 +36,11 @@ Expo SDK 57 (RN 0.86, React 19.2), Expo Router, supabase-js v2, react-native-svg
 - Неактивные вкладки в вебе навигатор может не прятать → каждая вкладка непрозрачная со своей авророй (`Screen tabs`), прозрачных сцен не делать.
 - `npx expo install` с `app.config.js` пишет «Cannot automatically write to dynamic config» и выходит с ошибкой — в скриптах не использовать с `set -e` без `|| true`.
 - В Supabase SQL Editor кнопка «Run selected» выполняет только выделенное; предупреждение про RLS для нашего скрипта — «Run without RLS» (RLS включается в самом скрипте).
-- В песочнице Claude npm может быть закрыт — тогда настоящий tsc/сборка только в EAS/Actions; проверять логи через коннектор Expo.
+- В песочнице Claude npm может быть закрыт — тогда настоящий tsc/сборка только в EAS/Actions; проверять логи через коннектор Expo. В облачной сессии на репозитории npm открыт: `npx tsc --noEmit`, `npx expo export --platform web|android`, скриншоты — Playwright по `dist` с подменой ответов Supabase.
+- Коннектор Supabase не применяет SQL со словами delete/drop/revoke (даже в теле функции): ждёт подтверждения и падает по тайм-ауту 60 с. Такие части сразу класть отдельным файлом `supabase/patch_*.sql` для SQL Editor.
+- Новые функции в public по умолчанию доступны anon — закрывать `revoke` в том же патче; после изменений базы — проверка безопасности (advisors).
+- Роли: владелец — основной аккаунт пользователя (с iPhone, ID 4GGG4H), а не любой аккаунт с его email. Перед выдачей ролей сверять ID с настройками.
+- В `Sheet` ширину карточек считать с учётом рамки панели; у `Pressy` ширину задавать и в `style`.
 
 ## 4. Дизайн-система (не отступать без просьбы)
 - Тёмная тема: фон `#0B0A14`, аврора (медленные цветные пятна), стеклянные карточки `rgba(28,23,48,0.74)` + граница `rgba(255,255,255,0.13)`, скругления крупные.
@@ -65,11 +74,12 @@ Expo SDK 57 (RN 0.86, React 19.2), Expo Router, supabase-js v2, react-native-svg
 1. Код: облачная сессия на `dvoe` → изменения в ветке → после «ок» в `main` (сайт обновится сам). Без облачной сессии — архив + `update.sh` в Codespace.
 2. База: изменения только в `supabase/schema.sql` (идемпотентно), применять через коннектор Supabase после «да» или через SQL Editor.
 3. Edge Function `push`: через коннектор Supabase (deploy) с выключенной проверкой JWT.
-4. APK: `eas build -p android --profile preview` в Codespace (или через Expo-коннектор, когда google-services.json переедет в EAS env var). Ссылка на APK — из списка сборок.
+4. APK: Claude запускает сборку через коннектор Expo (`build_run`, профиль `preview`, ветка `main`), проверяет лог (`processReleaseGoogleServices`) и даёт ссылку. Только JS-правки — `eas update --channel preview` из Codespace, без нового APK. Сборка — платная операция по лимиту Expo, только после «да».
 5. Проверка на телефонах обоих → баги → обновить этот файл.
 
 ## 8. План
-### 0.2 — «Гардероб и способности» (сейчас)
+### 0.2 — «Гардероб и способности» (выпущена 2 октября 2026)
+Осталось: проверка на телефонах обоих (чек-лист в `docs/PROGRESS_0.2.md` → «Шаг 8»), `eas update --channel preview` с правкой гаечного ключа для APK, перед публикацией в магазинах — защита от утёкших паролей в Supabase. Ниже — исходный план 0.2 (для истории).
 Системы целиком + стартовый контент (по 3–4 вещи на категорию, 3–4 локации):
 1. **Инвентарь** с сортировкой (по категории, редкости — редкость заложить в данные, показывать позже) — всё надеваемое: одежда, предметы, способности.
 2. **Гардероб** — экран из профиля рядом с чибиком. Категории: шляпы, причёски, глаза, верх, низ, обувь, аксессуары (предметы в руках), цвета (система перекраски — 10 цветов). Надетое видят все.
@@ -95,7 +105,7 @@ Expo SDK 57 (RN 0.86, React 19.2), Expo Router, supabase-js v2, react-native-svg
    Везде: тёмный фон с лёгкой авророй, акцент `#FF6B8A` + сиреневый, читается в маленьком размере, не похоже на пересекающиеся круги.
 10. **Комната разработчиков** — скрытый экран, виден только аккаунтам с ролью «разработчик» (роли в базе, проверка на сервере; разработчиков сколько угодно, главный — Gaster, он добавляет и убирает). Внутри: выдать любой предмет/способность себе или другому; создать секретный код и видеть, кто его ввёл; запустить способность «вхолостую»; переключать время суток и локацию для проверки; общая статистика (сколько пар, активных).
 
-### 0.2.1, 0.2.2 … — наборы контента
+### 0.2.1, 0.2.2 … — наборы контента (следующий шаг)
 До 10 предметов в каждой категории и 10 локаций. Каждый набор — короткий отдельный чат.
 
 ### 0.2.x — «Портал»
