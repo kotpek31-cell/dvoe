@@ -94,7 +94,7 @@ function build(page, outDir) {
   const html = `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Стенд «Двое» — ${page}</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800&family=Unbounded:wght@600;700&display=swap">
-<style>html,body,#root{margin:0;height:100%;background:#0B0A14}#root{display:flex;flex-direction:column}</style></head>
+<style>html,body,#root{margin:0;height:100%;background:#0B0A14}#root{display:flex;flex-direction:column}[data-pe="box-none"]>*{pointer-events:auto}</style></head>
 <body><div id="root"></div><script>${js.replace(/<\/script/g, '<\\/script')}</script></body></html>`;
   const out = path.join(outDir, `${page}.html`);
   fs.writeFileSync(out, html);

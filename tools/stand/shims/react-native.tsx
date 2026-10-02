@@ -434,8 +434,10 @@ function domProps(p: Props, base: Record<string, string | number>) {
   const css = { ...base, ...toCss(flat) };
   const w = fontWeightOf(flat.fontFamily);
   if (w) css.fontWeight = w;
-  if (p.pointerEvents) css.pointerEvents = p.pointerEvents === 'box-none' ? 'none' : String(p.pointerEvents);
+  // 'box-none': сам элемент нажатий не ловит, а дети ловят (правило [data-pe] в build.cjs возвращает детям auto)
+  if (p.pointerEvents) css.pointerEvents = p.pointerEvents === 'box-none' || p.pointerEvents === 'none' ? 'none' : 'auto';
   const out: Record<string, unknown> = { style: css };
+  if (p.pointerEvents === 'box-none') out['data-pe'] = 'box-none';
   if (p.accessibilityLabel) out['aria-label'] = p.accessibilityLabel;
   if (p.testID) out['data-testid'] = p.testID;
   return { out, flat };
@@ -464,7 +466,7 @@ function make(tag: string, base: Record<string, string | number>, animated: bool
         dirty.delete(apply);
       };
     }, [live]);
-    const on = p.onPress || p.onLongPress ? { onClick: (e: MouseEvent) => (p.onPress as ((e: unknown) => void) | undefined)?.({ nativeEvent: { pageX: e.pageX, pageY: e.pageY, locationX: e.nativeEvent.offsetX, locationY: e.nativeEvent.offsetY } }) } : {};
+    const on = p.onPress || p.onLongPress ? { onClick: (e: MouseEvent) => (p.onPress as ((e: unknown) => void) | undefined)?.({ nativeEvent: { pageX: e.pageX - (rootBox()?.left ?? 0), pageY: e.pageY - (rootBox()?.top ?? 0), locationX: e.nativeEvent.offsetX, locationY: e.nativeEvent.offsetY } }) } : {};
     if (p.onPress || p.onLongPress) (out.style as Record<string, unknown>).cursor = 'pointer';
     const children = tag === 'span' && p.numberOfLines === 1 ? p.children : p.children;
     return createElement(tag, { ...out, ...on, ref: (n: HTMLElement | null) => { el.current = n; if (typeof ref === 'function') ref(n); else if (ref) (ref as MutableRefObject<HTMLElement | null>).current = n; } }, children as ReactNode);
@@ -533,7 +535,17 @@ export declare namespace Animated {
 }
 
 export const Platform = { OS: 'web' as string, select: <T,>(o: { web?: T; default?: T; android?: T; ios?: T }) => o.web ?? o.default, Version: 0 };
-const win = () => ({ width: typeof window === 'undefined' ? 390 : window.innerWidth, height: typeof window === 'undefined' ? 844 : window.innerHeight, scale: 2, fontScale: 1 });
+// «Экран» стенда — блок #root: страницу можно показать колонкой по центру (как телефон), а не на всё окно
+const rootBox = () => (typeof document === 'undefined' ? null : document.getElementById('root')?.getBoundingClientRect() ?? null);
+const win = () => {
+  const r = rootBox();
+  return {
+    width: r && r.width > 0 ? Math.round(r.width) : typeof window === 'undefined' ? 390 : window.innerWidth,
+    height: r && r.height > 0 ? Math.round(r.height) : typeof window === 'undefined' ? 844 : window.innerHeight,
+    scale: 2,
+    fontScale: 1,
+  };
+};
 export const Dimensions = { get: (_w?: string) => win(), addEventListener: (..._a: unknown[]) => ({ remove() {} }) };
 export function useWindowDimensions() {
   const [d, setD] = useState(win);
@@ -544,7 +556,8 @@ export function useWindowDimensions() {
   }, []);
   return d;
 }
-const reduced = () => typeof window !== 'undefined' && /[?&]reduce=1/.test(window.location.search);
+const reduced = () =>
+  typeof window !== 'undefined' && (/[?&]reduce=1/.test(window.location.search) || Boolean(window.matchMedia?.('(prefers-reduced-motion: reduce)').matches));
 export const AccessibilityInfo = {
   isReduceMotionEnabled: () => Promise.resolve(reduced()),
   isScreenReaderEnabled: () => Promise.resolve(false),
