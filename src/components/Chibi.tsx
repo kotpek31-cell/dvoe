@@ -12,6 +12,7 @@ import { INK, mixColor, type FaceKey } from '../lib/face';
 import { useScreenFocused } from '../lib/focus';
 import { nativeDriver, useReducedMotion } from '../lib/motion';
 import { CLOTH } from '../lib/palette';
+import { NEW_EYES } from '../lib/eyes';
 import { Face, type EyeStyle } from './Face';
 
 export type ChibiPose = 'idle' | 'walk' | 'run' | 'wave' | 'hug' | 'cheer' | 'jump' | 'fallen' | 'sleep';
@@ -39,7 +40,7 @@ const SW = 2.2;
 
 // Порядок вещей внутри одного слоя рисунка
 const ORDER: WearCat[] = ['back', 'hair', 'hat', 'face', 'top', 'bottom', 'shoes', 'hand'];
-const EYE_STYLES = new Set<EyeStyle>(['classic', 'lashes', 'sparkle', 'sleepy', 'azure']);
+const EYE_STYLES = new Set<EyeStyle>(['classic', 'lashes', 'sparkle', 'sleepy', 'azure', ...NEW_EYES]);
 
 const PARTS = {
   legL: { x: 47, y: 124 },
@@ -142,10 +143,20 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
       </>
     );
 
+    // Живые слои 0.2.1: спина одной вещи качается, слои *Fx мерцают
+    const swayer = items.find((it) => it.item.meta.anim === 'sway' && it.item.art.layers?.back);
+    const still = items.filter((it) => it !== swayer);
+    const stillBack = still.some((it) => it.item.art.layers?.back) ? still.flatMap((it) => renderLayer(it.item.art.layers?.back, paint(it), `${it.item.id}.back`)) : null;
+    const pv = swayer?.item.meta.pivot;
     return {
       handL: has('handL'),
       handR: has('handR'),
-      back: has('back') ? layer('back') : null,
+      back: stillBack,
+      sway: swayer ? renderLayer(swayer.item.art.layers?.back, paint(swayer), `${swayer.item.id}.sway`) : null,
+      pivot: (Array.isArray(pv) && pv.length === 2 ? pv : [60, 100]) as [number, number],
+      backFx: has('backFx') ? layer('backFx') : null,
+      handFx: has('handFx') ? <G transform="rotate(-16 81 103)">{layer('handFx')}</G> : null,
+      fxKind: items.find((it) => it.item.art.layers?.backFx || it.item.art.layers?.handFx)?.item.meta.anim === 'pulse' ? 'pulse' : 'flicker',
       hairBack: has('hairBack') ? layer('hairBack') : null,
       legL: leg('L'),
       legR: leg('R'),
@@ -185,12 +196,38 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
   const flap = useRef(new Animated.Value(0)).current; // крылья, нимб, парение
   const wave = useRef(new Animated.Value(0)).current;
   const hop = useRef(new Animated.Value(0)).current; // прыжок
+  const swayV = useRef(new Animated.Value(0)).current; // плащ, шарф, хвост
+  const fx = useRef(new Animated.Value(1)).current; // мерцание огоньков
   const stretch = useRef(new Animated.Value(0)).current; // потягивается
   const [glance, setGlance] = useState(0); // оглядывается
 
   const animate = !still && !reduce && visible && !fallen;
   const moving = pose === 'walk' || pose === 'run';
   const floaty = hover || halo;
+  const hasSway = Boolean(art.sway);
+  const hasFx = Boolean(art.backFx || art.handFx);
+  const fxKind = art.fxKind;
+  // Крылья машут, только если парение — от крыльев (не от метлы или ранца)
+  const flapWings = Boolean(worn.back?.item.meta.hover) && !worn.back?.item.meta.anim;
+
+  useEffect(() => {
+    swayV.setValue(0);
+    fx.setValue(1);
+    if (!animate) return;
+    const loops: Animated.CompositeAnimation[] = [];
+    const tm = (v: Animated.Value, toValue: number, duration: number, easing = Easing.inOut(Easing.sin)) =>
+      Animated.timing(v, { toValue, duration, easing, useNativeDriver: nativeDriver });
+    if (hasSway) loops.push(Animated.loop(Animated.sequence([tm(swayV, 1, moving ? 420 : 1300), tm(swayV, -1, moving ? 420 : 1300)])));
+    if (hasFx) {
+      loops.push(
+        fxKind === 'pulse'
+          ? Animated.loop(Animated.sequence([tm(fx, 0.5, 1100), tm(fx, 1, 1100)]))
+          : Animated.loop(Animated.sequence([tm(fx, 0.55, 90, Easing.linear), tm(fx, 0.95, 120, Easing.linear), tm(fx, 0.5, 80, Easing.linear), tm(fx, 1, 140, Easing.linear), tm(fx, 0.8, 110, Easing.linear)])),
+      );
+    }
+    loops.forEach((a) => a.start());
+    return () => loops.forEach((a) => a.stop());
+  }, [animate, hasSway, hasFx, fxKind, moving, swayV, fx]);
 
   useEffect(() => {
     [cycle, breath, flap, wave, hop, stretch].forEach((v) => v.setValue(0));
@@ -326,6 +363,7 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
       armL: around(PARTS.shoulderL.x, PARTS.shoulderL.y, [{ rotate: deg(armL) }]),
       armR: around(PARTS.shoulderR.x, PARTS.shoulderR.y, [{ rotate: deg(armR) }]),
       hair: around(60, 40, [{ rotate: hair }]),
+      sway: around(art.pivot[0], art.pivot[1], [{ rotate: swayV.interpolate({ inputRange: [-1, 1], outputRange: moving ? ['-6deg', '6deg'] : ['-3deg', '3deg'] }) }]),
       wings: around(60, 104, [{ scaleX: flap.interpolate({ inputRange: [0, 0.25, 0.5, 0.75, 1], outputRange: [1, 0.86, 1, 0.86, 1] }) }]),
       halo: [
         { translateY: flap.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0, -1.8 * k, 0] }) },
@@ -334,7 +372,7 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
       shadow: around(60, 163, [{ scale: shadow }]),
       sleep: [{ translateY: breath.interpolate({ inputRange: [0, 1], outputRange: [0, -1.2 * k] }) }],
     };
-  }, [k, pose, moving, fallen, hover, animate, cycle, breath, flap, wave, hop, stretch]);
+  }, [k, pose, moving, fallen, hover, animate, cycle, breath, flap, wave, hop, stretch, swayV, art.pivot]);
 
   const face = (
     <View style={{ position: 'absolute', left: 12.5 * k, top: 24.5 * k }}>
@@ -386,8 +424,15 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
         </Layer>
       </Moving>
       <Moving transform={t.root}>
+        {art.sway ? (
+          <Moving transform={t.sway}>
+            <Layer k={k} big>
+              {art.sway}
+            </Layer>
+          </Moving>
+        ) : null}
         {art.back ? (
-          hover ? (
+          flapWings ? (
             <Moving transform={t.wings}>
               <Layer k={k} big>
                 {art.back}
@@ -398,6 +443,13 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
               {art.back}
             </Layer>
           )
+        ) : null}
+        {art.backFx ? (
+          <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: fx }]}>
+            <Layer k={k} big>
+              {art.backFx}
+            </Layer>
+          </Animated.View>
         ) : null}
         {art.hairBack ? (
           <Moving transform={t.hair}>
@@ -420,6 +472,13 @@ function ChibiView({ look, emotion, value, pose, size, gaze, flip = false, mog =
           <Layer k={k} big={art.handR}>
             {art.armR}
           </Layer>
+          {art.handFx ? (
+            <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: fx }]}>
+              <Layer k={k} big>
+                {art.handFx}
+              </Layer>
+            </Animated.View>
+          ) : null}
         </Moving>
         <Layer k={k}>{art.head}</Layer>
         {face}

@@ -1057,7 +1057,15 @@ insert into public.locations (id, name, sort, open_by_default) values
   ('meadow', 'Луг у озера',     10, true),
   ('aurora', 'Северное сияние', 20, true),
   ('roof',   'Крыша города',    30, true),
-  ('beach',  'Пляж',            40, true)
+  ('beach',  'Пляж',            40, true),
+  ('forest', 'Лес с костром',   50, true),
+  ('snow',   'Снежная деревня', 60, true),
+  ('cafe',   'Кафе',            70, true),
+  ('moon',   'Луна',            80, true),
+  ('sakura', 'Сад сакуры',      90, true),
+  ('rain',   'Город под дождём', 100, true),
+  ('mountains', 'Горы',         110, true),
+  ('cave',   'Пещера с кристаллами', 120, true)
 on conflict (id) do update set name = excluded.name, sort = excluded.sort, open_by_default = excluded.open_by_default;
 
 -- Закрытые по умолчанию локации, которые пара уже открыла

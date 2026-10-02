@@ -15,7 +15,7 @@ import { isHealthKitSupported, requestSleepAccess } from '../src/lib/healthkit';
 import { refreshAccess, useAccess } from '../src/lib/access';
 import { haptic } from '../src/lib/motion';
 import { registerForPushAsync, scheduleReminders } from '../src/lib/notifications';
-import { loadSoundsEnabled, setSoundsEnabled } from '../src/lib/sound';
+import { loadAmbientEnabled, loadSoundsEnabled, setAmbientEnabled, setSoundsEnabled } from '../src/lib/sound';
 import { enableWebPush, webPushState, type WebPushState } from '../src/lib/webPush';
 import { refreshWidgets } from '../src/lib/widgets';
 import { C, S } from '../src/theme';
@@ -38,6 +38,7 @@ export default function SettingsScreen() {
   const [webState, setWebState] = useState<WebPushState | null>(null);
   const [usageAccess, setUsageAccess] = useState(ScreenSleep.hasUsageAccess());
   const [sounds, setSounds] = useState(true);
+  const [ambient, setAmbient] = useState(true);
   const [copied, setCopied] = useState(false);
   const access = useAccess();
   const taps = useRef<number[]>([]);
@@ -58,6 +59,7 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     loadSoundsEnabled().then(setSounds).catch(() => undefined);
+    loadAmbientEnabled().then(setAmbient).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -175,7 +177,7 @@ export default function SettingsScreen() {
         {pushInfo ? <Txt size={14}>{pushInfo}</Txt> : null}
       </Card>
 
-      <Card title="Способности">
+      <Card title="Звуки">
         <Row style={styles.between}>
           <View style={styles.flex}>
             <Txt weight="heavy" size={16}>
@@ -194,6 +196,26 @@ export default function SettingsScreen() {
             trackColor={{ false: 'rgba(255,255,255,0.18)', true: C.accent }}
             thumbColor="#FFFFFF"
             accessibilityLabel="Звуки способностей"
+          />
+        </Row>
+        <Row style={styles.between}>
+          <View style={styles.flex}>
+            <Txt weight="heavy" size={16}>
+              Звуки места
+            </Txt>
+            <Txt muted size={13}>
+              Тихий фон на главной: костёр, дождь, волны
+            </Txt>
+          </View>
+          <Switch
+            value={ambient}
+            onValueChange={(v) => {
+              setAmbient(v);
+              setAmbientEnabled(v).catch(() => undefined);
+            }}
+            trackColor={{ false: 'rgba(255,255,255,0.18)', true: C.accent }}
+            thumbColor="#FFFFFF"
+            accessibilityLabel="Звуки места"
           />
         </Row>
       </Card>

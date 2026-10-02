@@ -2,9 +2,9 @@
 // Переключатель «Звуки способностей» в настройках; по умолчанию включены.
 import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 import { getFlag, setFlag } from './prefs';
-import { SOUND_FILES, type SoundName } from './soundFiles';
+import { AMBIENT_FILES, AMBIENT_VOLUME, SOUND_FILES, type AmbientId, type SoundName } from './soundFiles';
 
-export type { SoundName };
+export type { AmbientId, SoundName };
 
 let enabled = true;
 getFlag('abilitySoundsOff').then((off) => {
@@ -14,12 +14,15 @@ getFlag('abilitySoundsOff').then((off) => {
 const players = new Map<SoundName, AudioPlayer>();
 let modeSet = false;
 
+function audioMode() {
+  if (modeSet) return;
+  modeSet = true;
+  setAudioModeAsync({ playsInSilentMode: false, interruptionMode: 'mixWithOthers', shouldPlayInBackground: false }).catch(() => undefined);
+}
+
 function player(name: SoundName): AudioPlayer | null {
   try {
-    if (!modeSet) {
-      modeSet = true;
-      setAudioModeAsync({ playsInSilentMode: false, interruptionMode: 'mixWithOthers', shouldPlayInBackground: false }).catch(() => undefined);
-    }
+    audioMode();
     let p = players.get(name);
     if (!p) {
       p = createAudioPlayer(SOUND_FILES[name]);
@@ -73,4 +76,52 @@ export async function setSoundsEnabled(value: boolean) {
 export async function loadSoundsEnabled(): Promise<boolean> {
   enabled = !(await getFlag('abilitySoundsOff'));
   return enabled;
+}
+
+// ---------- Фоновый звук места ----------
+// Переключатель «Звуки места» в настройках; по умолчанию включены. Играет только на главной.
+let ambientOn = true;
+let wanted: AmbientId | null = null;
+let amb: { id: AmbientId; p: AudioPlayer } | null = null;
+getFlag('ambientOff').then((off) => {
+  ambientOn = !off;
+  if (!ambientOn) playAmbient(null, true);
+});
+
+export function playAmbient(id: AmbientId | null, keepWanted = false) {
+  if (!keepWanted) wanted = id;
+  if (amb && amb.id === id && ambientOn) return;
+  if (amb) {
+    try {
+      amb.p.pause();
+      amb.p.remove();
+    } catch {
+      // ничего
+    }
+    amb = null;
+  }
+  if (!id || !ambientOn) return;
+  try {
+    audioMode();
+    const p = createAudioPlayer(AMBIENT_FILES[id]);
+    p.loop = true;
+    p.volume = AMBIENT_VOLUME;
+    p.play();
+    amb = { id, p };
+  } catch {
+    amb = null;
+  }
+}
+
+export const ambientEnabled = () => ambientOn;
+
+export async function setAmbientEnabled(value: boolean) {
+  ambientOn = value;
+  playAmbient(value ? wanted : null, true);
+  await setFlag('ambientOff', !value);
+}
+
+export async function loadAmbientEnabled(): Promise<boolean> {
+  ambientOn = !(await getFlag('ambientOff'));
+  return ambientOn;
 }

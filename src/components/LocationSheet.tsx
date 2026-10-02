@@ -1,7 +1,7 @@
-// Панель выбора локации: 4 карточки с маленькой картинкой места в текущем времени суток.
+// Панель выбора локации: карточки (список прокручивается) с маленькой картинкой места в текущем времени суток.
 // Локация одна на пару: сменил один — второй сразу видит то же место.
 import { useState } from 'react';
-import { ActivityIndicator, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { usePair } from '../context/PairProvider';
 import { setLocation } from '../lib/api';
 import { LOCATIONS, type LocationId } from '../lib/locations';
@@ -23,10 +23,10 @@ export function LocationSheet({ visible, onClose, current, time, onError }: {
   onError: (text: string) => void;
 }) {
   const { patchPair, partner } = usePair();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const [busy, setBusy] = useState<LocationId | null>(null);
   const cardW = Math.floor((Math.min(width, 560) - S.lg * 2 - S.md - 4) / 2); // 4 — рамка панели
-  const cardH = Math.round(cardW * 0.8);
+  const cardH = Math.round(cardW * 0.62);
   // картинка целиком по высоте сцены, показываем середину — горизонт и место для чибиков
   const sceneH = Math.round((cardW * 844) / 390);
 
@@ -50,7 +50,7 @@ export function LocationSheet({ visible, onClose, current, time, onError }: {
       <Txt muted size={14}>
         Место одно на двоих{partner ? ` — ${partner.display_name} увидит его сразу` : ''}. Сейчас {TIME_LABEL[time]}.
       </Txt>
-      <View style={styles.grid}>
+      <ScrollView style={{ maxHeight: Math.round(height * 0.6) }} contentContainerStyle={styles.grid} showsVerticalScrollIndicator={false}>
         {LOCATIONS.map((loc) => {
           const on = loc.id === current;
           return (
@@ -86,13 +86,13 @@ export function LocationSheet({ visible, onClose, current, time, onError }: {
             </Pressy>
           );
         })}
-      </View>
+      </ScrollView>
     </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: S.md },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: S.md, paddingBottom: S.sm },
   card: {
     borderRadius: R.lg,
     borderWidth: 2,

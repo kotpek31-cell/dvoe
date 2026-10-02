@@ -89,6 +89,123 @@ export const STARTER_ITEMS: ItemRow[] = [
   "rarity": 0
  },
  {
+  "id": "hair.bun",
+  "cat": "hair",
+  "name": "Пучок",
+  "source": "free",
+  "palette": "hair",
+  "def_color": "chestnut",
+  "sort": 60,
+  "art": {
+   "layers": {
+    "hairBack": "<path d=\"M14 68 C10 36 32 16 60 16 C88 16 110 36 106 68 C106 76 104 82 100 86 L20 86 C16 82 14 76 14 68 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><circle cx=\"60\" cy=\"11\" r=\"12.5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><path d=\"M52 6 C56 2 63 1 67 4\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.3\"></path><ellipse cx=\"60\" cy=\"22\" rx=\"9\" ry=\"3.2\" fill=\"#FF6B8A\" stroke=\"#2B2035\" stroke-width=\"1.6\"></ellipse>",
+    "hairFront": "<path d=\"M15 70 C11 38 32 16 60 16 C88 16 109 38 105 70 C103 63 101 58 98 54 C94 58 89 58 85 55 C82 59 76 60 71 57 C67 61 62 61 58 58 C54 61 48 61 45 57 C41 60 36 59 32 55 C28 58 23 58 21 54 C18 59 16 64 15 70 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M31 31 C39 23 50 20 60 20\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.3\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "hair.braids",
+  "cat": "hair",
+  "name": "Косички",
+  "source": "free",
+  "palette": "hair",
+  "def_color": "caramel",
+  "sort": 70,
+  "art": {
+   "layers": {
+    "hairBack": "<path d=\"M14 68 C10 36 32 16 60 16 C88 16 110 36 106 68 C106 74 104 78 101 80 L19 80 C16 78 14 74 14 68 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><ellipse cx=\"17\" cy=\"84\" rx=\"7.2\" ry=\"6.4\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></ellipse><ellipse cx=\"15\" cy=\"95\" rx=\"7.2\" ry=\"6.4\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></ellipse><ellipse cx=\"14\" cy=\"106\" rx=\"7.2\" ry=\"6.4\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></ellipse><ellipse cx=\"14\" cy=\"116\" rx=\"7.2\" ry=\"6.4\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></ellipse><path d=\"M10 124 C10 130 12 134 14 136 C16 134 18 130 18 124 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"1.8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><ellipse cx=\"14\" cy=\"122.5\" rx=\"5\" ry=\"3\" fill=\"#5ED3A0\" stroke=\"#2B2035\" stroke-width=\"1.6\"></ellipse><g transform=\"translate(120 0) scale(-1 1)\"><ellipse cx=\"17\" cy=\"84\" rx=\"7.2\" ry=\"6.4\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></ellipse><ellipse cx=\"15\" cy=\"95\" rx=\"7.2\" ry=\"6.4\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></ellipse><ellipse cx=\"14\" cy=\"106\" rx=\"7.2\" ry=\"6.4\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></ellipse><ellipse cx=\"14\" cy=\"116\" rx=\"7.2\" ry=\"6.4\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></ellipse><path d=\"M10 124 C10 130 12 134 14 136 C16 134 18 130 18 124 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"1.8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><ellipse cx=\"14\" cy=\"122.5\" rx=\"5\" ry=\"3\" fill=\"#5ED3A0\" stroke=\"#2B2035\" stroke-width=\"1.6\"></ellipse></g>",
+    "hairFront": "<path d=\"M15 70 C11 38 32 16 60 16 C88 16 109 38 105 70 C103 63 101 58 98 54 C94 58 89 58 85 55 C82 59 76 60 71 57 C67 61 62 61 58 58 C54 61 48 61 45 57 C41 60 36 59 32 55 C28 58 23 58 21 54 C18 59 16 64 15 70 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M31 31 C39 23 50 20 60 20\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.3\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "hair.curly",
+  "cat": "hair",
+  "name": "Кудри",
+  "source": "free",
+  "palette": "hair",
+  "def_color": "chocolate",
+  "sort": 80,
+  "art": {
+   "layers": {
+    "hairBack": "<circle cx=\"22\" cy=\"50\" r=\"14\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><circle cx=\"17\" cy=\"70\" r=\"13\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><circle cx=\"21\" cy=\"90\" r=\"11\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><circle cx=\"98\" cy=\"50\" r=\"14\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><circle cx=\"103\" cy=\"70\" r=\"13\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><circle cx=\"99\" cy=\"90\" r=\"11\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><circle cx=\"36\" cy=\"26\" r=\"15\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><circle cx=\"60\" cy=\"17\" r=\"16\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><circle cx=\"84\" cy=\"26\" r=\"15\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle>",
+    "hairFront": "<path d=\"M17 58 C14 32 34 17 60 17 C86 17 106 32 103 58 Z\" fill=\"@c\" stroke=\"none\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><circle cx=\"22\" cy=\"52\" r=\"8\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><circle cx=\"32\" cy=\"42\" r=\"9.5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><circle cx=\"46\" cy=\"37\" r=\"10\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><circle cx=\"60\" cy=\"35\" r=\"10\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><circle cx=\"74\" cy=\"37\" r=\"10\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><circle cx=\"88\" cy=\"42\" r=\"9.5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><circle cx=\"98\" cy=\"52\" r=\"8\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><path d=\"M40 26 C46 22 54 21 60 22\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.3\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "hair.buzz",
+  "cat": "hair",
+  "name": "Ёжик",
+  "source": "free",
+  "palette": "hair",
+  "def_color": "coal",
+  "sort": 90,
+  "art": {
+   "layers": {
+    "hairFront": "<path d=\"M18 54 C17 32 35 20 60 20 C85 20 103 32 102 54 C99 48 95 46 91 48 L87 41 L82 47 L77 39 L72 46 L66 38 L60 45 L54 38 L48 46 L43 39 L38 47 L33 41 L29 48 C25 46 21 48 18 54 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M34 30 C42 25 50 23 58 23\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.28\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "hair.wavy",
+  "cat": "hair",
+  "name": "Волнистые",
+  "source": "free",
+  "palette": "hair",
+  "def_color": "ginger",
+  "sort": 100,
+  "art": {
+   "layers": {
+    "hairBack": "<path d=\"M14 66 C10 34 32 15 60 15 C88 15 110 34 106 66 C108 80 112 90 108 100 C104 108 110 116 106 124 C102 132 92 133 88 127 L32 127 C28 133 18 132 14 124 C10 116 16 108 12 100 C8 90 12 80 14 66 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M20 100 C16 108 20 114 18 120 M100 100 C104 108 100 114 102 120\" fill=\"none\" stroke=\"@c|d0.25\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.6\"></path>",
+    "hairFront": "<path d=\"M15 66 C11 36 32 15 60 15 C88 15 109 36 105 66 C103 58 100 52 96 48 C88 52 76 50 66 41 C58 50 44 54 30 52 C24 56 18 60 15 66 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M16 62 C11 74 15 84 13 94 C12 100 15 106 19 108 C22 100 25 92 24 84 C24 76 24 68 23 60 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M104 62 C109 74 105 84 107 94 C108 100 105 106 101 108 C98 100 95 92 96 84 C96 76 96 68 97 60 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M30 32 C38 24 48 20 58 20\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.3\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "hair.vamp",
+  "cat": "hair",
+  "name": "Зачёс вампира",
+  "source": "code",
+  "palette": "hair",
+  "def_color": "coal",
+  "sort": 110,
+  "art": {
+   "layers": {
+    "hairBack": "<path d=\"M14 66 C10 34 32 15 60 15 C88 15 110 34 106 66 C106 74 104 80 100 84 L20 84 C16 80 14 74 14 66 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path>",
+    "hairFront": "<path d=\"M16 62 C12 34 32 15 60 15 C88 15 108 34 104 62 C101 52 95 45 86 42 C76 39 67 41 60 51 C53 41 44 39 34 42 C25 45 19 52 16 62 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M28 36 C38 27 48 24 57 26 M63 26 C72 24 82 27 92 36\" fill=\"none\" stroke=\"@c|l0.3\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.6\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "hair.frank",
+  "cat": "hair",
+  "name": "Плоская стрижка",
+  "source": "code",
+  "palette": "hair",
+  "def_color": "coal",
+  "sort": 120,
+  "art": {
+   "layers": {
+    "hairFront": "<path d=\"M17 52 L16 22 C16 16 20 12 26 12 L94 12 C100 12 104 16 104 22 L103 52 C100 47 96 47 93 50 L89 44 L84 51 L79 44 L74 51 L68 44 L62 51 L56 44 L50 51 L44 44 L38 51 L32 44 L27 50 C24 47 20 47 17 52 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M24 18 H96\" fill=\"none\" stroke=\"@c|l0.3\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.55\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
   "id": "eyes.classic",
   "cat": "eyes",
   "name": "Обычные",
@@ -155,6 +272,90 @@ export const STARTER_ITEMS: ItemRow[] = [
   "art": {},
   "meta": {
    "style": "azure"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "eyes.cat",
+  "cat": "eyes",
+  "name": "Кошачьи",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "mint",
+  "sort": 60,
+  "art": {},
+  "meta": {
+   "style": "cat"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "eyes.star",
+  "cat": "eyes",
+  "name": "Звёздочки",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "sky",
+  "sort": 70,
+  "art": {},
+  "meta": {
+   "style": "star"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "eyes.happy",
+  "cat": "eyes",
+  "name": "Весёлые",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "coal",
+  "sort": 80,
+  "art": {},
+  "meta": {
+   "style": "happy"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "eyes.wink",
+  "cat": "eyes",
+  "name": "Подмигивание",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "coal",
+  "sort": 90,
+  "art": {},
+  "meta": {
+   "style": "wink"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "eyes.heart",
+  "cat": "eyes",
+  "name": "Сердечки",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "coal",
+  "sort": 100,
+  "art": {},
+  "meta": {
+   "style": "heart"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "eyes.vamp",
+  "cat": "eyes",
+  "name": "Глаза вампира",
+  "source": "code",
+  "palette": null,
+  "def_color": null,
+  "sort": 110,
+  "art": {},
+  "meta": {
+   "style": "vamp"
   },
   "rarity": 0
  },
@@ -249,6 +450,102 @@ export const STARTER_ITEMS: ItemRow[] = [
   "art": {
    "layers": {
     "over": "<ellipse cx=\"60\" cy=\"0\" rx=\"30\" ry=\"9\" fill=\"none\" stroke=\"#FFE89A\" stroke-width=\"9\" opacity=\"0.3\"></ellipse><ellipse cx=\"60\" cy=\"0\" rx=\"25\" ry=\"6.5\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"6.4\"></ellipse><ellipse cx=\"60\" cy=\"0\" rx=\"25\" ry=\"6.5\" fill=\"none\" stroke=\"#FFD45E\" stroke-width=\"3.6\"></ellipse><path d=\"M40 -3 C48 -6 60 -7 72 -5\" fill=\"none\" stroke=\"#FFF6CF\" stroke-width=\"1.4\" stroke-linecap=\"round\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "hat.ears",
+  "cat": "hat",
+  "name": "Ушки котика",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "coal",
+  "sort": 70,
+  "art": {
+   "layers": {
+    "hat": "<path d=\"M23 38 L20 6 L48 22 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M27 30 L26 14 L40 22 Z\" fill=\"#FF9EBB\" stroke=\"none\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><g transform=\"translate(120 0) scale(-1 1)\"><path d=\"M23 38 L20 6 L48 22 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M27 30 L26 14 L40 22 Z\" fill=\"#FF9EBB\" stroke=\"none\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path></g><path d=\"M19 46 C22 26 40 15 60 15 C80 15 98 26 101 46\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"6.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M19 46 C22 26 40 15 60 15 C80 15 98 26 101 46\" fill=\"none\" stroke=\"@c\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "hat.wreath",
+  "cat": "hat",
+  "name": "Венок",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "strawberry",
+  "sort": 80,
+  "art": {
+   "layers": {
+    "hat": "<ellipse cx=\"20\" cy=\"46\" rx=\"7\" ry=\"3.6\" fill=\"#5ED3A0\" stroke=\"#2B2035\" stroke-width=\"1.5\" transform=\"rotate(30 20 46)\"></ellipse><ellipse cx=\"26\" cy=\"33\" rx=\"7\" ry=\"3.6\" fill=\"#5ED3A0\" stroke=\"#2B2035\" stroke-width=\"1.5\" transform=\"rotate(50 26 33)\"></ellipse><ellipse cx=\"36\" cy=\"24\" rx=\"7\" ry=\"3.6\" fill=\"#5ED3A0\" stroke=\"#2B2035\" stroke-width=\"1.5\" transform=\"rotate(65 36 24)\"></ellipse><ellipse cx=\"48\" cy=\"19\" rx=\"7\" ry=\"3.6\" fill=\"#5ED3A0\" stroke=\"#2B2035\" stroke-width=\"1.5\" transform=\"rotate(80 48 19)\"></ellipse><ellipse cx=\"60\" cy=\"17\" rx=\"7\" ry=\"3.6\" fill=\"#5ED3A0\" stroke=\"#2B2035\" stroke-width=\"1.5\" transform=\"rotate(90 60 17)\"></ellipse><ellipse cx=\"72\" cy=\"19\" rx=\"7\" ry=\"3.6\" fill=\"#5ED3A0\" stroke=\"#2B2035\" stroke-width=\"1.5\" transform=\"rotate(100 72 19)\"></ellipse><ellipse cx=\"84\" cy=\"24\" rx=\"7\" ry=\"3.6\" fill=\"#5ED3A0\" stroke=\"#2B2035\" stroke-width=\"1.5\" transform=\"rotate(115 84 24)\"></ellipse><ellipse cx=\"94\" cy=\"33\" rx=\"7\" ry=\"3.6\" fill=\"#5ED3A0\" stroke=\"#2B2035\" stroke-width=\"1.5\" transform=\"rotate(130 94 33)\"></ellipse><ellipse cx=\"100\" cy=\"46\" rx=\"7\" ry=\"3.6\" fill=\"#5ED3A0\" stroke=\"#2B2035\" stroke-width=\"1.5\" transform=\"rotate(150 100 46)\"></ellipse><circle cx=\"23\" cy=\"36\" r=\"3.2\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"26.8\" cy=\"38.76\" r=\"3.2\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"25.35\" cy=\"43.24\" r=\"3.2\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"20.65\" cy=\"43.24\" r=\"3.2\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"19.2\" cy=\"38.76\" r=\"3.2\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"23\" cy=\"40\" r=\"2.2399999999999998\" fill=\"#FFB347\"></circle><circle cx=\"42\" cy=\"17\" r=\"3.2\" fill=\"#FFFFFF\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"45.8\" cy=\"19.76\" r=\"3.2\" fill=\"#FFFFFF\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"44.35\" cy=\"24.24\" r=\"3.2\" fill=\"#FFFFFF\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"39.65\" cy=\"24.24\" r=\"3.2\" fill=\"#FFFFFF\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"38.2\" cy=\"19.76\" r=\"3.2\" fill=\"#FFFFFF\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"42\" cy=\"21\" r=\"2.2399999999999998\" fill=\"#FFB347\"></circle><circle cx=\"60\" cy=\"12\" r=\"3.2\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"63.8\" cy=\"14.76\" r=\"3.2\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"62.35\" cy=\"19.24\" r=\"3.2\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"57.65\" cy=\"19.24\" r=\"3.2\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"56.2\" cy=\"14.76\" r=\"3.2\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"60\" cy=\"16\" r=\"2.2399999999999998\" fill=\"#FFB347\"></circle><circle cx=\"78\" cy=\"17\" r=\"3.2\" fill=\"#FFD966\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"81.8\" cy=\"19.76\" r=\"3.2\" fill=\"#FFD966\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"80.35\" cy=\"24.24\" r=\"3.2\" fill=\"#FFD966\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"75.65\" cy=\"24.24\" r=\"3.2\" fill=\"#FFD966\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"74.2\" cy=\"19.76\" r=\"3.2\" fill=\"#FFD966\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"78\" cy=\"21\" r=\"2.2399999999999998\" fill=\"#FFB347\"></circle><circle cx=\"97\" cy=\"36\" r=\"3.2\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"100.8\" cy=\"38.76\" r=\"3.2\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"99.35\" cy=\"43.24\" r=\"3.2\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"94.65\" cy=\"43.24\" r=\"3.2\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"93.2\" cy=\"38.76\" r=\"3.2\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"97\" cy=\"40\" r=\"2.2399999999999998\" fill=\"#FFB347\"></circle>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "hat.tophat",
+  "cat": "hat",
+  "name": "Цилиндр",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "coal",
+  "sort": 90,
+  "art": {
+   "layers": {
+    "hat": "<g transform=\"rotate(-6 60 30)\"><path d=\"M37 34 L39 -4 C39 -7 42 -9 45 -9 L75 -9 C78 -9 81 -7 81 -4 L83 34 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M38 21 L82 21 L82.7 30 L37.4 30 Z\" fill=\"@c|k\" stroke=\"#2B2035\" stroke-width=\"1.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M12 37 C12 31 34 29 60 29 C86 29 108 31 108 37 C108 43 86 45 60 45 C34 45 12 43 12 37 Z\" fill=\"@c|d0.12\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M44 -4 V18\" fill=\"none\" stroke=\"@c|l0.3\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.45\"></path></g>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "hat.ushanka",
+  "cat": "hat",
+  "name": "Ушанка",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "blueberry",
+  "sort": 100,
+  "art": {
+   "layers": {
+    "hat": "<path d=\"M14 48 C11 62 13 76 19 86 C25 86 30 80 31 70 L32 48 Z\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><g transform=\"translate(120 0) scale(-1 1)\"><path d=\"M14 48 C11 62 13 76 19 86 C25 86 30 80 31 70 L32 48 Z\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path></g><path d=\"M18 46 C16 22 36 7 60 7 C84 7 104 22 102 46 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M60 8 V36\" fill=\"none\" stroke=\"@c|d0.22\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.6\"></path><path d=\"M15 46 C15 37 30 33 60 33 C90 33 105 37 105 46 C105 55 90 57 60 57 C30 57 15 55 15 46 Z\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M24 42 l3 3 M36 39 l3 3 M50 38 l3 3 M66 38 l3 3 M80 39 l3 3 M93 42 l3 3\" fill=\"none\" stroke=\"#C9C0E0\" stroke-width=\"1.3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "hat.pumpkin",
+  "cat": "hat",
+  "name": "Шапка-тыква",
+  "source": "code",
+  "palette": null,
+  "def_color": null,
+  "sort": 110,
+  "art": {
+   "layers": {
+    "hat": "<path d=\"M60 9 C62 2 66 -3 72 -4 C70 0 67 4 66 10 Z\" fill=\"#4E8A3E\" stroke=\"#2B2035\" stroke-width=\"1.8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M66 4 C72 -2 82 -2 86 4 C80 8 72 8 66 4 Z\" fill=\"#6FC067\" stroke=\"#2B2035\" stroke-width=\"1.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M16 50 C12 24 34 8 60 8 C86 8 108 24 104 50 C96 55 86 53 80 49 C72 55 48 55 40 49 C34 53 24 55 16 50 Z\" fill=\"#FF9A3D\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M40 13 C34 24 33 38 36 50 M60 9 V51 M80 13 C86 24 87 38 84 50\" fill=\"none\" stroke=\"#d07f3b\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"></path><path d=\"M28 22 C34 16 42 13 50 12\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.35\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "hat.witch",
+  "cat": "hat",
+  "name": "Шляпа ведьмы",
+  "source": "code",
+  "palette": null,
+  "def_color": null,
+  "sort": 120,
+  "art": {
+   "layers": {
+    "hat": "<path d=\"M8 40 C8 32 32 29 60 29 C88 29 112 32 112 40 C112 47 88 49 60 49 C32 49 8 47 8 40 Z\" fill=\"#3A2E5A\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M30 38 C40 28 46 6 56 -12 C60 -19 71 -24 82 -18 C73 -16 67 -10 65 0 C63 14 78 28 92 38 Z\" fill=\"#4A3A6E\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M33 31 C50 34 72 34 88 31 L91 37 C72 41 50 41 30 37 Z\" fill=\"#9B6BFF\" stroke=\"#2B2035\" stroke-width=\"1.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><rect x=\"55\" y=\"30.5\" width=\"9\" height=\"8\" rx=\"1.6\" fill=\"#FFD45E\" stroke=\"#2B2035\" stroke-width=\"1.6\"></rect><path d=\"M0 -6 L1.8 -1.8 L6 -1.6 L2.8 1.2 L3.8 5.6 L0 3.2 L-3.8 5.6 L-2.8 1.2 L-6 -1.6 L-1.8 -1.8 Z\" fill=\"#FFD966\" stroke=\"#2B2035\" stroke-width=\"0.9\" stroke-linejoin=\"round\" transform=\"translate(48 12) scale(0.6)\"></path>"
    }
   },
   "meta": {},
@@ -367,6 +664,155 @@ export const STARTER_ITEMS: ItemRow[] = [
   "rarity": 0
  },
  {
+  "id": "top.flannel",
+  "cat": "top",
+  "name": "Клетчатая рубашка",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "cherry",
+  "sort": 70,
+  "art": {
+   "layers": {
+    "body": "<path d=\"M40 104 C40 99 47 96 60 96 C73 96 80 99 80 104 L84 128 C85 134 81 137 76 137 L44 137 C39 137 35 134 36 128 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M48 101 V136 M72 101 V136\" fill=\"none\" stroke=\"@c|d0.3\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.55\"></path><path d=\"M40.5 110 H79.5 M38.6 124 H81.4\" fill=\"none\" stroke=\"@c|d0.3\" stroke-width=\"2.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.55\"></path><path d=\"M54 98 V136 M66 98 V136 M39.5 117 H80.5\" fill=\"none\" stroke=\"@c|l0.35\" stroke-width=\"1\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"></path><path d=\"M60 103 V136\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.6\"></path><circle cx=\"60\" cy=\"110\" r=\"1.3\" fill=\"#F4F0FF\"></circle><circle cx=\"60\" cy=\"120\" r=\"1.3\" fill=\"#F4F0FF\"></circle><circle cx=\"60\" cy=\"130\" r=\"1.3\" fill=\"#F4F0FF\"></circle><path d=\"M47 98 L54 106 L60 100 L66 106 L73 98 C66 96.5 54 96.5 47 98 Z\" fill=\"@c|l0.2\" stroke=\"#2B2035\" stroke-width=\"1.5\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path>"
+   }
+  },
+  "meta": {
+   "sleeve": "full"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "top.puffer",
+  "cat": "top",
+  "name": "Пуховик",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "sky",
+  "sort": 80,
+  "art": {
+   "layers": {
+    "body": "<path d=\"M37 105 C36 98 46 94 60 94 C74 94 84 98 83 105 L86 130 C87 137 82 141 76 141 L44 141 C38 141 33 137 34 130 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M37 113 C50 116 70 116 83 113 M35.5 124 C50 127 70 127 84.5 124\" fill=\"none\" stroke=\"@c|d0.25\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"></path><path d=\"M60 100 V140\" fill=\"none\" stroke=\"@c|d0.35\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M46 96 C50 101 70 101 74 96 L74 92 C68 95 52 95 46 92 Z\" fill=\"@c|l0.25\" stroke=\"#2B2035\" stroke-width=\"1.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M42 108 C44 105 47 104 50 104\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.45\"></path>"
+   }
+  },
+  "meta": {
+   "sleeve": "full"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "top.cardigan",
+  "cat": "top",
+  "name": "Кардиган",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "mint",
+  "sort": 90,
+  "art": {
+   "layers": {
+    "body": "<path d=\"M40 104 C40 99 47 96 60 96 C73 96 80 99 80 104 L84 128 C85 134 81 137 76 137 L44 137 C39 137 35 134 36 128 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M50 97.5 L60 124 L70 97.5 C66 96.6 54 96.6 50 97.5 Z\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"1.5\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M50 98 L60 125 V137 M70 98 L60 125\" fill=\"none\" stroke=\"@c|d0.3\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><circle cx=\"56.5\" cy=\"118\" r=\"1.7\" fill=\"@c|l0.5\" stroke=\"#2B2035\" stroke-width=\"1.1\"></circle><circle cx=\"56.5\" cy=\"126\" r=\"1.7\" fill=\"@c|l0.5\" stroke=\"#2B2035\" stroke-width=\"1.1\"></circle><circle cx=\"56.5\" cy=\"133\" r=\"1.7\" fill=\"@c|l0.5\" stroke=\"#2B2035\" stroke-width=\"1.1\"></circle><path d=\"M41 122 H52 V130 H41 Z\" fill=\"@c|d0.12\" stroke=\"#2B2035\" stroke-width=\"1.3\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M38 133 C50 135 70 135 82 133\" fill=\"none\" stroke=\"@c|d0.25\" stroke-width=\"1.3\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"></path>"
+   }
+  },
+  "meta": {
+   "sleeve": "full"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "top.pajama",
+  "cat": "top",
+  "name": "Пижама",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "sky",
+  "sort": 100,
+  "art": {
+   "layers": {
+    "body": "<path d=\"M40 104 C40 99 47 96 60 96 C73 96 80 99 80 104 L84 128 C85 134 81 137 76 137 L44 137 C39 137 35 134 36 128 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M47 99.5 C49 106 56 107 60 102 C64 107 71 106 73 99.5 C68 98 52 98 47 99.5 Z\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"1.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M60 104 V136\" fill=\"none\" stroke=\"@c|l0.5\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><circle cx=\"60\" cy=\"110\" r=\"1.3\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"60\" cy=\"120\" r=\"1.3\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"60\" cy=\"130\" r=\"1.3\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><path d=\"M0 -6 L1.8 -1.8 L6 -1.6 L2.8 1.2 L3.8 5.6 L0 3.2 L-3.8 5.6 L-2.8 1.2 L-6 -1.6 L-1.8 -1.8 Z\" fill=\"#FFD966\" stroke=\"#2B2035\" stroke-width=\"0.8\" stroke-linejoin=\"round\" transform=\"translate(47 114) scale(0.55)\"></path><path d=\"M0 -6 L1.8 -1.8 L6 -1.6 L2.8 1.2 L3.8 5.6 L0 3.2 L-3.8 5.6 L-2.8 1.2 L-6 -1.6 L-1.8 -1.8 Z\" fill=\"#FFD966\" stroke=\"#2B2035\" stroke-width=\"0.8\" stroke-linejoin=\"round\" transform=\"translate(71 124) scale(0.5)\"></path><path d=\"M0 -6 L1.8 -1.8 L6 -1.6 L2.8 1.2 L3.8 5.6 L0 3.2 L-3.8 5.6 L-2.8 1.2 L-6 -1.6 L-1.8 -1.8 Z\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"0.7\" stroke-linejoin=\"round\" transform=\"translate(49 129) scale(0.4)\"></path><path d=\"M0 -6 L1.8 -1.8 L6 -1.6 L2.8 1.2 L3.8 5.6 L0 3.2 L-3.8 5.6 L-2.8 1.2 L-6 -1.6 L-1.8 -1.8 Z\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"0.7\" stroke-linejoin=\"round\" transform=\"translate(73 108) scale(0.4)\"></path>"
+   }
+  },
+  "meta": {
+   "sleeve": "full",
+   "cuff": "#F4F0FF"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "top.pumpkin",
+  "cat": "top",
+  "name": "Костюм тыквы",
+  "source": "code",
+  "palette": null,
+  "def_color": null,
+  "sort": 110,
+  "art": {
+   "layers": {
+    "body": "<path d=\"M35 108 C31 97 46 92 60 94 C74 92 89 97 85 108 C92 118 90 135 80 141 C70 146 50 146 40 141 C30 135 28 118 35 108 Z\" fill=\"#FF9A3D\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M46 97 C40 110 40 130 46 143 M60 95 V145 M74 97 C80 110 80 130 74 143\" fill=\"none\" stroke=\"#d07f3b\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"></path><path d=\"M49 113 L54 107 L58 113 Z M62 113 L66 107 L71 113 Z\" fill=\"#5A2A12\" stroke=\"#2B2035\" stroke-width=\"1.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M46 124 L50 121 L53 125 L57 121 L60 125 L63 121 L67 125 L70 121 L74 124 C70 132 50 132 46 124 Z\" fill=\"#5A2A12\" stroke=\"#2B2035\" stroke-width=\"1.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M52 96 C55 100 65 100 68 96 L66 92 C62 94 58 94 54 92 Z\" fill=\"#4E8A3E\" stroke=\"#2B2035\" stroke-width=\"1.5\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path>"
+   }
+  },
+  "meta": {
+   "sleeve": "full",
+   "sleeveColor": "mint"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "top.vamp",
+  "cat": "top",
+  "name": "Камзол с жабо",
+  "source": "code",
+  "palette": "cloth",
+  "def_color": "coal",
+  "sort": 120,
+  "art": {
+   "layers": {
+    "body": "<path d=\"M40 104 C40 99 47 96 60 96 C73 96 80 99 80 104 L84 128 C85 134 81 137 76 137 L44 137 C39 137 35 134 36 128 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M49 97.4 L60 124 L71 97.4 C66 96.5 54 96.5 49 97.4 Z\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"1.5\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M55 101 C52 104 57 106 54 109 C52 112 58 113 56 116 L64 116 C62 113 68 112 66 109 C63 106 68 104 65 101 Z\" fill=\"#FFFFFF\" stroke=\"#2B2035\" stroke-width=\"1.3\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><circle cx=\"60\" cy=\"102\" r=\"2.6\" fill=\"#E5304F\" stroke=\"#2B2035\" stroke-width=\"1.3\"></circle><path d=\"M49 97.4 L60 124 L56 126 L44 100 Z M71 97.4 L60 124 L64 126 L76 100 Z\" fill=\"@c|l0.12\" stroke=\"#2B2035\" stroke-width=\"1.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><circle cx=\"60\" cy=\"128\" r=\"1.3\" fill=\"#FFD45E\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><circle cx=\"60\" cy=\"133\" r=\"1.3\" fill=\"#FFD45E\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle>"
+   }
+  },
+  "meta": {
+   "sleeve": "full",
+   "cuff": "#F4F0FF"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "top.witch",
+  "cat": "top",
+  "name": "Платье ведьмы",
+  "source": "code",
+  "palette": "cloth",
+  "def_color": "coal",
+  "sort": 130,
+  "art": {
+   "layers": {
+    "body": "<path d=\"M41 103 C41 98.5 48 96 60 96 C72 96 79 98.5 79 103 L86 133 L82 140 L76 135 L70 141 L64 135 L58 141 L52 135 L46 141 L40 135 L35 140 L34 133 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M39.5 112 H80.5 L81.6 118 H38.4 Z\" fill=\"#FF9A3D\" stroke=\"#2B2035\" stroke-width=\"1.5\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><rect x=\"56\" y=\"111\" width=\"8\" height=\"8\" rx=\"1.4\" fill=\"#FFD45E\" stroke=\"#2B2035\" stroke-width=\"1.3\"></rect><path d=\"M47 99 Q60 108 73 99 Q60 96 47 99 Z\" fill=\"#9B6BFF\" stroke=\"#2B2035\" stroke-width=\"1.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M0 -6 L1.8 -1.8 L6 -1.6 L2.8 1.2 L3.8 5.6 L0 3.2 L-3.8 5.6 L-2.8 1.2 L-6 -1.6 L-1.8 -1.8 Z\" fill=\"#FFD966\" stroke=\"#2B2035\" stroke-width=\"0.7\" stroke-linejoin=\"round\" transform=\"translate(48 128) scale(0.45)\"></path><path d=\"M0 -6 L1.8 -1.8 L6 -1.6 L2.8 1.2 L3.8 5.6 L0 3.2 L-3.8 5.6 L-2.8 1.2 L-6 -1.6 L-1.8 -1.8 Z\" fill=\"#FFD966\" stroke=\"#2B2035\" stroke-width=\"0.7\" stroke-linejoin=\"round\" transform=\"translate(71 125) scale(0.38)\"></path>"
+   }
+  },
+  "meta": {
+   "sleeve": "full",
+   "cuff": "#9B6BFF",
+   "coversBottom": true
+  },
+  "rarity": 0
+ },
+ {
+  "id": "top.frank",
+  "cat": "top",
+  "name": "Пиджак с заплатками",
+  "source": "code",
+  "palette": "cloth",
+  "def_color": "coal",
+  "sort": 140,
+  "art": {
+   "layers": {
+    "body": "<path d=\"M40 104 C40 99 47 96 60 96 C73 96 80 99 80 104 L84 128 L85 137 L80 134 L75 138 L70 134 L64 138 L58 134 L52 138 L46 134 L41 138 L35 136 L36 128 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M50 97.4 L60 116 L70 97.4 C66 96.6 54 96.6 50 97.4 Z\" fill=\"#E9E4F5\" stroke=\"#2B2035\" stroke-width=\"1.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M50 97.5 L56 112 L52 120 M70 97.5 L64 112 L68 120\" fill=\"none\" stroke=\"@c|l0.25\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><rect x=\"42\" y=\"118\" width=\"9\" height=\"9\" rx=\"1.5\" fill=\"#7F8CFF\" stroke=\"#2B2035\" stroke-width=\"1.4\"></rect><path d=\"M43 116.5 v2 M46.5 116.5 v2 M50 116.5 v2\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"1\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><rect x=\"70\" y=\"108\" width=\"8\" height=\"7\" rx=\"1.5\" fill=\"#FFAA6B\" stroke=\"#2B2035\" stroke-width=\"1.4\"></rect><path d=\"M69 111.5 h-2 M79 111.5 h2\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"1\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>"
+   }
+  },
+  "meta": {
+   "sleeve": "full"
+  },
+  "rarity": 0
+ },
+ {
   "id": "bottom.pants",
   "cat": "bottom",
   "name": "Брюки",
@@ -410,6 +856,142 @@ export const STARTER_ITEMS: ItemRow[] = [
   "art": {
    "layers": {
     "under": "<path d=\"M38 126 H82 L88 143 C88.5 145 87 146 85 146 L35 146 C33 146 31.5 145 32 143 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M48 132 L45 145 M60 132 V145 M72 132 L75 145\" fill=\"none\" stroke=\"@c|d0.2\" stroke-width=\"1.3\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.6\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "bottom.jeans",
+  "cat": "bottom",
+  "name": "Джинсы",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "blueberry",
+  "sort": 40,
+  "art": {
+   "layers": {
+    "legL": "<rect x=\"47\" y=\"124\" width=\"11\" height=\"24\" rx=\"5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><rect x=\"46.6\" y=\"141\" width=\"11.8\" height=\"5\" rx=\"2\" fill=\"@c|l0.3\" stroke=\"#2B2035\" stroke-width=\"1.6\"></rect><path d=\"M54.5 126 V140\" fill=\"none\" stroke=\"@c|l0.35\" stroke-width=\"1\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"></path>",
+    "legR": "<rect x=\"62\" y=\"124\" width=\"11\" height=\"24\" rx=\"5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><rect x=\"61.6\" y=\"141\" width=\"11.8\" height=\"5\" rx=\"2\" fill=\"@c|l0.3\" stroke=\"#2B2035\" stroke-width=\"1.6\"></rect><path d=\"M69.5 126 V140\" fill=\"none\" stroke=\"@c|l0.35\" stroke-width=\"1\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "bottom.joggers",
+  "cat": "bottom",
+  "name": "Спортивки",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "lavender",
+  "sort": 50,
+  "art": {
+   "layers": {
+    "legL": "<rect x=\"47\" y=\"124\" width=\"11\" height=\"24\" rx=\"5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><path d=\"M49.2 126 V141\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.9\"></path><rect x=\"47.4\" y=\"141.5\" width=\"10.2\" height=\"5\" rx=\"2.4\" fill=\"@c|d0.2\" stroke=\"#2B2035\" stroke-width=\"1.6\"></rect>",
+    "legR": "<rect x=\"62\" y=\"124\" width=\"11\" height=\"24\" rx=\"5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><path d=\"M70.8 126 V141\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.9\"></path><rect x=\"62.4\" y=\"141.5\" width=\"10.2\" height=\"5\" rx=\"2.4\" fill=\"@c|d0.2\" stroke=\"#2B2035\" stroke-width=\"1.6\"></rect>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "bottom.tutu",
+  "cat": "bottom",
+  "name": "Юбка-пачка",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "strawberry",
+  "sort": 60,
+  "art": {
+   "layers": {
+    "under": "<path d=\"M38 125 H82 L92 137 L86 135 L82 141 L76 136 L70 142 L64 137 L60 143 L56 137 L50 142 L44 136 L38 141 L34 135 L28 137 Z\" fill=\"@c|l0.35\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M38 125 H82 L88 134 L82 132 L77 137 L70 133 L64 138 L60 133 L56 138 L50 133 L43 137 L38 132 L32 134 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M37.5 124 H82.5 V128.5 H37.5 Z\" fill=\"@c|d0.12\" stroke=\"#2B2035\" stroke-width=\"1.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "bottom.plaid",
+  "cat": "bottom",
+  "name": "Клетчатая юбка",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "cherry",
+  "sort": 70,
+  "art": {
+   "layers": {
+    "under": "<path d=\"M38 126 H82 L88 143 C88.5 145 87 146 85 146 L35 146 C33 146 31.5 145 32 143 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M47 127 L44 145 M60 127 V145 M73 127 L76 145\" fill=\"none\" stroke=\"@c|d0.32\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.55\"></path><path d=\"M36 134 H84 M34 141 H86\" fill=\"none\" stroke=\"@c|d0.32\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.55\"></path><path d=\"M53 127 L52 145 M67 127 L68 145 M35 137.5 H85\" fill=\"none\" stroke=\"#FFD966\" stroke-width=\"1\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.75\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "bottom.overalls",
+  "cat": "bottom",
+  "name": "Комбинезон",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "blueberry",
+  "sort": 80,
+  "art": {
+   "layers": {
+    "legL": "<rect x=\"47\" y=\"124\" width=\"11\" height=\"24\" rx=\"5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><rect x=\"46.6\" y=\"142\" width=\"11.8\" height=\"4.6\" rx=\"2\" fill=\"@c|l0.25\" stroke=\"#2B2035\" stroke-width=\"1.5\"></rect>",
+    "legR": "<rect x=\"62\" y=\"124\" width=\"11\" height=\"24\" rx=\"5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><rect x=\"61.6\" y=\"142\" width=\"11.8\" height=\"4.6\" rx=\"2\" fill=\"@c|l0.25\" stroke=\"#2B2035\" stroke-width=\"1.5\"></rect>",
+    "under": "<path d=\"M37 124 H83 L84 132 H36 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path>",
+    "front": "<path d=\"M46 99 L50 112 M74 99 L70 112\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M46 99 L50 112 M74 99 L70 112\" fill=\"none\" stroke=\"@c\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M48 110 H72 L73 128 H47 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M53 114 H67 V121 H53 Z\" fill=\"@c|d0.12\" stroke=\"#2B2035\" stroke-width=\"1.3\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><circle cx=\"50.5\" cy=\"113\" r=\"1.8\" fill=\"#FFD966\" stroke=\"#2B2035\" stroke-width=\"1.1\"></circle><circle cx=\"69.5\" cy=\"113\" r=\"1.8\" fill=\"#FFD966\" stroke=\"#2B2035\" stroke-width=\"1.1\"></circle>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "bottom.pjpants",
+  "cat": "bottom",
+  "name": "Пижамные штаны",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "sky",
+  "sort": 90,
+  "art": {
+   "layers": {
+    "legL": "<rect x=\"47\" y=\"124\" width=\"11\" height=\"24\" rx=\"5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><circle cx=\"50.5\" cy=\"130\" r=\"1.2\" fill=\"#F4F0FF\"></circle><circle cx=\"54.5\" cy=\"136\" r=\"1.2\" fill=\"#FFD966\"></circle><circle cx=\"51\" cy=\"142\" r=\"1.2\" fill=\"#F4F0FF\"></circle>",
+    "legR": "<rect x=\"62\" y=\"124\" width=\"11\" height=\"24\" rx=\"5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><circle cx=\"65.5\" cy=\"130\" r=\"1.2\" fill=\"#F4F0FF\"></circle><circle cx=\"69.5\" cy=\"136\" r=\"1.2\" fill=\"#FFD966\"></circle><circle cx=\"66\" cy=\"142\" r=\"1.2\" fill=\"#F4F0FF\"></circle>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "bottom.capri",
+  "cat": "bottom",
+  "name": "Бриджи",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "mint",
+  "sort": 100,
+  "art": {
+   "layers": {
+    "legL": "<rect x=\"47\" y=\"124\" width=\"11\" height=\"24\" rx=\"5\" fill=\"@skin\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><rect x=\"47\" y=\"124\" width=\"11\" height=\"15\" rx=\"5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><rect x=\"46.6\" y=\"135\" width=\"11.8\" height=\"4.4\" rx=\"2\" fill=\"@c|l0.3\" stroke=\"#2B2035\" stroke-width=\"1.5\"></rect>",
+    "legR": "<rect x=\"62\" y=\"124\" width=\"11\" height=\"24\" rx=\"5\" fill=\"@skin\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><rect x=\"62\" y=\"124\" width=\"11\" height=\"15\" rx=\"5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><rect x=\"61.6\" y=\"135\" width=\"11.8\" height=\"4.4\" rx=\"2\" fill=\"@c|l0.3\" stroke=\"#2B2035\" stroke-width=\"1.5\"></rect>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "bottom.frank",
+  "cat": "bottom",
+  "name": "Рваные брюки",
+  "source": "code",
+  "palette": "cloth",
+  "def_color": "lavender",
+  "sort": 110,
+  "art": {
+   "layers": {
+    "legL": "<path d=\"M47 128 C47 125 49 124 52.5 124 C56 124 58 125 58 128 L58 142 L55 140 L52.5 143 L50 140 L47 142 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><rect x=\"49\" y=\"129\" width=\"6\" height=\"5\" rx=\"1\" fill=\"#FFAA6B\" stroke=\"#2B2035\" stroke-width=\"1.2\"></rect>",
+    "legR": "<path d=\"M62 128 C62 125 64 124 67.5 124 C71 124 73 125 73 128 L73 142 L70 140 L67.5 143 L65 140 L62 142 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M65 131 l5 3 M65 134 l5 -3\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"1\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>"
    }
   },
   "meta": {},
@@ -467,6 +1049,159 @@ export const STARTER_ITEMS: ItemRow[] = [
   "rarity": 0
  },
  {
+  "id": "shoes.sneakers",
+  "cat": "shoes",
+  "name": "Кроссовки",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "cherry",
+  "sort": 40,
+  "art": {
+   "layers": {
+    "shoeL": "<path d=\"M44 150 C44 145 47.5 143.5 52.5 143.5 C57.5 143.5 60 146 60 150.5 C60 154.5 57 156.5 52 156.5 C47 156.5 44 154.5 44 150 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M45 154 H59\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M45 154 H59\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"0.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.5\" transform=\"translate(0 1.6)\"></path><path d=\"M47 150 C51 147 55 147 58 149\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>",
+    "shoeR": "<path d=\"M76 150 C76 145 72.5 143.5 67.5 143.5 C62.5 143.5 60 146 60 150.5 C60 154.5 63 156.5 68 156.5 C73 156.5 76 154.5 76 150 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M61 154 H75\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M61 154 H75\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"0.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.5\" transform=\"translate(0 1.6)\"></path><path d=\"M73 150 C69 147 65 147 62 149\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "shoes.bunny",
+  "cat": "shoes",
+  "name": "Тапочки-зайчики",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "milk",
+  "sort": 50,
+  "art": {
+   "layers": {
+    "shoeL": "<ellipse cx=\"49\" cy=\"141\" rx=\"2.4\" ry=\"6\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"1.6\" transform=\"rotate(-12 49 146)\"></ellipse><ellipse cx=\"49\" cy=\"141.5\" rx=\"1\" ry=\"3.6\" fill=\"#FF9EBB\" transform=\"rotate(-12 49 146)\"></ellipse><ellipse cx=\"53\" cy=\"141\" rx=\"2.4\" ry=\"6\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"1.6\" transform=\"rotate(12 53 146)\"></ellipse><ellipse cx=\"53\" cy=\"141.5\" rx=\"1\" ry=\"3.6\" fill=\"#FF9EBB\" transform=\"rotate(12 53 146)\"></ellipse><path d=\"M44 150 C44 145 47.5 143.5 52.5 143.5 C57.5 143.5 60 146 60 150.5 C60 154.5 57 156.5 52 156.5 C47 156.5 44 154.5 44 150 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><circle cx=\"48\" cy=\"149.5\" r=\"0.9\" fill=\"#2B2035\"></circle><circle cx=\"52\" cy=\"149.5\" r=\"0.9\" fill=\"#2B2035\"></circle><circle cx=\"50\" cy=\"152\" r=\"1.1\" fill=\"#FF9EBB\"></circle>",
+    "shoeR": "<ellipse cx=\"71\" cy=\"141\" rx=\"2.4\" ry=\"6\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"1.6\" transform=\"rotate(12 71 146)\"></ellipse><ellipse cx=\"71\" cy=\"141.5\" rx=\"1\" ry=\"3.6\" fill=\"#FF9EBB\" transform=\"rotate(12 71 146)\"></ellipse><ellipse cx=\"67\" cy=\"141\" rx=\"2.4\" ry=\"6\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"1.6\" transform=\"rotate(-12 67 146)\"></ellipse><ellipse cx=\"67\" cy=\"141.5\" rx=\"1\" ry=\"3.6\" fill=\"#FF9EBB\" transform=\"rotate(-12 67 146)\"></ellipse><path d=\"M76 150 C76 145 72.5 143.5 67.5 143.5 C62.5 143.5 60 146 60 150.5 C60 154.5 63 156.5 68 156.5 C73 156.5 76 154.5 76 150 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><circle cx=\"72\" cy=\"149.5\" r=\"0.9\" fill=\"#2B2035\"></circle><circle cx=\"68\" cy=\"149.5\" r=\"0.9\" fill=\"#2B2035\"></circle><circle cx=\"70\" cy=\"152\" r=\"1.1\" fill=\"#FF9EBB\"></circle>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "shoes.rainboots",
+  "cat": "shoes",
+  "name": "Резиновые сапоги",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "lemon",
+  "sort": 60,
+  "art": {
+   "layers": {
+    "shoeL": "<rect x=\"46\" y=\"132\" width=\"13\" height=\"17\" rx=\"3.5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><path d=\"M44 150 C44 145 47.5 143.5 52.5 143.5 C57.5 143.5 60 146 60 150.5 C60 154.5 57 156.5 52 156.5 C47 156.5 44 154.5 44 150 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M45 153.6 H59\" fill=\"none\" stroke=\"@c|d0.3\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M49 135 V146\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.6\"></path>",
+    "shoeR": "<rect x=\"61\" y=\"132\" width=\"13\" height=\"17\" rx=\"3.5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><path d=\"M76 150 C76 145 72.5 143.5 67.5 143.5 C62.5 143.5 60 146 60 150.5 C60 154.5 63 156.5 68 156.5 C73 156.5 76 154.5 76 150 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M61 153.6 H75\" fill=\"none\" stroke=\"@c|d0.3\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M64 135 V146\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.6\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "shoes.maryjanes",
+  "cat": "shoes",
+  "name": "Туфельки",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "cherry",
+  "sort": 70,
+  "art": {
+   "layers": {
+    "shoeL": "<rect x=\"47\" y=\"136\" width=\"11\" height=\"10\" rx=\"3\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"1.8\"></rect><path d=\"M44 150 C44 145 47.5 143.5 52.5 143.5 C57.5 143.5 60 146 60 150.5 C60 154.5 57 156.5 52 156.5 C47 156.5 44 154.5 44 150 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M46 147 H58\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"3.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M46 147 H58\" fill=\"none\" stroke=\"@c|d0.2\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><circle cx=\"55\" cy=\"147\" r=\"1.3\" fill=\"#FFD966\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><path d=\"M47.5 150.5 l3 -1\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"></path>",
+    "shoeR": "<rect x=\"62\" y=\"136\" width=\"11\" height=\"10\" rx=\"3\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"1.8\"></rect><path d=\"M76 150 C76 145 72.5 143.5 67.5 143.5 C62.5 143.5 60 146 60 150.5 C60 154.5 63 156.5 68 156.5 C73 156.5 76 154.5 76 150 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M62 147 H74\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"3.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M62 147 H74\" fill=\"none\" stroke=\"@c|d0.2\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><circle cx=\"65\" cy=\"147\" r=\"1.3\" fill=\"#FFD966\" stroke=\"#2B2035\" stroke-width=\"0.9\"></circle><path d=\"M72.5 150.5 l-3 -1\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "shoes.sandals",
+  "cat": "shoes",
+  "name": "Сандалии",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "apricot",
+  "sort": 80,
+  "art": {
+   "layers": {
+    "shoeL": "<path d=\"M44 150 C44 145 47.5 143.5 52.5 143.5 C57.5 143.5 60 146 60 150.5 C60 154.5 57 156.5 52 156.5 C47 156.5 44 154.5 44 150 Z\" fill=\"@skin\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M45 155 H59\" fill=\"none\" stroke=\"@c\" stroke-width=\"3.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M46 149 H59 M52 144 V149\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"3.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M46 149 H59 M52 144 V149\" fill=\"none\" stroke=\"@c\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>",
+    "shoeR": "<path d=\"M76 150 C76 145 72.5 143.5 67.5 143.5 C62.5 143.5 60 146 60 150.5 C60 154.5 63 156.5 68 156.5 C73 156.5 76 154.5 76 150 Z\" fill=\"@skin\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M61 155 H75\" fill=\"none\" stroke=\"@c\" stroke-width=\"3.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M61 149 H74 M68 144 V149\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"3.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M61 149 H74 M68 144 V149\" fill=\"none\" stroke=\"@c\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "shoes.uggs",
+  "cat": "shoes",
+  "name": "Угги",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "apricot",
+  "sort": 90,
+  "art": {
+   "layers": {
+    "shoeL": "<rect x=\"45.4\" y=\"133\" width=\"14.2\" height=\"16\" rx=\"5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><path d=\"M44 150 C44 145 47.5 143.5 52.5 143.5 C57.5 143.5 60 146 60 150.5 C60 154.5 57 156.5 52 156.5 C47 156.5 44 154.5 44 150 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><rect x=\"44.6\" y=\"130\" width=\"15.8\" height=\"6.4\" rx=\"3.2\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"1.8\"></rect><path d=\"M45 153.6 H59\" fill=\"none\" stroke=\"@c|d0.25\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M48 141 h9\" fill=\"none\" stroke=\"@c|d0.18\" stroke-width=\"1.1\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"></path>",
+    "shoeR": "<rect x=\"60.4\" y=\"133\" width=\"14.2\" height=\"16\" rx=\"5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><path d=\"M76 150 C76 145 72.5 143.5 67.5 143.5 C62.5 143.5 60 146 60 150.5 C60 154.5 63 156.5 68 156.5 C73 156.5 76 154.5 76 150 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><rect x=\"59.6\" y=\"130\" width=\"15.8\" height=\"6.4\" rx=\"3.2\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"1.8\"></rect><path d=\"M61 153.6 H75\" fill=\"none\" stroke=\"@c|d0.25\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M63 141 h9\" fill=\"none\" stroke=\"@c|d0.18\" stroke-width=\"1.1\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "shoes.hightops",
+  "cat": "shoes",
+  "name": "Высокие кеды",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "coal",
+  "sort": 100,
+  "art": {
+   "layers": {
+    "shoeL": "<rect x=\"46.6\" y=\"137\" width=\"11.8\" height=\"12\" rx=\"3\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><path d=\"M44 150 C44 145 47.5 143.5 52.5 143.5 C57.5 143.5 60 146 60 150.5 C60 154.5 57 156.5 52 156.5 C47 156.5 44 154.5 44 150 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M44 150 C44 147 45.5 146 48 146 L50 146 L50 155.5 C46.5 155 44 153.5 44 150 Z\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"1.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M45 153.8 H59\" fill=\"none\" stroke=\"#F4F0FF\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M50 140 h5 M50 143.5 h5\" fill=\"none\" stroke=\"#F4F0FF\" stroke-width=\"1.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><circle cx=\"48.6\" cy=\"141\" r=\"2\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"1\"></circle>",
+    "shoeR": "<rect x=\"61.6\" y=\"137\" width=\"11.8\" height=\"12\" rx=\"3\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><path d=\"M76 150 C76 145 72.5 143.5 67.5 143.5 C62.5 143.5 60 146 60 150.5 C60 154.5 63 156.5 68 156.5 C73 156.5 76 154.5 76 150 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M76 150 C76 147 74.5 146 72 146 L70 146 L70 155.5 C73.5 155 76 153.5 76 150 Z\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"1.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M61 153.8 H75\" fill=\"none\" stroke=\"#F4F0FF\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M65 140 h5 M65 143.5 h5\" fill=\"none\" stroke=\"#F4F0FF\" stroke-width=\"1.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><circle cx=\"71.4\" cy=\"141\" r=\"2\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"1\"></circle>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "shoes.witch",
+  "cat": "shoes",
+  "name": "Чулки и туфли ведьмы",
+  "source": "code",
+  "palette": null,
+  "def_color": null,
+  "sort": 110,
+  "art": {
+   "layers": {
+    "shoeL": "<rect x=\"47\" y=\"124\" width=\"11\" height=\"24\" rx=\"5\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><rect x=\"48.1\" y=\"128\" width=\"8.8\" height=\"3\" fill=\"#9B6BFF\"></rect><rect x=\"48.1\" y=\"134\" width=\"8.8\" height=\"3\" fill=\"#9B6BFF\"></rect><rect x=\"48.1\" y=\"140\" width=\"8.8\" height=\"3\" fill=\"#9B6BFF\"></rect><path d=\"M43 151 C40 148 37 149 36 146 C40 145 44 145 47 146 L58 146 C60 148 60 152 57 154 L47 154 C45 154 44 153 43 151 Z\" fill=\"#2E2438\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><rect x=\"50.5\" y=\"146.4\" width=\"4\" height=\"3.4\" rx=\"0.8\" fill=\"#FFD45E\" stroke=\"#2B2035\" stroke-width=\"1\"></rect>",
+    "shoeR": "<rect x=\"62\" y=\"124\" width=\"11\" height=\"24\" rx=\"5\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><rect x=\"63.1\" y=\"128\" width=\"8.8\" height=\"3\" fill=\"#9B6BFF\"></rect><rect x=\"63.1\" y=\"134\" width=\"8.8\" height=\"3\" fill=\"#9B6BFF\"></rect><rect x=\"63.1\" y=\"140\" width=\"8.8\" height=\"3\" fill=\"#9B6BFF\"></rect><path d=\"M77 151 C80 148 83 149 84 146 C80 145 76 145 73 146 L62 146 C60 148 60 152 63 154 L73 154 C75 154 76 153 77 151 Z\" fill=\"#2E2438\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><rect x=\"65.5\" y=\"146.4\" width=\"4\" height=\"3.4\" rx=\"0.8\" fill=\"#FFD45E\" stroke=\"#2B2035\" stroke-width=\"1\"></rect>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "shoes.frank",
+  "cat": "shoes",
+  "name": "Тяжёлые ботинки",
+  "source": "code",
+  "palette": null,
+  "def_color": null,
+  "sort": 120,
+  "art": {
+   "layers": {
+    "shoeL": "<rect x=\"45.4\" y=\"134\" width=\"14.2\" height=\"15\" rx=\"3\" fill=\"#4A4258\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><path d=\"M41 152 C41 146 45 144 52 144 C58 144 61 147 61 152 L61 155 L41 155 Z\" fill=\"#4A4258\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><rect x=\"40\" y=\"154\" width=\"22\" height=\"5\" rx=\"1.6\" fill=\"#2E2438\" stroke=\"#2B2035\" stroke-width=\"1.8\"></rect><path d=\"M48 138 h9 M48 142 h9\" fill=\"none\" stroke=\"#8E8AA6\" stroke-width=\"1.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>",
+    "shoeR": "<rect x=\"60.4\" y=\"134\" width=\"14.2\" height=\"15\" rx=\"3\" fill=\"#4A4258\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><path d=\"M79 152 C79 146 75 144 68 144 C62 144 59 147 59 152 L59 155 L79 155 Z\" fill=\"#4A4258\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><rect x=\"58\" y=\"154\" width=\"22\" height=\"5\" rx=\"1.6\" fill=\"#2E2438\" stroke=\"#2B2035\" stroke-width=\"1.8\"></rect><path d=\"M63 138 h9 M63 142 h9\" fill=\"none\" stroke=\"#8E8AA6\" stroke-width=\"1.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
   "id": "back.backpack",
   "cat": "back",
   "name": "Рюкзак",
@@ -498,6 +1233,169 @@ export const STARTER_ITEMS: ItemRow[] = [
   },
   "meta": {
    "hover": true
+  },
+  "rarity": 0
+ },
+ {
+  "id": "back.cape",
+  "cat": "back",
+  "name": "Плащ",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "cherry",
+  "sort": 30,
+  "art": {
+   "layers": {
+    "back": "<path d=\"M41 97 C31 110 25 130 22 153 C34 158 48 157 60 155 C72 157 86 158 98 153 C95 130 89 110 79 97 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M36 120 C32 132 30 142 30 152 M84 120 C88 132 90 142 90 152\" fill=\"none\" stroke=\"@c|d0.25\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.6\"></path>",
+    "front": "<path d=\"M44 98 L54 102 M76 98 L66 102\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"4.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M44 98 L54 102 M76 98 L66 102\" fill=\"none\" stroke=\"@c\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><circle cx=\"60\" cy=\"102\" r=\"3.2\" fill=\"#FFD45E\" stroke=\"#2B2035\" stroke-width=\"1.6\"></circle>"
+   }
+  },
+  "meta": {
+   "anim": "sway",
+   "pivot": [
+    60,
+    98
+   ]
+  },
+  "rarity": 0
+ },
+ {
+  "id": "back.fairy",
+  "cat": "back",
+  "name": "Крылья феи",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "sky",
+  "sort": 40,
+  "art": {
+   "layers": {
+    "back": "<path d=\"M48 104 C40 86 22 70 10 76 C0 82 6 100 22 106 C30 109 40 108 48 106 Z\" fill=\"@c|l0.45\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" fill-opacity=\"0.85\"></path><path d=\"M48 108 C38 112 24 120 22 132 C22 140 32 140 40 132 C45 126 48 118 48 108 Z\" fill=\"@c|l0.3\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" fill-opacity=\"0.85\"></path><path d=\"M46 104 C36 94 24 84 14 82 M46 110 C38 118 32 126 28 134\" fill=\"none\" stroke=\"@c\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.8\"></path><path d=\"M0 -6 C0.8 -1.4 1.4 -0.8 6 0 C1.4 0.8 0.8 1.4 0 6 C-0.8 1.4 -1.4 0.8 -6 0 C-1.4 -0.8 -0.8 -1.4 0 -6 Z\" fill=\"#FFFFFF\" transform=\"translate(20 90) scale(0.4)\"></path><g transform=\"translate(120 0) scale(-1 1)\"><path d=\"M48 104 C40 86 22 70 10 76 C0 82 6 100 22 106 C30 109 40 108 48 106 Z\" fill=\"@c|l0.45\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" fill-opacity=\"0.85\"></path><path d=\"M48 108 C38 112 24 120 22 132 C22 140 32 140 40 132 C45 126 48 118 48 108 Z\" fill=\"@c|l0.3\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" fill-opacity=\"0.85\"></path><path d=\"M46 104 C36 94 24 84 14 82 M46 110 C38 118 32 126 28 134\" fill=\"none\" stroke=\"@c\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.8\"></path><path d=\"M0 -6 C0.8 -1.4 1.4 -0.8 6 0 C1.4 0.8 0.8 1.4 0 6 C-0.8 1.4 -1.4 0.8 -6 0 C-1.4 -0.8 -0.8 -1.4 0 -6 Z\" fill=\"#FFFFFF\" transform=\"translate(20 90) scale(0.4)\"></path></g>"
+   }
+  },
+  "meta": {
+   "hover": true
+  },
+  "rarity": 0
+ },
+ {
+  "id": "back.guitar",
+  "cat": "back",
+  "name": "Гитара",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "apricot",
+  "sort": 50,
+  "art": {
+   "layers": {
+    "back": "<g transform=\"translate(30 128) rotate(55) translate(-59.5 -130)\"><rect x=\"56\" y=\"50\" width=\"7\" height=\"70\" rx=\"2\" fill=\"#7A4A33\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><rect x=\"54\" y=\"40\" width=\"11\" height=\"14\" rx=\"3\" fill=\"#5A3A2A\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><path d=\"M57 44 h-3 M57 49 h-3 M62 44 h3 M62 49 h3\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M59.5 112 C48 112 44 120 47 128 C42 134 44 148 59.5 148 C75 148 77 134 72 128 C75 120 71 112 59.5 112 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><circle cx=\"59.5\" cy=\"128\" r=\"4.6\" fill=\"#3A2A24\" stroke=\"#2B2035\" stroke-width=\"1.6\"></circle><rect x=\"53\" y=\"138\" width=\"13\" height=\"3.4\" rx=\"1\" fill=\"#5A3A2A\" stroke=\"#2B2035\" stroke-width=\"1.4\"></rect></g>",
+    "front": "<path d=\"M76 99 L40 132\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"5.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M76 99 L40 132\" fill=\"none\" stroke=\"@c|d0.25\" stroke-width=\"3.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "back.scarf",
+  "cat": "back",
+  "name": "Шарф",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "cherry",
+  "sort": 60,
+  "art": {
+   "layers": {
+    "back": "<path d=\"M76 98 C88 94 100 100 112 92 L114 101 C104 110 90 107 78 106 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M112 92 l4 -2 M113 96 l4 -1 M114 100 l4 0\" fill=\"none\" stroke=\"@c\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M90 98 L92 106 M100 97 L101 105\" fill=\"none\" stroke=\"@c|l0.4\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.9\"></path>",
+    "front": "<path d=\"M66 104 L74 104 L76 125 L67 125 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M67.6 112 H74.8 M68.2 119 H75.4\" fill=\"none\" stroke=\"@c|l0.4\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M68 125 v3 M71 125 v3 M74 125 v3\" fill=\"none\" stroke=\"@c\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M42 95 C48 102 72 102 78 95 L80 103 C72 110 48 110 40 103 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M50 101 L49 107 M60 103 V109 M70 101 L71 107\" fill=\"none\" stroke=\"@c|l0.4\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.9\"></path>"
+   }
+  },
+  "meta": {
+   "anim": "sway",
+   "pivot": [
+    78,
+    102
+   ]
+  },
+  "rarity": 0
+ },
+ {
+  "id": "back.tail",
+  "cat": "back",
+  "name": "Хвост котика",
+  "source": "free",
+  "palette": "hair",
+  "def_color": "coal",
+  "sort": 70,
+  "art": {
+   "layers": {
+    "back": "<path d=\"M66 132 C86 142 102 134 102 118 C102 106 108 99 115 103\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"10.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M66 132 C86 142 102 134 102 118 C102 106 108 99 115 103\" fill=\"none\" stroke=\"@c\" stroke-width=\"6.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><circle cx=\"115\" cy=\"103\" r=\"4.4\" fill=\"@c|l0.35\" stroke=\"#2B2035\" stroke-width=\"1.8\"></circle>"
+   }
+  },
+  "meta": {
+   "anim": "sway",
+   "pivot": [
+    70,
+    132
+   ]
+  },
+  "rarity": 0
+ },
+ {
+  "id": "back.bear",
+  "cat": "back",
+  "name": "Мишка-рюкзак",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "apricot",
+  "sort": 80,
+  "art": {
+   "layers": {
+    "back": "<path d=\"M31 104 C31 96 37 92 45 92 H75 C83 92 89 96 89 104 V130 C89 136 85 140 79 140 H41 C35 140 31 136 31 130 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><circle cx=\"81\" cy=\"80\" r=\"5.6\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><circle cx=\"103\" cy=\"80\" r=\"5.6\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><circle cx=\"81\" cy=\"80\" r=\"2.6\" fill=\"@c|l0.4\"></circle><circle cx=\"103\" cy=\"80\" r=\"2.6\" fill=\"@c|l0.4\"></circle><circle cx=\"92\" cy=\"92\" r=\"13.5\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></circle><ellipse cx=\"92\" cy=\"97\" rx=\"6\" ry=\"4.6\" fill=\"@c|l0.45\" stroke=\"#2B2035\" stroke-width=\"1.4\"></ellipse><circle cx=\"87\" cy=\"89\" r=\"1.5\" fill=\"#2B2035\"></circle><circle cx=\"97\" cy=\"89\" r=\"1.5\" fill=\"#2B2035\"></circle><ellipse cx=\"92\" cy=\"95.4\" rx=\"1.8\" ry=\"1.3\" fill=\"#2B2035\"></ellipse><circle cx=\"84\" cy=\"95\" r=\"1.8\" fill=\"#FF9EBB\" opacity=\"0.8\"></circle><circle cx=\"100\" cy=\"95\" r=\"1.8\" fill=\"#FF9EBB\" opacity=\"0.8\"></circle>",
+    "front": "<path d=\"M48 99 C46 108 45.5 118 45.5 129 M72 99 C74 108 74.5 118 74.5 129\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"5.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M48 99 C46 108 45.5 118 45.5 129 M72 99 C74 108 74.5 118 74.5 129\" fill=\"none\" stroke=\"@c|d0.1\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "back.jetpack",
+  "cat": "back",
+  "name": "Ранец-ракета",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "milk",
+  "sort": 90,
+  "art": {
+   "layers": {
+    "back": "<rect x=\"24\" y=\"100\" width=\"14\" height=\"32\" rx=\"6\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><path d=\"M24 106 C24 98 27 92 31 90 C35 92 38 98 38 106 Z\" fill=\"#E5566B\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><rect x=\"26.5\" y=\"131\" width=\"9\" height=\"5\" rx=\"1.5\" fill=\"#8E8AA6\" stroke=\"#2B2035\" stroke-width=\"1.6\"></rect><path d=\"M28 110 V126\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.6\"></path><g transform=\"translate(120 0) scale(-1 1)\"><rect x=\"24\" y=\"100\" width=\"14\" height=\"32\" rx=\"6\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><path d=\"M24 106 C24 98 27 92 31 90 C35 92 38 98 38 106 Z\" fill=\"#E5566B\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><rect x=\"26.5\" y=\"131\" width=\"9\" height=\"5\" rx=\"1.5\" fill=\"#8E8AA6\" stroke=\"#2B2035\" stroke-width=\"1.6\"></rect><path d=\"M28 110 V126\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.6\"></path></g>",
+    "backFx": "<path d=\"M31 136 C26 142 27 150 31 156 C35 150 36 142 31 136 Z\" fill=\"#FFB347\" stroke=\"#2B2035\" stroke-width=\"1.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M31 139 C29 143 29.5 148 31 151 C32.5 148 33 143 31 139 Z\" fill=\"#FFF2A8\" stroke=\"none\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><g transform=\"translate(120 0) scale(-1 1)\"><path d=\"M31 136 C26 142 27 150 31 156 C35 150 36 142 31 136 Z\" fill=\"#FFB347\" stroke=\"#2B2035\" stroke-width=\"1.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M31 139 C29 143 29.5 148 31 151 C32.5 148 33 143 31 139 Z\" fill=\"#FFF2A8\" stroke=\"none\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path></g>"
+   }
+  },
+  "meta": {
+   "hover": true,
+   "anim": "flicker"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "back.vampcape",
+  "cat": "back",
+  "name": "Плащ вампира",
+  "source": "code",
+  "palette": null,
+  "def_color": null,
+  "sort": 100,
+  "art": {
+   "layers": {
+    "back": "<path d=\"M41 97 C31 110 25 130 22 153 C34 158 48 157 60 155 C72 157 86 158 98 153 C95 130 89 110 79 97 Z\" fill=\"#2E2438\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M44 100 C36 112 31 130 29 150 C40 153 52 152 60 151 C68 152 80 153 91 150 C89 130 84 112 76 100 Z\" fill=\"#C9304A\" stroke=\"#2B2035\" stroke-width=\"1.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M48 101 C32 99 14 88 4 68 C20 72 38 82 57 96 Z\" fill=\"#2E2438\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M46 98 C32 96 18 87 10 74 C24 78 38 85 52 95 Z\" fill=\"#C9304A\" stroke=\"none\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><g transform=\"translate(120 0) scale(-1 1)\"><path d=\"M48 101 C32 99 14 88 4 68 C20 72 38 82 57 96 Z\" fill=\"#2E2438\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M46 98 C32 96 18 87 10 74 C24 78 38 85 52 95 Z\" fill=\"#C9304A\" stroke=\"none\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path></g>",
+    "front": "<circle cx=\"60\" cy=\"101\" r=\"3\" fill=\"#E5304F\" stroke=\"#2B2035\" stroke-width=\"1.6\"></circle>"
+   }
+  },
+  "meta": {
+   "anim": "sway",
+   "pivot": [
+    60,
+    98
+   ]
   },
   "rarity": 0
  },
@@ -583,6 +1481,146 @@ export const STARTER_ITEMS: ItemRow[] = [
   "rarity": 0
  },
  {
+  "id": "hand.flashlight",
+  "cat": "hand",
+  "name": "Фонарик",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "lemon",
+  "sort": 60,
+  "art": {
+   "layers": {
+    "handR": "<g transform=\"rotate(-24 81 126)\"><rect x=\"78\" y=\"121\" width=\"20\" height=\"9\" rx=\"3\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><rect x=\"96\" y=\"119\" width=\"7\" height=\"13\" rx=\"2.4\" fill=\"@c|d0.15\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><circle cx=\"85\" cy=\"125.5\" r=\"1.5\" fill=\"#E5566B\" stroke=\"#2B2035\" stroke-width=\"1\"></circle></g>",
+    "handFx": "<g transform=\"rotate(-24 81 126)\"><path d=\"M103 120 L140 104 C145 114 145 136 140 146 L103 131 Z\" fill=\"#FFE9A0\" stroke=\"none\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" opacity=\"0.6\"></path><path d=\"M103 122 L132 114 C135 120 135 131 132 137 L103 129 Z\" fill=\"#FFFBE8\" stroke=\"none\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\" opacity=\"0.85\"></path></g>"
+   }
+  },
+  "meta": {
+   "anim": "pulse"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "hand.umbrella",
+  "cat": "hand",
+  "name": "Зонтик",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "strawberry",
+  "sort": 70,
+  "art": {
+   "layers": {
+    "back": "<g transform=\"rotate(12 88 46)\"><path d=\"M42 46 C44 20 64 6 88 6 C112 6 132 20 134 46 C128 42 122 42 117 46 C111 42 104 42 98 46 C93 42 84 42 78 46 C73 42 64 42 59 46 C53 42 47 42 42 46 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M88 6 C78 18 76 32 78 46 M88 6 C98 18 100 32 98 46 M88 6 C70 14 60 28 59 46 M88 6 C106 14 116 28 117 46\" fill=\"none\" stroke=\"@c|d0.25\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"></path><path d=\"M86 6 L88 -2 L90 6 Z\" fill=\"#2B2035\" stroke=\"#2B2035\" stroke-width=\"1.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path></g>",
+    "handR": "<path d=\"M80 128 C81 118 82 100 84 60\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"4.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M80 128 C81 118 82 100 84 60\" fill=\"none\" stroke=\"#8E8AA6\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M80 128 C79 133 74 134 73 130\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "hand.icecream",
+  "cat": "hand",
+  "name": "Мороженое",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "strawberry",
+  "sort": 80,
+  "art": {
+   "layers": {
+    "handR": "<path d=\"M84 133 L79 115 L97 113 Z\" fill=\"#E9B66A\" stroke=\"#2B2035\" stroke-width=\"1.8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M82 118 L94 116 M83 123 L92 121 M88 128 L84 118\" fill=\"none\" stroke=\"#C98A4B\" stroke-width=\"1\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.8\"></path><path d=\"M78 115 C76 106 82 99 89 100 C96 99 101 106 98 114 C96 117 94 113 92 116 C90 113 87 118 85 115 C83 118 80 113 78 115 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><circle cx=\"90\" cy=\"98\" r=\"2.6\" fill=\"#E5304F\" stroke=\"#2B2035\" stroke-width=\"1.3\"></circle><path d=\"M82 105 C84 103 86 102 88 102\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.6\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "hand.book",
+  "cat": "hand",
+  "name": "Книжка",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "blueberry",
+  "sort": 90,
+  "art": {
+   "layers": {
+    "handR": "<g transform=\"rotate(-8 88 122)\"><rect x=\"80\" y=\"110\" width=\"19\" height=\"24\" rx=\"2.4\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\"></rect><rect x=\"97.5\" y=\"111.5\" width=\"3\" height=\"21\" rx=\"1\" fill=\"#F4F0FF\" stroke=\"#2B2035\" stroke-width=\"1.4\"></rect><path d=\"M84 117 h10 M84 121 h7\" fill=\"none\" stroke=\"@c|l0.5\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><circle cx=\"89\" cy=\"127\" r=\"2.4\" fill=\"@c|k\" stroke=\"#2B2035\" stroke-width=\"1.1\"></circle></g>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "hand.sparkler",
+  "cat": "hand",
+  "name": "Бенгальский огонь",
+  "source": "free",
+  "palette": null,
+  "def_color": null,
+  "sort": 100,
+  "art": {
+   "layers": {
+    "handR": "<path d=\"M81 128 L101 95\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M81 128 L101 95\" fill=\"none\" stroke=\"#B9B2CC\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M92 110 L101 95\" fill=\"none\" stroke=\"#4A4258\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>",
+    "handFx": "<circle cx=\"101\" cy=\"94\" r=\"12\" fill=\"#FFE9A0\" opacity=\"0.6\"></circle><path d=\"M101 94 l12 -12 M101 94 l15 2 M101 94 l-4 -16 M101 94 l10 12 M101 94 l-13 -6\" fill=\"none\" stroke=\"#FFE38A\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M0 -6 C0.8 -1.4 1.4 -0.8 6 0 C1.4 0.8 0.8 1.4 0 6 C-0.8 1.4 -1.4 0.8 -6 0 C-1.4 -0.8 -0.8 -1.4 0 -6 Z\" fill=\"#FFF6C2\" transform=\"translate(101 94) scale(2)\" stroke=\"#2B2035\" stroke-width=\"0.5\"></path><path d=\"M0 -6 C0.8 -1.4 1.4 -0.8 6 0 C1.4 0.8 0.8 1.4 0 6 C-0.8 1.4 -1.4 0.8 -6 0 C-1.4 -0.8 -0.8 -1.4 0 -6 Z\" fill=\"#FFFFFF\" transform=\"translate(115 82) scale(0.7)\"></path><path d=\"M0 -6 C0.8 -1.4 1.4 -0.8 6 0 C1.4 0.8 0.8 1.4 0 6 C-0.8 1.4 -1.4 0.8 -6 0 C-1.4 -0.8 -0.8 -1.4 0 -6 Z\" fill=\"#FFE38A\" transform=\"translate(94 77) scale(0.6)\"></path><path d=\"M0 -6 C0.8 -1.4 1.4 -0.8 6 0 C1.4 0.8 0.8 1.4 0 6 C-0.8 1.4 -1.4 0.8 -6 0 C-1.4 -0.8 -0.8 -1.4 0 -6 Z\" fill=\"#FFFFFF\" transform=\"translate(117 97) scale(0.55)\"></path><circle cx=\"111\" cy=\"107\" r=\"1.3\" fill=\"#FFD966\"></circle><circle cx=\"88\" cy=\"89\" r=\"1.2\" fill=\"#FFFFFF\"></circle>"
+   }
+  },
+  "meta": {
+   "anim": "flicker"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "hand.kite",
+  "cat": "hand",
+  "name": "Воздушный змей",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "cherry",
+  "sort": 110,
+  "art": {
+   "layers": {
+    "handR": "<path d=\"M81 126 C100 110 120 80 136 52\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"1.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M136 52 C130 62 140 68 134 78 C128 88 138 92 132 100\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"1\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><g transform=\"translate(133 70) scale(0.4)\"><path d=\"M0 0 C-4 -7 -12 -8 -12 -1 C-12 6 -4 5 0 0 Z M0 0 C4 -7 12 -8 12 -1 C12 6 4 5 0 0 Z\" fill=\"#FFD966\" stroke=\"#2B2035\" stroke-width=\"1.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path></g><g transform=\"translate(134 86) scale(0.4)\"><path d=\"M0 0 C-4 -7 -12 -8 -12 -1 C-12 6 -4 5 0 0 Z M0 0 C4 -7 12 -8 12 -1 C12 6 4 5 0 0 Z\" fill=\"#FFD966\" stroke=\"#2B2035\" stroke-width=\"1.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path></g><path d=\"M136 52 L124 34 L136 10 L148 34 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M136 10 L148 34 L136 34 Z\" fill=\"@c|l0.35\" stroke=\"#2B2035\" stroke-width=\"1.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M124 34 L136 52 L136 34 Z\" fill=\"@c|d0.12\" stroke=\"#2B2035\" stroke-width=\"1.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M136 10 V52 M124 34 H148\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"1.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.6\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "hand.jack",
+  "cat": "hand",
+  "name": "Фонарь Джека",
+  "source": "code",
+  "palette": null,
+  "def_color": null,
+  "sort": 120,
+  "art": {
+   "layers": {
+    "handR": "<circle cx=\"91\" cy=\"143\" r=\"17\" fill=\"#FFC266\" opacity=\"0.4\"></circle><path d=\"M81 126 L86 132 M81 126 L96 132\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M80 142 C78 134 84 130 91 131 C98 130 104 134 102 142 C104 150 98 155 91 154 C84 155 78 150 80 142 Z\" fill=\"#FF9A3D\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M86 132 C84 138 84 148 86 153 M96 132 C98 138 98 148 96 153\" fill=\"none\" stroke=\"#ca7c3b\" stroke-width=\"1.3\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.7\"></path><path d=\"M90 131 L91 127 L93 127 L92 131 Z\" fill=\"#4E8A3E\" stroke=\"#2B2035\" stroke-width=\"1.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M84.5 140 L87 136.5 L89 140 Z M93 140 L95 136.5 L97.5 140 Z M84 145 L87 147 L89 145 L91 147 L93 145 L95 147 L98 145 C96 150 86 150 84 145 Z\" fill=\"#5A2A12\" stroke=\"#2B2035\" stroke-width=\"1\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path>",
+    "handFx": "<path d=\"M85.5 139.6 L87 137.6 L88.2 139.6 Z M93.8 139.6 L95 137.6 L96.6 139.6 Z M86 146 L87.4 147 L89 146 L91 147 L93 146 L94.6 147 L96 146 C94 148.6 88 148.6 86 146 Z\" fill=\"#FFE38A\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path>"
+   }
+  },
+  "meta": {
+   "anim": "flicker"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "hand.broom",
+  "cat": "hand",
+  "name": "Метла",
+  "source": "code",
+  "palette": null,
+  "def_color": null,
+  "sort": 130,
+  "art": {
+   "layers": {
+    "handR": "<path d=\"M90 82 L74 150\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M90 82 L74 150\" fill=\"none\" stroke=\"#9C5B3B\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M70 146 C66 152 62 160 60 168 C66 168 76 168 84 166 C82 158 80 152 78 147 Z\" fill=\"#E9C48A\" stroke=\"#2B2035\" stroke-width=\"1.8\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><path d=\"M68 156 L65 166 M73 155 L72 167 M77 155 L79 166\" fill=\"none\" stroke=\"#C98A4B\" stroke-width=\"1.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M69.4 145 L78.8 147 L78 150.6 L68.6 148.6 Z\" fill=\"#9B6BFF\" stroke=\"#2B2035\" stroke-width=\"1.4\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path>"
+   }
+  },
+  "meta": {
+   "hover": true
+  },
+  "rarity": 0
+ },
+ {
   "id": "face.bandana",
   "cat": "face",
   "name": "Бандана на лицо",
@@ -596,6 +1634,139 @@ export const STARTER_ITEMS: ItemRow[] = [
    }
   },
   "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "face.glasses",
+  "cat": "face",
+  "name": "Круглые очки",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "coal",
+  "sort": 20,
+  "art": {
+   "layers": {
+    "mask": "<path d=\"M35 68 a9.5 9.5 0 1 0 19 0 a9.5 9.5 0 1 0 -19 0 Z M66 68 a9.5 9.5 0 1 0 19 0 a9.5 9.5 0 1 0 -19 0 Z\" fill=\"#FFFFFF\" fill-opacity=\"0.14\"></path><path d=\"M35 68 a9.5 9.5 0 1 0 19 0 a9.5 9.5 0 1 0 -19 0 Z M66 68 a9.5 9.5 0 1 0 19 0 a9.5 9.5 0 1 0 -19 0 Z M54 67 Q60 63 66 67 M35 67 L21 64 M85 67 L99 64\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"4.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M35 68 a9.5 9.5 0 1 0 19 0 a9.5 9.5 0 1 0 -19 0 Z M66 68 a9.5 9.5 0 1 0 19 0 a9.5 9.5 0 1 0 -19 0 Z M54 67 Q60 63 66 67 M35 67 L21 64 M85 67 L99 64\" fill=\"none\" stroke=\"@c\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M39 63 l4 -3 M70 63 l4 -3\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.8\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "face.sunglasses",
+  "cat": "face",
+  "name": "Солнечные очки",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "cherry",
+  "sort": 30,
+  "art": {
+   "layers": {
+    "mask": "<path d=\"M56 63 Q60 60 64 63 M33 62 L20 60 M87 62 L100 60\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"4.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M56 63 Q60 60 64 63 M33 62 L20 60 M87 62 L100 60\" fill=\"none\" stroke=\"@c\" stroke-width=\"2.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M33 63 C33 60 35 59 38 59 H52 C55 59 56 60 56 63 C56 72 52 77 45 77 C38 77 33 72 33 63 Z\" fill=\"#2E2438\" stroke=\"@c\" stroke-width=\"2.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><g transform=\"translate(120 0) scale(-1 1)\"><path d=\"M33 63 C33 60 35 59 38 59 H52 C55 59 56 60 56 63 C56 72 52 77 45 77 C38 77 33 72 33 63 Z\" fill=\"#2E2438\" stroke=\"@c\" stroke-width=\"2.6\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path></g><path d=\"M38 64 l6 -2.4 M69 64 l6 -2.4\" fill=\"none\" stroke=\"#FFFFFF\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" opacity=\"0.55\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "face.freckles",
+  "cat": "face",
+  "name": "Веснушки",
+  "source": "free",
+  "palette": null,
+  "def_color": null,
+  "sort": 40,
+  "art": {
+   "layers": {
+    "mask": "<circle cx=\"30\" cy=\"79\" r=\"1.15\" fill=\"#B5653F\" opacity=\"0.75\"></circle><circle cx=\"35\" cy=\"82\" r=\"1.15\" fill=\"#B5653F\" opacity=\"0.75\"></circle><circle cx=\"33\" cy=\"76\" r=\"1.15\" fill=\"#B5653F\" opacity=\"0.75\"></circle><circle cx=\"39\" cy=\"79\" r=\"1.15\" fill=\"#B5653F\" opacity=\"0.75\"></circle><circle cx=\"36\" cy=\"86\" r=\"1.15\" fill=\"#B5653F\" opacity=\"0.75\"></circle><g transform=\"translate(120 0) scale(-1 1)\"><circle cx=\"30\" cy=\"79\" r=\"1.15\" fill=\"#B5653F\" opacity=\"0.75\"></circle><circle cx=\"35\" cy=\"82\" r=\"1.15\" fill=\"#B5653F\" opacity=\"0.75\"></circle><circle cx=\"33\" cy=\"76\" r=\"1.15\" fill=\"#B5653F\" opacity=\"0.75\"></circle><circle cx=\"39\" cy=\"79\" r=\"1.15\" fill=\"#B5653F\" opacity=\"0.75\"></circle><circle cx=\"36\" cy=\"86\" r=\"1.15\" fill=\"#B5653F\" opacity=\"0.75\"></circle></g>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "face.plaster",
+  "cat": "face",
+  "name": "Пластырь",
+  "source": "free",
+  "palette": null,
+  "def_color": null,
+  "sort": 50,
+  "art": {
+   "layers": {
+    "mask": "<g transform=\"translate(87 83) rotate(-28)\"><rect x=\"-9\" y=\"-3.6\" width=\"18\" height=\"7.2\" rx=\"3.4\" fill=\"#FFD3A8\" stroke=\"#2B2035\" stroke-width=\"1.6\"></rect><rect x=\"-3.4\" y=\"-2.6\" width=\"6.8\" height=\"5.2\" rx=\"1.2\" fill=\"#F4B98A\"></rect><circle cx=\"-1.6\" cy=\"-1\" r=\"0.5\" fill=\"#C98E68\"></circle><circle cx=\"1.6\" cy=\"-1\" r=\"0.5\" fill=\"#C98E68\"></circle><circle cx=\"-1.6\" cy=\"1.2\" r=\"0.5\" fill=\"#C98E68\"></circle><circle cx=\"1.6\" cy=\"1.2\" r=\"0.5\" fill=\"#C98E68\"></circle></g>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "face.stickers",
+  "cat": "face",
+  "name": "Звёздочки на щеках",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "lemon",
+  "sort": 60,
+  "art": {
+   "layers": {
+    "mask": "<path d=\"M0 -6 L1.8 -1.8 L6 -1.6 L2.8 1.2 L3.8 5.6 L0 3.2 L-3.8 5.6 L-2.8 1.2 L-6 -1.6 L-1.8 -1.8 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"1.1\" stroke-linejoin=\"round\" transform=\"translate(31 84) scale(0.75)\"></path><path d=\"M0 -6 L1.8 -1.8 L6 -1.6 L2.8 1.2 L3.8 5.6 L0 3.2 L-3.8 5.6 L-2.8 1.2 L-6 -1.6 L-1.8 -1.8 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"1.1\" stroke-linejoin=\"round\" transform=\"translate(89 84) scale(0.75)\"></path><path d=\"M0 -6 C0.8 -1.4 1.4 -0.8 6 0 C1.4 0.8 0.8 1.4 0 6 C-0.8 1.4 -1.4 0.8 -6 0 C-1.4 -0.8 -0.8 -1.4 0 -6 Z\" fill=\"#FFFFFF\" transform=\"translate(25 76) scale(0.35)\"></path><path d=\"M0 -6 C0.8 -1.4 1.4 -0.8 6 0 C1.4 0.8 0.8 1.4 0 6 C-0.8 1.4 -1.4 0.8 -6 0 C-1.4 -0.8 -0.8 -1.4 0 -6 Z\" fill=\"#FFFFFF\" transform=\"translate(95 76) scale(0.35)\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "face.sleepmask",
+  "cat": "face",
+  "name": "Маска для сна",
+  "source": "free",
+  "palette": "cloth",
+  "def_color": "lavender",
+  "sort": 70,
+  "art": {
+   "layers": {
+    "hat": "<path d=\"M18 42 C30 36 90 36 102 42\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M18 42 C30 36 90 36 102 42\" fill=\"none\" stroke=\"@c|d0.15\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M60 34 C54 30 44 29 37 31 C30 33 28 40 32 45 C37 50 50 49 57 45 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path><g transform=\"translate(120 0) scale(-1 1)\"><path d=\"M60 34 C54 30 44 29 37 31 C30 33 28 40 32 45 C37 50 50 49 57 45 Z\" fill=\"@c\" stroke=\"#2B2035\" stroke-width=\"2.2\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path></g><path d=\"M38 40 Q44 44 50 40 M70 40 Q76 44 82 40\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M40 42 l-1 2.4 M44 43 v2.6 M48 42 l1 2.4 M72 42 l-1 2.4 M76 43 v2.6 M80 42 l1 2.4\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"1.1\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>"
+   }
+  },
+  "meta": {},
+  "rarity": 0
+ },
+ {
+  "id": "face.fangs",
+  "cat": "face",
+  "name": "Клыки вампира",
+  "source": "code",
+  "palette": null,
+  "def_color": null,
+  "sort": 80,
+  "art": {
+   "layers": {
+    "mask": "<path d=\"M54 84.6 L56 90 L58 84.8 Z M62 84.8 L64 90 L66 84.6 Z\" fill=\"#FFFFFF\" stroke=\"#2B2035\" stroke-width=\"1.3\" stroke-linejoin=\"round\" stroke-linecap=\"round\"></path>"
+   }
+  },
+  "meta": {
+   "skin": "#EDE6FA"
+  },
+  "rarity": 0
+ },
+ {
+  "id": "face.frank",
+  "cat": "face",
+  "name": "Швы и болты",
+  "source": "code",
+  "palette": null,
+  "def_color": null,
+  "sort": 90,
+  "art": {
+   "layers": {
+    "back": "<rect x=\"8\" y=\"80\" width=\"14\" height=\"7\" rx=\"2\" fill=\"#9A94AE\" stroke=\"#2B2035\" stroke-width=\"1.8\"></rect><rect x=\"4\" y=\"77.5\" width=\"6\" height=\"12\" rx=\"2\" fill=\"#C9C3DA\" stroke=\"#2B2035\" stroke-width=\"1.8\"></rect><g transform=\"translate(120 0) scale(-1 1)\"><rect x=\"8\" y=\"80\" width=\"14\" height=\"7\" rx=\"2\" fill=\"#9A94AE\" stroke=\"#2B2035\" stroke-width=\"1.8\"></rect><rect x=\"4\" y=\"77.5\" width=\"6\" height=\"12\" rx=\"2\" fill=\"#C9C3DA\" stroke=\"#2B2035\" stroke-width=\"1.8\"></rect></g>",
+    "mask": "<path d=\"M74 88 L92 80\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"1.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M77 83.6 l2 4.4 M82 81.6 l2 4.4 M87 79.6 l2 4.4\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M28 56 L40 54\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"1.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path><path d=\"M31 52.6 l1 4.6 M36 52 l1 4.6\" fill=\"none\" stroke=\"#2B2035\" stroke-width=\"1.2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"></path>"
+   }
+  },
+  "meta": {
+   "skin": "#A9D99B"
+  },
   "rarity": 0
  },
  {

@@ -121,7 +121,9 @@ export function dress(look: Look, catalog: Catalog): Dressed {
     }
     if (slot && item) worn[cat] = { slot, item, color: itemColor(slot, item) };
   }
-  return { skin: skinColor(look), worn };
+  // Вещь может красить кожу (бледный вампир, зелёный Франкенштейн)
+  const tint = WEAR_CATS.map((c) => worn[c]?.item.meta.skin).find((s): s is string => typeof s === 'string' && /^#[0-9a-fA-F]{6}$/.test(s));
+  return { skin: tint ?? skinColor(look), worn };
 }
 
 // ---------- Гардероб ----------

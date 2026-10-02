@@ -25,6 +25,7 @@ import { entryMix, mixDominant } from '../../src/lib/emotions';
 import { errorMessage } from '../../src/lib/env';
 import type { FaceKey } from '../../src/lib/face';
 import { hasOverride, setDevOverride, useDevOverride } from '../../src/lib/devOverride';
+import { useAmbient } from '../../src/lib/ambient';
 import { useScreenFocused } from '../../src/lib/focus';
 import { useLoader } from '../../src/lib/hooks';
 import { openWhatsNew, useWhatsNew } from '../../src/lib/whatsNew';
@@ -57,6 +58,7 @@ export default function HomeScreen() {
   const override = useDevOverride();
   const time = override.time ?? dayTimeOf(now);
   const loc: LocationId = override.location ?? (isLocationId(pair?.location) ? pair.location : 'meadow');
+  useAmbient(loc, focused);
   const version = useTableVersion('mood_entries', 'profiles', 'sleep_entries');
   const { data } = useLoader(async () => {
     const [moods, streaks] = await Promise.all([fetchMoods(day, day), fetchStreaks(day)]);

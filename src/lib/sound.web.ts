@@ -3,9 +3,9 @@
 // В беззвучном режиме iPhone звука не будет — так решает система.
 import { Asset } from 'expo-asset';
 import { getFlag, setFlag } from './prefs';
-import { SOUND_FILES, type SoundName } from './soundFiles';
+import { AMBIENT_FILES, AMBIENT_LOOP, AMBIENT_START, AMBIENT_VOLUME, SOUND_FILES, type AmbientId, type SoundName } from './soundFiles';
 
-export type { SoundName };
+export type { AmbientId, SoundName };
 
 let enabled = true;
 getFlag('abilitySoundsOff').then((off) => {
@@ -45,6 +45,8 @@ function unlock() {
   } catch {
     // ничего
   }
+  // фоновый звук ждал первого касания
+  if (wanted && !amb) playAmbient(wanted);
 }
 
 if (typeof window !== 'undefined') {
@@ -127,4 +129,100 @@ export async function setSoundsEnabled(value: boolean) {
 export async function loadSoundsEnabled(): Promise<boolean> {
   enabled = !(await getFlag('abilitySoundsOff'));
   return enabled;
+}
+
+// ---------- Фоновый звук места ----------
+// Петля из буфера: [AMBIENT_START, AMBIENT_START + AMBIENT_LOOP] — шов точно в период, без щелчка.
+// До первого касания Safari молчит — звук начнётся после него. Смена места — мягкое сведение.
+let ambientOn = true;
+let wanted: AmbientId | null = null;
+let amb: { id: AmbientId; src: AudioBufferSourceNode; gain: GainNode } | null = null;
+const ambBuffers = new Map<AmbientId, Promise<AudioBuffer | null>>();
+getFlag('ambientOff').then((off) => {
+  ambientOn = !off;
+  if (!ambientOn) stopAmbient();
+});
+
+function loadAmbient(id: AmbientId): Promise<AudioBuffer | null> {
+  let b = ambBuffers.get(id);
+  if (!b) {
+    b = (async () => {
+      const c = context();
+      if (!c) return null;
+      try {
+        const uri = Asset.fromModule(AMBIENT_FILES[id]).uri;
+        const data = await (await fetch(uri)).arrayBuffer();
+        return await new Promise<AudioBuffer>((resolve, reject) => c.decodeAudioData(data, resolve, reject));
+      } catch {
+        ambBuffers.delete(id);
+        return null;
+      }
+    })();
+    ambBuffers.set(id, b);
+  }
+  return b;
+}
+
+function stopAmbient() {
+  const c = ctx;
+  if (!amb || !c) return;
+  const old = amb;
+  amb = null;
+  try {
+    old.gain.gain.setTargetAtTime(0, c.currentTime, 0.35);
+    setTimeout(() => {
+      try {
+        old.src.stop();
+      } catch {
+        // уже остановлен
+      }
+    }, 1800);
+  } catch {
+    // ничего
+  }
+}
+
+export function playAmbient(id: AmbientId | null) {
+  wanted = id;
+  if (amb && amb.id === id) return;
+  stopAmbient();
+  if (!id || !ambientOn || !touched) return;
+  const c = context();
+  if (!c) return;
+  if (c.state === 'suspended') c.resume().catch(() => undefined);
+  loadAmbient(id).then((buf) => {
+    if (!buf || wanted !== id || amb || !ambientOn) return;
+    try {
+      const src = c.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      const end = Math.min(buf.duration, AMBIENT_START + AMBIENT_LOOP);
+      src.loopStart = end - AMBIENT_LOOP > 0 ? end - AMBIENT_LOOP : 0;
+      src.loopEnd = end;
+      const gain = c.createGain();
+      gain.gain.value = 0;
+      gain.gain.setTargetAtTime(AMBIENT_VOLUME, c.currentTime, 0.6);
+      src.connect(gain).connect(c.destination);
+      src.start(0, src.loopStart);
+      amb = { id, src, gain };
+    } catch {
+      amb = null;
+    }
+  });
+}
+
+export const ambientEnabled = () => ambientOn;
+
+export async function setAmbientEnabled(value: boolean) {
+  ambientOn = value;
+  if (value) {
+    const w = wanted;
+    playAmbient(w);
+  } else stopAmbient();
+  await setFlag('ambientOff', !value);
+}
+
+export async function loadAmbientEnabled(): Promise<boolean> {
+  ambientOn = !(await getFlag('ambientOff'));
+  return ambientOn;
 }

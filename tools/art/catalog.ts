@@ -5,6 +5,7 @@
 // Слои, зависящие от стороны (штанины, обувь), сохраняются отдельно: legL/legR, shoeL/shoeR.
 import { writeFileSync } from 'node:fs';
 import { ITEMS, CAT_ORDER } from './chibi.ts';
+import './items2.ts';
 
 const LEG_X = { L: 47, R: 62 } as const;
 const SIDED = new Set(['leg', 'shoe']);
@@ -42,6 +43,9 @@ for (const [id, it] of sorted) {
   if (it.cuff) meta.cuff = it.cuff;
   if (it.coversBottom) meta.coversBottom = true;
   if (it.hover) meta.hover = true;
+  if (it.anim) meta.anim = it.anim;
+  if (it.pivot) meta.pivot = it.pivot;
+  if (it.skin) meta.skin = it.skin;
   if (it.cat === 'eyes') meta.style = id.split('.')[1];
   perCat[it.cat] = (perCat[it.cat] ?? 0) + 10;
   rows.push({

@@ -3,10 +3,12 @@ import { memo, useEffect, useId, useMemo, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Svg, { Circle, Defs, Ellipse, G, LinearGradient, Path, Stop } from 'react-native-svg';
 import { FACE_PATHS, FACE_SPOTS, faceModel, INK, type FaceKey, type FaceModel } from '../lib/face';
+import { renderLayer } from '../lib/art';
+import { eyeArt, isNewEye, type NewEyeStyle } from '../lib/eyes';
 import { CLOTH, SKIN } from '../lib/palette';
 
 // Стили глаз чибика (вещи категории «Глаза»): рисует движок лица, а не каталог
-export type EyeStyle = 'classic' | 'lashes' | 'sparkle' | 'sleepy' | 'azure';
+export type EyeStyle = 'classic' | 'lashes' | 'sparkle' | 'sleepy' | 'azure' | NewEyeStyle;
 
 type Props = {
   emotion: FaceKey;
@@ -30,6 +32,11 @@ const BOX = 120;
 
 // Глаза выбранного стиля и цвета (по рисунку макета, tools/art/chibi.ts)
 function StyledEyes({ f, style, color, skin, gid }: { f: FaceModel; style: EyeStyle; color?: string; skin: string; gid: string }) {
+  if (isNewEye(style)) {
+    // стили 0.2.1 — общий рисунок с макетом (src/lib/eyes.ts)
+    const c = color ?? CLOTH.coal[1];
+    return <G opacity={f.eyesOp}>{renderLayer(eyeArt(style, f, c, 'vg'), { c, skin, ids: gid }, gid)}</G>;
+  }
   const g = f.geo;
   const open = g.h > 3;
   const sides = [

@@ -14,6 +14,9 @@ export type ItemMeta = {
   coversBottom?: boolean; // платье закрывает «Низ»
   hover?: boolean; // крылья: чибик парит
   style?: string; // стиль глаз (рисует движок лица)
+  anim?: 'sway' | 'flicker' | 'pulse'; // 0.2.1: спина качается, слои *Fx мерцают
+  pivot?: [number, number]; // точка качания спины
+  skin?: string; // вещь красит кожу (вампир, Франкенштейн)
   [key: string]: unknown;
 };
 
