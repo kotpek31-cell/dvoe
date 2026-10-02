@@ -17,6 +17,7 @@
 - **Supabase:** проект «Dvoe», ref `uvlausosjxzhytzyfduz`, eu-north-1, URL `https://uvlausosjxzhytzyfduz.supabase.co` (`.co`!). Ключ publishable в `.env` (закоммичен намеренно). Confirm email выключен.
 - **Firebase:** проект `dvoe-19c34`, ключ FCM V1 загружен в Expo → Credentials. `google-services.json` — в EAS env var `GOOGLE_SERVICES_JSON` (File, Secret, окружения preview и production; профиль preview в eas.json берёт окружение preview), в репозиторий НЕ класть. В логе сборки проверять шаг `processReleaseGoogleServices`.
 - **Codespace** probable-space-pancake: секрет `EXPO_TOKEN`; нужен для `eas update` (и как запасной путь для `eas build`).
+- **Резервная копия «Живая рука»:** `.github/workflows/backup.yml` — при каждом push все ветки и теги → приватный `kotpek31-cell/dvoe-backup` (main — без принуждения), раз в сутки pg_dump схем public и private → ветка `db-dumps` там же, последние 14. Секреты репозитория `BACKUP_TOKEN` (fine-grained, только dvoe-backup: Contents + Workflows RW) и `SUPABASE_DB_URL` (Session pooler, порт 5432). В dvoe-backup Actions выключены. Как восстановить — `docs/ГЛАВНЫЙ_РЕЗЕРВНЫЙ_ФАЙЛ.md`.
 - **Коннекторы Claude (подключены):** GitHub Integration (репозиторий `dvoe`), Supabase (SQL, функции, логи), Expo (сборки, логи). Облачные сессии Claude — на репозитории `dvoe`; кредиты $100 до 5 ноября 2026.
 
 ## 3. Стек и устройство
@@ -70,6 +71,7 @@ Expo SDK 57 (RN 0.86, React 19.2), Expo Router, supabase-js v2, react-native-svg
 - **Необратимое — только после явного «да»:** удаление/изменение данных в базе (в т.ч. через коннектор Supabase), смена пакета/projectId, работа с секретами, push в `main` (= живой сайт), запуск платной сборки/операции.
 - Ответ дан — считай закрытым, не возвращайся без просьбы. Время важно: не трать его на то, чего можно избежать.
 - **Уровни рассуждений:** Low, Medium, High, Extra (между High и Max), Max, а в Claude Code ещё Ultracode (несколько агентов, сильно тратит лимит). Перед каждым этапом говори, какой поставить: интервью — High, ТЗ — Max, макет и разработка — High (Extra для самых сложных частей), установка и инструкции — Medium, мелкие правки — Low/Medium. Ultracode — только для больших независимых частей и с предупреждением о цене.
+- **«Живая рука» (резервная копия) — после каждого этапа:** обнови `docs/ГЛАВНЫЙ_РЕЗЕРВНЫЙ_ФАЙЛ.md` (дата, состояние версий и веток, что изменилось в инфраструктуре и шагах восстановления; БЕЗ паролей, ключей, кодов и личных данных — репозиторий публичный), сохрани полный текст ТЗ текущей версии в `docs/TZ_*.md`, запушь, проверь, что последний запуск `.github/workflows/backup.yml` зелёный (GitHub Actions; красный — разобраться и сказать), и пришли пользователю этот файл (SendUserFile).
 - **В конце каждой версии** обнови этот файл: что сделано, что изменилось, новые грабли, следующий шаг. Напомни об этом сам.
 
 ## 7. Как выпускать обновление

@@ -1,0 +1,101 @@
+# «Живая рука» — резервная копия в приватный репозиторий kotpek31-cell/dvoe-backup.
+# 1) При каждом push в любую ветку (и раз в сутки) копирует туда все ветки и теги.
+#    main — только вперёд: если историю main переписали, копия не затирается, запуск краснеет.
+# 2) Раз в сутки (и по кнопке Run workflow) — pg_dump схем public и private из Supabase
+#    в ветку db-dumps, хранятся последние 14 копий (ветка пересоздаётся, старых копий в истории нет).
+# Нужны секреты репозитория (Settings → Secrets and variables → Actions):
+#   BACKUP_TOKEN    — fine-grained токен только на dvoe-backup: Contents и Workflows — Read and write
+#   SUPABASE_DB_URL — строка подключения Session pooler (порт 5432) с паролем базы
+# Секреты в лог не выводятся; дамп с личными данными уходит только в приватный репозиторий.
+name: Резервная копия
+
+on:
+  push:
+    branches: ['**']
+  schedule:
+    - cron: '23 0 * * *' # 03:23 по Москве
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  BACKUP_REPO: kotpek31-cell/dvoe-backup
+  PG_MAJOR: '17' # версия Postgres в Supabase; pg_dump должен быть не старше сервера
+
+jobs:
+  mirror:
+    if: github.repository == 'kotpek31-cell/dvoe'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: backup-mirror
+      cancel-in-progress: false
+    steps:
+      - name: Копия всех веток и тегов
+        env:
+          BACKUP_TOKEN: ${{ secrets.BACKUP_TOKEN }}
+          SRC: https://github.com/${{ github.repository }}.git
+        run: |
+          set -euo pipefail
+          [ -n "$BACKUP_TOKEN" ] || { echo "::error::Нет секрета BACKUP_TOKEN"; exit 1; }
+          DEST="https://x-access-token:${BACKUP_TOKEN}@github.com/${BACKUP_REPO}.git"
+          git init -q --bare src && cd src
+          git fetch -q "$SRC" '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+          # main — без принуждения, остальные ветки — с принуждением (сессии Claude иногда переписывают свои ветки)
+          mapfile -t refs < <(git for-each-ref --format='+%(refname):%(refname)' refs/heads/ | grep -v '^+refs/heads/main:')
+          git push -q "$DEST" refs/heads/main:refs/heads/main
+          [ ${#refs[@]} -eq 0 ] || git push -q "$DEST" "${refs[@]}"
+          git push -q "$DEST" 'refs/tags/*:refs/tags/*'
+          echo "Скопировано веток: $(git for-each-ref refs/heads/ | wc -l), тегов: $(git for-each-ref refs/tags/ | wc -l)"
+
+  db-dump:
+    if: github.repository == 'kotpek31-cell/dvoe' && github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    concurrency:
+      group: backup-db
+      cancel-in-progress: false
+    steps:
+      - name: Установка pg_dump ${{ env.PG_MAJOR }}
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -qq postgresql-common >/dev/null
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y >/dev/null
+          sudo apt-get install -y -qq "postgresql-client-${PG_MAJOR}" >/dev/null
+          "/usr/lib/postgresql/${PG_MAJOR}/bin/pg_dump" --version
+
+      - name: Копия базы (public и private), последние 14
+        env:
+          BACKUP_TOKEN: ${{ secrets.BACKUP_TOKEN }}
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          [ -n "$BACKUP_TOKEN" ] || { echo "::error::Нет секрета BACKUP_TOKEN"; exit 1; }
+          [ -n "$SUPABASE_DB_URL" ] || { echo "::error::Нет секрета SUPABASE_DB_URL"; exit 1; }
+          DEST="https://x-access-token:${BACKUP_TOKEN}@github.com/${BACKUP_REPO}.git"
+
+          rc=0; git ls-remote --exit-code --heads "$DEST" db-dumps >/dev/null || rc=$?
+          case $rc in
+            0) git clone -q --depth 1 --branch db-dumps "$DEST" dumps ;;
+            2) git init -q dumps && git -C dumps remote add origin "$DEST" ;;
+            *) echo "::error::Нет доступа к ${BACKUP_REPO} — проверьте BACKUP_TOKEN"; exit 1 ;;
+          esac
+
+          file="dvoe_$(date -u +%Y-%m-%d_%H%M)UTC.sql.gz"
+          "/usr/lib/postgresql/${PG_MAJOR}/bin/pg_dump" "$SUPABASE_DB_URL" \
+            --schema=public --schema=private --no-owner --quote-all-identifiers \
+            | gzip -9 > "dumps/$file"
+          gzip -t "dumps/$file"
+          zgrep -q 'PostgreSQL database dump complete' "dumps/$file" || { echo "::error::Дамп неполный"; exit 1; }
+          size=$(stat -c %s "dumps/$file")
+          [ "$size" -lt 95000000 ] || { echo "::error::Дамп больше 95 МБ — GitHub не примет файл"; exit 1; }
+
+          cd dumps
+          ls -1 dvoe_*.sql.gz | sort -r | tail -n +15 | xargs -r rm -f
+          git checkout -q --orphan fresh
+          git add -A
+          git -c user.name='dvoe-backup' -c user.email='backup@users.noreply.github.com' \
+            commit -q -m "Копия базы $file"
+          git push -q -f origin fresh:db-dumps
+          echo "Готово: $file ($((size / 1024)) КБ), копий в хранилище: $(ls -1 dvoe_*.sql.gz | wc -l)"
