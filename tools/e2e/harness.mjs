@@ -250,7 +250,7 @@ export async function openPhone(browser, port, uid, name, opts = {}) {
     localStorage.setItem('sb-uvlausosjxzhytzyfduz-auth-token', s);
     localStorage.setItem('dvoe.onboarded', '1');
     // «Что нового» и подсказка на главной не мешают сценариям (ключи — src/lib/prefs.ts)
-    for (const k of ['dvoe:whats-new-0.2.1', 'dvoe:whats-new-0.2.2', 'dvoe:whats-new-0.2-fix', 'dvoe:hint-nudge']) localStorage.setItem(k, '1');
+    for (const k of ['dvoe:whats-new-0.2.1', 'dvoe:whats-new-0.2.2', 'dvoe:whats-new-0.2-fix', 'dvoe:whats-new-3.0', 'dvoe:hint-nudge']) localStorage.setItem(k, '1');
   }, [JSON.stringify(session)]);
   await ctx.route(/supabase\.co\/(rest|auth|functions|storage)\//, async (route) => {
     const req = route.request();
