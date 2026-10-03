@@ -8,7 +8,7 @@ const KEYS = {
   ambientOff: 'dvoe:ambient-off',
   quietInSilent: 'dvoe:quiet-in-silent',
   joystick: 'dvoe:joystick-off',
-  whatsNew: 'dvoe:whats-new-0.2-fix', // новый ключ — «Что нового» покажется само ещё раз
+  whatsNew: 'dvoe:whats-new-3.0', // новый ключ — «Что нового» покажется само ещё раз
 } as const;
 
 type Key = keyof typeof KEYS;

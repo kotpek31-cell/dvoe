@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "noImplicitAny": false,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowImportingTsExtensions": true,
+    "types": [],
+    "paths": {
+      "react-native": ["./shims/react-native.tsx"],
+      "react-native-svg": ["./shims/react-native-svg.tsx"]
+    }
+  },
+  "include": ["types/stubs.d.ts", "../../src/**/*.ts", "../../src/**/*.tsx", "../../app/**/*.tsx", "pages/*.tsx", "shims/*.ts", "shims/*.tsx"],
+  "exclude": ["../../node_modules", "../../src/widgets/**", "../../src/**/*.android.tsx", "../../src/**/*.ios.ts"]
+}

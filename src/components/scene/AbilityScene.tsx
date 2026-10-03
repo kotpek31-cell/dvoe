@@ -4,11 +4,12 @@
 // тряска, звёздочки → партнёр лежит → встаёт, свет возвращается.
 // «Объятия» (4 с): бегут навстречу, обнимаются, сердечки, розовое свечение, перезвон, лицо «любовь».
 // «Уменьшить движение»: без бега, приближения, тряски и вспышки — короткое затемнение и итог.
+// 3.0: объятия — лучи света за парой и искорки по кругу; «Мог» — молнии в темноте, череп с объёмом, ударная волна.
 // 0.2.2: «Мог» в шляпу грибника (scene.blocked) — до удара как обычно; в момент удара шляпа светится, вырастает
 // купол из спор, черепа отскакивают, применивший чихает и падает сам, цель радуется. Плашка «Шляпа грибника отразила «Мог»».
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
-import Svg, { Circle, Defs, Path, RadialGradient, Stop } from 'react-native-svg';
+import Svg, { Circle, Defs, Ellipse, LinearGradient, Path, RadialGradient, Stop } from 'react-native-svg';
 import type { Scene } from '../../context/AbilityProvider';
 import type { Look } from '../../lib/chibi';
 import { INK, type FaceKey } from '../../lib/face';
@@ -57,13 +58,67 @@ function sample(t: Animated.Value, from: number, to: number, steps: number, fn: 
 const SKULL = 'M0 -14 C-9 -14 -15 -8 -15 0 C-15 5 -12 8.5 -9 10 V15 H-4.5 V12 H-1.5 V15 H1.5 V12 H4.5 V15 H9 V10 C12 8.5 15 5 15 0 C15 -8 9 -14 0 -14 Z';
 const BURST = 'M0 -60 L14 -18 L58 -30 L24 2 L54 36 L10 22 L0 66 L-10 22 L-54 36 L-24 2 L-58 -30 L-14 -18 Z';
 
+const LIGHTNING = 'M8 0 L0 22 H7 L2 44 L18 16 H10 L16 0 Z';
+const SPARKLE = 'M0 -10 C0.8 -2.4 2.4 -0.8 10 0 C2.4 0.8 0.8 2.4 0 10 C-0.8 2.4 -2.4 0.8 -10 0 C-2.4 -0.8 -0.8 -2.4 0 -10 Z';
+
 function Skull({ size }: { size: number }) {
   return (
     <Svg width={size} height={size} viewBox="-17 -17 34 34">
-      <Path d={SKULL} fill="#F4F0FF" stroke={INK} strokeWidth={1.6} strokeLinejoin="round" />
+      <Defs>
+        <RadialGradient id="skullG" cx="-4" cy="-7" r="24" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor="#FFFFFF" />
+          <Stop offset="0.6" stopColor="#EDE6FF" />
+          <Stop offset="1" stopColor="#B9A8E6" />
+        </RadialGradient>
+      </Defs>
+      <Path d={SKULL} fill="url(#skullG)" stroke="#5B4A8E" strokeWidth={1.3} strokeLinejoin="round" />
       <Circle cx={-5.5} cy={0} r={4} fill={INK} />
       <Circle cx={5.5} cy={0} r={4} fill={INK} />
+      <Circle cx={-6.4} cy={-1} r={1.1} fill="#B39DFF" />
+      <Circle cx={4.6} cy={-1} r={1.1} fill="#B39DFF" />
       <Path d="M0 5 L-1.8 8 H1.8 Z" fill={INK} />
+    </Svg>
+  );
+}
+
+// Лучи света за обнимающейся парой: веер из двенадцати лучей, мягко гаснущих к краю
+function Rays({ size, color }: { size: number; color: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="-100 -100 200 200">
+      <Defs>
+        <RadialGradient id="raysG" cx="0" cy="0" r="100" gradientUnits="userSpaceOnUse">
+          <Stop offset="0" stopColor={color} stopOpacity={0.55} />
+          <Stop offset="1" stopColor={color} stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      {Array.from({ length: 12 }, (_, i) => (
+        <Path key={i} d="M0 0 L-9 -100 L9 -100 Z" fill="url(#raysG)" transform={`rotate(${i * 30})`} />
+      ))}
+    </Svg>
+  );
+}
+
+function Sparkle({ size, color }: { size: number; color: string }) {
+  return (
+    <Svg width={size} height={size} viewBox="-12 -12 24 24">
+      <Path d={SPARKLE} fill={color} />
+      <Circle cx={0} cy={0} r={2.2} fill="#FFFFFF" />
+    </Svg>
+  );
+}
+
+// Молния: светящийся контур и белая сердцевина
+function Bolt({ w, h }: { w: number; h: number }) {
+  return (
+    <Svg width={w} height={h} viewBox="-4 -2 26 48">
+      <Defs>
+        <LinearGradient id="boltG" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor="#FFFFFF" />
+          <Stop offset="1" stopColor="#C9B6FF" />
+        </LinearGradient>
+      </Defs>
+      <Path d={LIGHTNING} fill="#9B6BFF" opacity={0.45} stroke="#9B6BFF" strokeWidth={4} strokeLinejoin="round" />
+      <Path d={LIGHTNING} fill="url(#boltG)" />
     </Svg>
   );
 }
@@ -249,8 +304,9 @@ export function AbilityScene({ scene, t, reduce, caster, target, width, height, 
       return { c0: reduce ? C1 : C0, c1: C1, t0: T, t1: T };
     }
     const cx = width / 2;
-    const CL = cx - size * 0.74;
-    const TR = cx - size * 0.26;
+    // 3.0: тела стройнее — встают ближе, чтобы объятия были объятиями
+    const CL = cx - size * 0.7;
+    const TR = cx - size * 0.3;
     return reduce
       ? { c0: CL, c1: CL, t0: TR, t1: TR }
       : { c0: Math.max(-size * 0.2, CL - width * 0.3), c1: CL, t0: Math.min(width - size * 0.8, TR + width * 0.3), t1: TR };
@@ -362,8 +418,9 @@ export function AbilityScene({ scene, t, reduce, caster, target, width, height, 
   const starRing = useMemo(() => {
     if (kind !== 'mog') return [];
     // упавший смотрит влево (перевёрнут) — голова у правого края; применивший падает навзничь — у левого
-    const hx = blocked ? 15 * k : size - 15 * k;
-    const hy = 70 * k;
+    // 3.0: голова меньше, лежащий длиннее — она у самого края рамки
+    const hx = blocked ? 2 * k : size - 2 * k;
+    const hy = 86 * k;
     const from = (reduce ? 1500 : 4000) + (blocked ? (reduce ? 200 : 350) : 0);
     const to = reduce ? 2600 : 6200;
     return [0, 2.1, 4.2].map((a0) => ({
@@ -371,6 +428,25 @@ export function AbilityScene({ scene, t, reduce, caster, target, width, height, 
       y: sample(t, from, to, reduce ? 1 : 22, (x) => hy + Math.sin(a0 + (reduce ? 0 : (x - from) / 260)) * 7 * k - 10),
     }));
   }, [kind, blocked, reduce, t, size, k]);
+
+  // Объятия: искорки кружат вокруг пары, пока она обнимается
+  const twinkles = useMemo(() => {
+    if (kind !== 'hug' || reduce) return [];
+    const cx = width / 2;
+    const cy = ground + chibiH * 0.46;
+    const rx = Math.min(width * 0.42, size * 1.35);
+    const ry = chibiH * 0.5;
+    return [0, 0.9, 1.8, 2.7, 3.6, 4.5, 5.4].map((a0, i) => {
+      const s = (14 + (i % 3) * 6) * Math.max(0.9, k);
+      const angle = (x: number) => a0 + ((x - HUG.reach) / 1000) * 1.5;
+      return {
+        s,
+        color: ['#FFFFFF', '#FFD3E2', '#FFE9B8'][i % 3],
+        x: sample(t, HUG.reach, HUG.release + 700, 34, (x) => cx + Math.cos(angle(x)) * rx - s / 2),
+        y: sample(t, HUG.reach, HUG.release + 700, 34, (x) => cy + Math.sin(angle(x)) * ry * (0.7 + (i % 2) * 0.3) - s / 2),
+      };
+    });
+  }, [kind, reduce, t, width, ground, chibiH, size, k]);
 
   const stars = anim.stars
     ? starRing.map((s, i) => (
@@ -393,6 +469,59 @@ export function AbilityScene({ scene, t, reduce, caster, target, width, height, 
         <Animated.View style={{ position: 'absolute', left: auraX - auraSize / 2, top: ground + chibiH * 0.5 - auraSize / 2, opacity: anim.aura }}>
           <Glow size={auraSize} color={auraColor} opacity={kind === 'mog' ? 0.6 : 0.85} />
         </Animated.View>
+        {kind === 'hug' && !reduce ? (
+          <>
+            {/* лучи медленно поворачиваются за парой, пятно света на земле под ногами */}
+            <Animated.View
+              style={{
+                position: 'absolute',
+                left: auraX - auraSize * 0.6,
+                top: ground + chibiH * 0.45 - auraSize * 0.6,
+                opacity: Animated.multiply(anim.aura, 0.55),
+                transform: [{ rotate: t.interpolate({ inputRange: [0, total], outputRange: ['0deg', '70deg'] }) }],
+              }}
+            >
+              <Rays size={auraSize * 1.2} color="#FFD3E2" />
+            </Animated.View>
+            <Animated.View style={{ position: 'absolute', left: auraX - size * 1.1, top: ground + chibiH * 0.9 - size * 0.2, opacity: anim.aura }}>
+              <Svg width={size * 2.2} height={size * 0.4} viewBox="0 0 220 40">
+                <Defs>
+                  <RadialGradient id="hugFloor" cx="110" cy="20" r="110" gradientUnits="userSpaceOnUse" gradientTransform="translate(0 16.4) scale(1 0.18)">
+                    <Stop offset="0" stopColor="#FF8FB3" stopOpacity={0.7} />
+                    <Stop offset="1" stopColor="#FF8FB3" stopOpacity={0} />
+                  </RadialGradient>
+                </Defs>
+                <Ellipse cx={110} cy={20} rx={110} ry={20} fill="url(#hugFloor)" />
+              </Svg>
+            </Animated.View>
+            {twinkles.map((tw, i) => (
+              <Animated.View key={`tw${i}`} style={{ position: 'absolute', left: 0, top: 0, opacity: anim.aura, transform: [{ translateX: tw.x }, { translateY: tw.y }] }}>
+                <Sparkle size={tw.s} color={tw.color} />
+              </Animated.View>
+            ))}
+          </>
+        ) : null}
+        {kind === 'mog' && !reduce
+          ? [
+              { x: 0.16, y: 0.16, w: 44, at: 1700, rot: '-14deg' },
+              { x: 0.74, y: 0.2, w: 36, at: 2300, rot: '12deg' },
+              { x: 0.44, y: 0.1, w: 52, at: 2950, rot: '4deg' },
+              { x: 0.84, y: 0.34, w: 30, at: 3500, rot: '-8deg' },
+            ].map((b, i) => (
+              <Animated.View
+                key={`bolt${i}`}
+                style={{
+                  position: 'absolute',
+                  left: width * b.x,
+                  top: height * b.y,
+                  opacity: t.interpolate({ inputRange: [b.at, b.at + 40, b.at + 110, b.at + 150, b.at + 260], outputRange: [0, 1, 0.25, 0.9, 0], ...clamp }),
+                  transform: [{ rotate: b.rot }],
+                }}
+              >
+                <Bolt w={b.w * Math.max(1, k)} h={b.w * 1.9 * Math.max(1, k)} />
+              </Animated.View>
+            ))
+          : null}
         {skulls.map((s, i) => (
           <Animated.View
             key={i}
@@ -504,7 +633,15 @@ export function AbilityScene({ scene, t, reduce, caster, target, width, height, 
             }}
           >
             <Svg width={140 * k} height={140 * k} viewBox="-70 -70 140 140">
-              <Path d={BURST} fill="#FFF6C2" stroke={INK} strokeWidth={2.4} strokeLinejoin="round" />
+              <Defs>
+                <RadialGradient id="burstG" cx="0" cy="0" r="66" gradientUnits="userSpaceOnUse">
+                  <Stop offset="0" stopColor="#FFFFFF" />
+                  <Stop offset="0.5" stopColor="#FFF2A8" />
+                  <Stop offset="1" stopColor="#FFB84D" />
+                </RadialGradient>
+              </Defs>
+              <Circle cx={0} cy={0} r={64} fill="none" stroke="#FFE9B8" strokeWidth={3} opacity={0.7} />
+              <Path d={BURST} fill="url(#burstG)" stroke="#C97A2E" strokeWidth={1.8} strokeLinejoin="round" />
             </Svg>
           </Animated.View>
         ) : null}

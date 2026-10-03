@@ -48,6 +48,7 @@ function Tab({ label, icon, focused, onPress, size }: { label: string; icon: Ico
       <Animated.View
         style={[
           styles.island,
+          focused ? styles.islandOn : null,
           {
             width,
             height: size,
@@ -57,9 +58,18 @@ function Tab({ label, icon, focused, onPress, size }: { label: string; icon: Ico
           },
         ]}
       >
-        <View style={{ width: size - 2, height: size - 2, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name={icon} size={22} color={focused ? '#FF8FA8' : 'rgba(255,255,255,0.66)'} strokeWidth={focused ? 2.3 : 2} />
-        </View>
+        {/* значок чуть «подпрыгивает», когда вкладку выбрали */}
+        <Animated.View
+          style={{
+            width: size - 2,
+            height: size - 2,
+            alignItems: 'center',
+            justifyContent: 'center',
+            transform: [{ scale: v.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, 1.2, 1.06] }) }],
+          }}
+        >
+          <Icon name={icon} size={22} color={focused ? '#FF9DB3' : 'rgba(255,255,255,0.66)'} strokeWidth={focused ? 2.3 : 2} />
+        </Animated.View>
         <Animated.Text
           numberOfLines={1}
           onLayout={(e) => {
@@ -121,7 +131,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     overflow: 'hidden',
-    boxShadow: '0px 10px 24px rgba(8,4,20,0.35)',
+    boxShadow: '0px 10px 24px rgba(8,4,20,0.35), inset 0px 1px 0px rgba(255,255,255,0.1)',
   },
+  islandOn: { boxShadow: '0px 8px 22px rgba(255,107,138,0.3), inset 0px 1px 0px rgba(255,255,255,0.22)' },
   label: { position: 'absolute', fontFamily: F.heavy, fontSize: 13, color: C.text },
 });

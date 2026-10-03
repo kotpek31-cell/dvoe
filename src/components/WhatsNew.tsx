@@ -1,4 +1,4 @@
-// «Что нового» после этапа фиксации 0.2: джойстик, объятия, шапки, звук (на iPhone — и новая иконка), за ними — карточки 0.2.2 и 0.2.1.
+// «Что нового» 3.0: новые чибики, живые места, эффекты; за ними — этап фиксации 0.2 (джойстик, объятия, шапки, звук, на iPhone — иконка), 0.2.2 и 0.2.1.
 // Про комнату — ни слова (она секретная). Яркие карточки, листаются вбок; на каждой картинка и 1–2 строки, внизу «Понятно».
 // Тексты хранятся в приложении. Картинки собраны из чибиков, иконок и маленькой локации — без файлов.
 import { useRef, useState, type ReactNode } from 'react';
@@ -15,7 +15,7 @@ import { Button, Txt } from './ui';
 
 type Card = { title: string; text: string; tint: string; art: (w: number, h: number, me: Look) => ReactNode };
 
-const scene = (id: 'forest' | 'sakura', time: 'night' | 'day') => (w: number, h: number) => {
+const scene = (id: 'forest' | 'sakura' | 'meadow', time: 'night' | 'day') => (w: number, h: number) => {
   const sceneH = Math.round((w * 844) / 390);
   return (
     <View style={[styles.scene, { width: w, height: h }]}>
@@ -44,6 +44,38 @@ const stick = (size: number) => (
     <View style={[styles.knob, { width: size * 0.44, height: size * 0.44, borderRadius: size * 0.22, transform: [{ translateX: size * 0.16 }, { translateY: -size * 0.08 }] }]} />
   </View>
 );
+
+const REDESIGN: Card[] = [
+  {
+    title: 'Новые чибики',
+    text: 'Стройнее и живее: мягкий объём и свет, шаг, прыжок и сон по-новому. Вся одежда из гардероба уже сидит по фигуре.',
+    tint: C.me,
+    art: (w, h, me) => (
+      <View style={[styles.center, styles.row, { gap: w * 0.06 }]}>
+        <Chibi look={me} emotion="joy" value={80} pose="idle" size={h * 0.62} still />
+        <Chibi look={LOOKS.girl} emotion="love" value={75} pose="wave" size={h * 0.62} flip still />
+      </View>
+    ),
+  },
+  {
+    title: 'Места ожили',
+    text: 'Свет и глубина во всех 12 местах. Звёзды мерцают и падают, плывут облака, на лугу — бабочки и светлячки.',
+    tint: '#9B8CFF',
+    art: scene('meadow', 'night'),
+  },
+  {
+    title: 'Искры и сердца',
+    text: 'Сердечки, конфетти и круг от касания земли. У «Объятий» — лучи и свечение, у «Мог» — молнии и вспышка.',
+    tint: C.accent,
+    art: (w, h) => (
+      <View style={[styles.center, styles.row, { gap: w * 0.06, alignItems: 'center' }]}>
+        <Icon name="sparkle" size={h * 0.26} color="#FFC266" strokeWidth={1.6} />
+        <Icon name="heart" size={h * 0.4} color={C.accent} fill="#FF6B8A55" strokeWidth={1.6} />
+        <Icon name="flame" size={h * 0.26} color="#B79CFF" strokeWidth={1.6} />
+      </View>
+    ),
+  },
+];
 
 const FIX: Card[] = [
   {
@@ -111,6 +143,7 @@ const FIX: Card[] = [
 ];
 
 const CARDS: Card[] = [
+  ...REDESIGN,
   ...FIX,
   {
     title: 'В лесу что-то выросло',

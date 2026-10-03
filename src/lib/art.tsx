@@ -1,4 +1,5 @@
 // Рисунок вещи из каталога: SVG-строка → элементы react-native-svg.
+// Разбор строки и стиль 3.0 — в artStyle.ts (без React: тот же код работает в макетах).
 // Строку разбираем один раз и запоминаем; цвета подставляем при отрисовке.
 // Токены цвета: '@c' — цвет вещи, '@skin' — кожа; после '|' операции:
 // d0.2 — темнее (к обводке), l0.3 — светлее (к белому), k — контраст (сердечко на свитере).
@@ -20,10 +21,12 @@ import {
   Rect,
   Stop,
 } from 'react-native-svg';
+import { parseArt, styledNodes, type ArtNode, type Zone } from './artStyle';
 import { INK, mixColor } from './face';
 import { CLOTH } from './palette';
 
-export type ArtNode = { tag: string; attrs: Record<string, string>; children: ArtNode[] };
+export { parseArt };
+export type { ArtNode, Zone };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const TAGS: Record<string, any> = {
@@ -89,47 +92,6 @@ const ATTRS: Record<string, string> = {
 };
 
 const COLOR_PROPS = new Set(['fill', 'stroke', 'stopColor']);
-const TAG_RE = /<(\/?)([a-zA-Z][\w:.-]*)((?:\s+[\w:.-]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>/g;
-const ATTR_RE = /([\w:.-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g;
-
-function decode(s: string): string {
-  return s
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&');
-}
-
-export function parseArt(src: string): ArtNode[] {
-  const root: ArtNode = { tag: '#root', attrs: {}, children: [] };
-  const stack: ArtNode[] = [root];
-  const text = src.replace(/<!--[\s\S]*?-->/g, '');
-  TAG_RE.lastIndex = 0;
-  let m: RegExpExecArray | null;
-  while ((m = TAG_RE.exec(text))) {
-    const [, closing, rawTag, rawAttrs, selfClosing] = m;
-    const tag = rawTag.toLowerCase();
-    if (closing) {
-      // закрываем ближайший такой же тег (лишние закрывающие пропускаем)
-      for (let i = stack.length - 1; i > 0; i -= 1) {
-        if (stack[i].tag === tag) {
-          stack.length = i;
-          break;
-        }
-      }
-      continue;
-    }
-    const attrs: Record<string, string> = {};
-    ATTR_RE.lastIndex = 0;
-    let a: RegExpExecArray | null;
-    while ((a = ATTR_RE.exec(rawAttrs))) attrs[a[1]] = decode(a[2] ?? a[3] ?? '');
-    const node: ArtNode = { tag, attrs, children: [] };
-    stack[stack.length - 1].children.push(node);
-    if (!selfClosing) stack.push(node);
-  }
-  return root.children;
-}
 
 const cache = new Map<string, ArtNode[]>();
 
@@ -201,7 +163,8 @@ export function renderArt(nodes: ArtNode[], paint: Paint, key = 'a'): ReactNode[
   return out;
 }
 
-// Готовая строка слоя → элементы
-export function renderLayer(src: string | undefined, paint: Paint, key: string): ReactNode[] {
-  return src ? renderArt(artNodes(src), paint, key) : [];
+// Готовая строка слоя вещи → элементы в стиле 3.0 (мягкий контур и объём, см. artStyle.ts).
+// zone — где слой рисуется: 'head' — на голове (она уменьшена, линии не утончаем), 'body' — всё остальное.
+export function renderLayer(src: string | undefined, paint: Paint, key: string, zone: Zone = 'body'): ReactNode[] {
+  return src ? renderArt(styledNodes(src, zone), paint, key) : [];
 }

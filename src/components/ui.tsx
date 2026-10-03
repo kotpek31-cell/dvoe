@@ -19,6 +19,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { notify } from '../lib/dialogs';
 import { errorMessage } from '../lib/env';
 import { useScreenFocused } from '../lib/focus';
@@ -129,6 +130,34 @@ export function Pressy({
     >
       <Animated.View style={[innerStyle, { transform: [{ scale }] }]}>{children}</Animated.View>
     </Pressable>
+  );
+}
+
+// Заливка-градиент под содержимым кнопки (3.0): свет сверху, тень снизу. Родителю нужен overflow: 'hidden'.
+// Цвета сверху вниз: блик по кромке, свет, основной, тень, тёмная кромка снизу
+const FILLS = {
+  accent: ['#FFC2D0', '#FF93AB', '#FF6B8A', '#EE4F78', '#D93F69'],
+  good: ['#C4F6DE', '#86E8BC', '#5ED3A0', '#3DBB87', '#2FA474'],
+} as const;
+export function GradFill({ kind }: { kind: keyof typeof FILLS }) {
+  const c = FILLS[kind];
+  // Обёртка без отступов: на телефоне 100% у абсолютного ребёнка считается от области внутри отступов кнопки,
+  // и без обёртки правый край кнопки остался бы без градиента.
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <Svg width="100%" height="100%" viewBox="0 0 100 100" preserveAspectRatio="none">
+        <Defs>
+          <LinearGradient id={`uiFill-${kind}`} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={c[0]} />
+            <Stop offset="0.07" stopColor={c[1]} />
+            <Stop offset="0.5" stopColor={c[2]} />
+            <Stop offset="0.93" stopColor={c[3]} />
+            <Stop offset="1" stopColor={c[4]} />
+          </LinearGradient>
+        </Defs>
+        <Rect x={0} y={0} width={100} height={100} fill={`url(#uiFill-${kind})`} />
+      </Svg>
+    </View>
   );
 }
 
@@ -321,8 +350,10 @@ export function Button({
         { backgroundColor: bg, opacity: inactive && !loading ? 0.45 : 1 },
         variant === 'secondary' ? styles.buttonBorder : null,
         variant === 'primary' ? styles.buttonGlow : null,
+        variant === 'success' ? styles.buttonGlowGood : null,
       ]}
     >
+      {variant === 'primary' ? <GradFill kind="accent" /> : variant === 'success' ? <GradFill kind="good" /> : null}
       {loading ? (
         <ActivityIndicator color={fg} />
       ) : (
@@ -354,7 +385,7 @@ export function Chip({
       scaleTo={0.9}
       accessibilityRole="checkbox"
       accessibilityState={{ checked: Boolean(selected) }}
-      innerStyle={[styles.chip, selected ? { backgroundColor: color, borderColor: color } : null]}
+      innerStyle={[styles.chip, selected ? { backgroundColor: color, borderColor: color, boxShadow: `0px 6px 16px ${color}40, ${EDGE_STRONG}` } : null]}
     >
       <Txt weight="bold" size={14} color={selected ? '#1D1526' : C.text}>
         {label}
@@ -460,6 +491,10 @@ export function Pill({ children, style }: { children: React.ReactNode; style?: S
   return <View style={[styles.pill, style]}>{children}</View>;
 }
 
+// Свет по верхней кромке: стекло выглядит объёмным, а не плоским (на Android 9 и старше просто не рисуется)
+const EDGE = 'inset 0px 1px 0px rgba(255,255,255,0.11)';
+const EDGE_STRONG = 'inset 0px 1.5px 0px rgba(255,255,255,0.4)';
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   flexShrink: { flexShrink: 1 },
@@ -476,17 +511,19 @@ const styles = StyleSheet.create({
     borderRadius: R.xl,
     padding: S.lg,
     gap: S.md,
+    boxShadow: `0px 10px 22px rgba(6,3,18,0.22), ${EDGE}`,
   },
   cardTint: { ...StyleSheet.absoluteFill, borderRadius: R.xl - 1 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: S.sm },
   row: { flexDirection: 'row', alignItems: 'center' },
   groupLabel: { flexDirection: 'row', alignItems: 'center', gap: S.sm, marginTop: 4 },
   groupLine: { flex: 1, height: 1, backgroundColor: C.border },
-  iconButton: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.glassBorder },
-  button: { minHeight: 52, borderRadius: R.pill, paddingHorizontal: S.xl, alignItems: 'center', justifyContent: 'center' },
+  iconButton: { alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: C.glassBorder, boxShadow: EDGE },
+  button: { minHeight: 52, borderRadius: R.pill, paddingHorizontal: S.xl, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   buttonSmall: { minHeight: 40, paddingHorizontal: S.lg },
-  buttonBorder: { borderWidth: 1, borderColor: C.glassBorder },
-  buttonGlow: { boxShadow: '0px 10px 24px rgba(255,107,138,0.3)' },
+  buttonBorder: { borderWidth: 1, borderColor: C.glassBorder, boxShadow: EDGE },
+  buttonGlow: { boxShadow: '0px 10px 24px rgba(255,107,138,0.34)' },
+  buttonGlowGood: { boxShadow: '0px 10px 24px rgba(94,211,160,0.26)' },
   buttonRow: { flexDirection: 'row', alignItems: 'center', gap: S.sm },
   chip: {
     minHeight: 44,
@@ -504,6 +541,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: R.pill,
     padding: 4,
+    boxShadow: EDGE,
   },
   segmentThumb: {
     position: 'absolute',
@@ -511,9 +549,10 @@ const styles = StyleSheet.create({
     top: 4,
     bottom: 4,
     borderRadius: R.pill,
-    backgroundColor: 'rgba(255,107,138,0.22)',
+    backgroundColor: 'rgba(255,107,138,0.24)',
     borderWidth: 1,
-    borderColor: 'rgba(255,143,168,0.45)',
+    borderColor: 'rgba(255,143,168,0.5)',
+    boxShadow: '0px 4px 14px rgba(255,107,138,0.22), inset 0px 1px 0px rgba(255,255,255,0.2)',
   },
   segment: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 },
   input: {
@@ -541,5 +580,6 @@ const styles = StyleSheet.create({
     backgroundColor: C.overlay,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.18)',
+    boxShadow: EDGE,
   },
 });

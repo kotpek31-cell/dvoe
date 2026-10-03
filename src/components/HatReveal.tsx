@@ -6,6 +6,7 @@ import Svg from 'react-native-svg';
 import { usePair } from '../context/PairProvider';
 import { updateMyProfile } from '../lib/api';
 import { renderLayer } from '../lib/art';
+import { headX, headY, HS } from '../lib/body';
 import { useCatalog } from '../lib/catalog';
 import { lookOf, lookToChibi, wear } from '../lib/chibi';
 import { errorMessage } from '../lib/env';
@@ -74,7 +75,7 @@ function RevealView({ dry }: { dry: boolean }) {
     const layers = hat?.art.layers;
     if (!layers) return null;
     const paint = { c: '#888888', skin: '#FFDCC4', ids: 'reveal' };
-    return [...renderLayer(layers.hat, paint, 'rv.hat'), ...renderLayer(layers.over, paint, 'rv.over')];
+    return [...renderLayer(layers.hat, { ...paint, ids: 'revealhat' }, 'rv.hat', 'head'), ...renderLayer(layers.over, { ...paint, ids: 'revealover' }, 'rv.over', 'head')];
   }, [hat]);
 
   const spores = useMemo(
@@ -126,8 +127,9 @@ function RevealView({ dry }: { dry: boolean }) {
       <View pointerEvents="none" style={{ position: 'absolute', left: cx - size / 2, top, width: size, height: chibiH }}>
         <Chibi look={landed ? withHat : bare} emotion={landed ? 'joy' : 'inspiration'} value={landed ? 95 : 70} pose={landed ? 'cheer' : 'idle'} size={size} />
         {!landed && hatArt ? (
-          <Animated.View style={{ position: 'absolute', left: -30 * k, top: -40 * k, transform: [{ translateY: hatY }] }}>
-            <Svg width={200 * k} height={224 * k} viewBox="-30 -40 200 224">
+          <Animated.View style={{ position: 'absolute', left: headX(-30) * k, top: headY(-40) * k, transform: [{ translateY: hatY }] }}>
+            {/* шляпа — в координатах головы: она меньше тела (см. body.ts) */}
+            <Svg width={200 * k * HS} height={224 * k * HS} viewBox="-30 -40 200 224">
               {hatArt}
             </Svg>
           </Animated.View>

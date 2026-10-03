@@ -89,7 +89,7 @@ function scenePlaces(ability: string, width: number, size: number) {
     return { target: t, caster: t - size * 0.92 };
   }
   const cx = width / 2;
-  return { target: cx - size * 0.26, caster: cx - size * 0.74 };
+  return { target: cx - size * 0.3, caster: cx - size * 0.7 };
 }
 
 export default function RoomScreen() {
@@ -931,7 +931,7 @@ export default function RoomScreen() {
     const a = myMover.now();
     const b = tm.now();
     const online = isOnline(target);
-    const gap = (g.base * 0.36) / g.worldW;
+    const gap = (g.base * 0.34) / g.worldW; // тело 3.0 уже, руки длиннее — встают чуть ближе, ладони сходятся
     let ax: number, bx: number, y: number;
     if (online) {
       const mx = (a.x + b.x) / 2;

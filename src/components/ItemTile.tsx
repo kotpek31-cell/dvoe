@@ -1,5 +1,5 @@
 // Плитка гардероба: неподвижный чибик в примеряемой вещи, обрезанный по нужной части тела.
-// Шляпы, волосы, глаза, лицо и кожа — крупно голова; верх — по пояс; остальное — чибик целиком.
+// Шляпы, волосы, глаза, лицо и кожа — крупно голова; верх — по пояс; низ и обувь — ноги; остальное — чибик целиком.
 import { memo, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { sameLook, type Look } from '../lib/chibi';
@@ -8,14 +8,16 @@ import { Chibi } from './Chibi';
 import { Icon, type IconName } from './Icon';
 import { Pressy, Txt } from './ui';
 
-export type Crop = 'head' | 'torso' | 'body' | 'wide';
+export type Crop = 'head' | 'torso' | 'legs' | 'body' | 'wide';
 
-// Область рисунка чибика (координаты 120×170), которую показывает плитка
+// Область рисунка чибика (координаты 120×170), которую показывает плитка.
+// 3.0: голова меньше и выше, туловище длиннее (см. src/lib/body.ts) — области подогнаны под новое тело.
 const AREA: Record<Crop, { x0: number; x1: number; y0: number; y1: number }> = {
-  head: { x0: 6, x1: 114, y0: -6, y1: 108 },
-  torso: { x0: 0, x1: 120, y0: 14, y1: 146 },
-  body: { x0: -6, x1: 126, y0: -8, y1: 174 },
-  wide: { x0: -28, x1: 148, y0: -24, y1: 176 },
+  head: { x0: 15, x1: 105, y0: -11, y1: 79 }, // с запасом сверху: цилиндр, колпак и нимб выше макушки
+  torso: { x0: 12, x1: 108, y0: 58, y1: 154 },
+  legs: { x0: 14, x1: 106, y0: 80, y1: 172 }, // низ и обувь — крупно, от пояса до подошв
+  body: { x0: -20, x1: 140, y0: 8, y1: 168 },
+  wide: { x0: -30, x1: 150, y0: -8, y1: 172 },
 };
 
 type ThumbProps = { look: Look; crop: Crop; size: number };
@@ -28,7 +30,7 @@ function LookThumbView({ look, crop, size }: ThumbProps) {
   return (
     <View style={[styles.thumb, { width: size, height: size }]} pointerEvents="none">
       <View style={{ position: 'absolute', left, top }}>
-        <Chibi look={look} emotion="joy" value={30} pose="idle" size={120 * k} still />
+        <Chibi look={look} emotion="joy" value={30} pose="idle" size={120 * k} still part={crop === 'head' ? 'head' : crop === 'torso' ? 'upper' : crop === 'legs' ? 'legs' : 'all'} />
       </View>
     </View>
   );

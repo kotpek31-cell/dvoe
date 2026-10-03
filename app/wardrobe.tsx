@@ -64,7 +64,7 @@ const CAT_LABELS: Record<Cat, string> = {
 
 const SKIN_LABELS = ['Светлая', 'Персик', 'Медовая', 'Карамель', 'Какао'];
 const REQUIRED = new Set<Cat>(['body', 'skin', 'eyes', 'top', 'ability']);
-const CROP: Partial<Record<Cat, Crop>> = { skin: 'head', hair: 'head', eyes: 'head', hat: 'head', face: 'head', top: 'torso', back: 'wide' };
+const CROP: Partial<Record<Cat, Crop>> = { skin: 'head', hair: 'head', eyes: 'head', hat: 'head', face: 'head', top: 'torso', bottom: 'legs', shoes: 'legs', back: 'wide' };
 
 
 const slotOf = (look: Look, cat: WearCat): Slot | null => (look as Record<WearCat, Slot | null | undefined>)[cat] ?? null;

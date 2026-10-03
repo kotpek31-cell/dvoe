@@ -81,6 +81,7 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: 560,
     alignSelf: 'center',
+    boxShadow: '0px -14px 40px rgba(4,2,14,0.5), inset 0px 1px 0px rgba(255,255,255,0.14)',
   },
   grip: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.22)', marginBottom: 2 },
   header: { flexDirection: 'row', alignItems: 'center', gap: S.md },
