@@ -5,7 +5,7 @@
 // 0.2.2: в «Лесу с костром» растут грибы — нажал на гриб, чибик идёт и срывает его в корзинку сверху.
 import { router } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Pressable, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, Pressable, Share, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AbilityButton } from '../../src/components/AbilityButton';
 import { Chibi } from '../../src/components/Chibi';
@@ -14,6 +14,7 @@ import { Face } from '../../src/components/Face';
 import { Icon } from '../../src/components/Icon';
 import { AbilityScene, sceneKind, worldTransform } from '../../src/components/scene/AbilityScene';
 import { Location } from '../../src/components/scene/Location';
+import { PlaceTitle } from '../../src/components/scene/PlaceTitle';
 import { Basket, BASKET_W, basketSlot, FlyingShroom, MushroomPatch, PluckWord } from '../../src/components/scene/Mushrooms';
 import { LocationSheet } from '../../src/components/LocationSheet';
 import { IconButton, Pill, Pressy, Txt } from '../../src/components/ui';
@@ -33,7 +34,7 @@ import { useScreenFocused } from '../../src/lib/focus';
 import { useLoader } from '../../src/lib/hooks';
 import { openWhatsNew, useWhatsNew } from '../../src/lib/whatsNew';
 import { isLocationId, LOCATION_BG, locationName, type LocationId } from '../../src/lib/locations';
-import { haptic, useReducedMotion } from '../../src/lib/motion';
+import { haptic, nativeDriver, useReducedMotion } from '../../src/lib/motion';
 import { HAT_ID, HOME_MUSHROOMS, MUSH_REGROW_MS, putMushroom, showHatReveal, useHunt, type MushColor } from '../../src/lib/mushrooms';
 import { NightContext } from '../../src/lib/night';
 import { canAutoplay, playSound } from '../../src/lib/sound';
@@ -64,6 +65,13 @@ export default function HomeScreen() {
   const time = override.time ?? dayTimeOf(now);
   const loc: LocationId = override.location ?? (isLocationId(pair?.location) ? pair.location : 'meadow');
   useAmbient(loc, focused);
+  // Смена места (ты или партнёр): новое проявляется поверх старого с лёгким приближением и вспышкой света, по центру — титр.
+  // Пока пара не загрузилась, место — луг по умолчанию; первую настоящую локацию показываем без перехода.
+  const locReady = Boolean(override.location) || isLocationId(pair?.location);
+  const shownLoc = useRef({ id: loc, ready: locReady });
+  const [prevLoc, setPrevLoc] = useState<LocationId | null>(null);
+  const [placeTitle, setPlaceTitle] = useState(0);
+  const reveal = useRef(new Animated.Value(1)).current;
   const version = useTableVersion('mood_entries', 'profiles', 'sleep_entries');
   const { data } = useLoader(async () => {
     const [moods, streaks] = await Promise.all([fetchMoods(day, day), fetchStreaks(day)]);
@@ -92,6 +100,23 @@ export default function HomeScreen() {
   const mountedAt = useRef(Date.now());
   const { scene, finishScene, setHomeVisible } = useAbility();
   const reduce = useReducedMotion();
+  useEffect(() => {
+    const was = shownLoc.current;
+    shownLoc.current = { id: loc, ready: locReady };
+    if (was.id === loc || !was.ready || !locReady) return;
+    setPrevLoc(was.id);
+    setPlaceTitle((n) => n + 1);
+    reveal.setValue(0);
+    const anim = Animated.timing(reveal, { toValue: 1, duration: reduce ? 260 : 1100, easing: Easing.out(Easing.cubic), useNativeDriver: nativeDriver });
+    anim.start();
+    // старое место убираем по таймеру: ответ о конце анимации с native driver может не прийти
+    const t = setTimeout(() => setPrevLoc(null), (reduce ? 260 : 1100) + 80);
+    return () => {
+      anim.stop();
+      reveal.setValue(1);
+      clearTimeout(t);
+    };
+  }, [loc, locReady, reduce, reveal]);
   const sceneT = useRef(new Animated.Value(0)).current;
   const [allowed, setAllowed] = useState<string | null>(null); // сцена, которую разрешили кнопкой «Смотреть»
 
@@ -409,7 +434,23 @@ export default function HomeScreen() {
     <NightContext.Provider value={time === 'night'}>
     <View style={[styles.root, { backgroundColor: LOCATION_BG[loc][time] }]}>
       <Animated.View style={[StyleSheet.absoluteFill, { transform: world }]}>
-        <Location id={loc} width={width} height={height} time={time} active={focused} />
+        {prevLoc ? <Location key={`was-${prevLoc}`} id={prevLoc} width={width} height={height} time={time} active={false} /> : null}
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            prevLoc
+              ? { opacity: reveal, transform: [{ scale: reduce ? 1 : reveal.interpolate({ inputRange: [0, 1], outputRange: [1.08, 1] }) }] }
+              : null,
+          ]}
+        >
+          <Location id={loc} width={width} height={height} time={time} active={focused} />
+        </Animated.View>
+        {prevLoc && !reduce ? (
+          <Animated.View
+            pointerEvents="none"
+            style={[StyleSheet.absoluteFill, styles.flash, { opacity: reveal.interpolate({ inputRange: [0, 0.3, 1], outputRange: [0, time === 'day' ? 0.35 : 0.22, 0] }) }]}
+          />
+        ) : null}
       </Animated.View>
 
       {playing ? (
@@ -550,6 +591,8 @@ export default function HomeScreen() {
       </View>
       </View>
 
+      {playing ? null : <PlaceTitle id={loc} nonce={placeTitle} top={insets.top + height * 0.16} />}
+
       <View style={[styles.topBar, { top: insets.top + 8 }, playing ? styles.hidden : null]} pointerEvents="box-none">
         <Pressy onPress={() => setPicker(true)} scaleTo={0.95} accessibilityLabel={`Место: ${locationName(loc)}. Нажми, чтобы сменить`}>
           <Pill>
@@ -669,6 +712,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#6FB7F5', overflow: 'hidden' },
   hidden: { opacity: 0 },
+  flash: { backgroundColor: '#FFF6E8' },
   front: { zIndex: 5000 },
   stage: { zIndex: 0 },
   ground: { position: 'absolute', left: 0, right: 0, bottom: 0 },

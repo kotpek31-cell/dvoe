@@ -29,6 +29,22 @@ export const LOCATIONS: { id: LocationId; name: string }[] = [
   { id: 'cave', name: 'Пещера с кристаллами' },
 ];
 
+// Одна строка настроения места — в окне выбора места и в титре на главной
+export const LOCATION_LINE: Record<LocationId, string> = {
+  meadow: 'Тёплая трава, озеро и бабочки',
+  aurora: 'Небо переливается всеми цветами',
+  roof: 'Огни города прямо под ногами',
+  beach: 'Шум волн, чайки и маяк',
+  forest: 'Треск костра и светлячки',
+  snow: 'Снегопад и тёплые окошки',
+  cafe: 'Пар от чашек и тихая музыка',
+  moon: 'Тишина и звёзды совсем рядом',
+  sakura: 'Лепестки кружатся в воздухе',
+  rain: 'Дождь стучит по лужам',
+  mountains: 'Облака у самых вершин',
+  cave: 'Кристаллы светятся в темноте',
+};
+
 export const locationName = (id: string | null | undefined) => LOCATIONS.find((l) => l.id === id)?.name ?? 'Луг у озера';
 export const isLocationId = (id: unknown): id is LocationId => LOCATIONS.some((l) => l.id === id);
 
