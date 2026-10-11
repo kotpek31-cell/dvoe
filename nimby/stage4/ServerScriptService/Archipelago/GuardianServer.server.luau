@@ -417,7 +417,8 @@ clearAction()
 local function inArena(pos: Vector3, reach: number): boolean
 	local flat = Vector3.new(pos.X - ARENA.X, 0, pos.Z - ARENA.Z).Magnitude
 	local up = pos.Y - FLOOR
-	return flat <= reach and up >= -25 and up <= Cfg.LEASH_UP
+	-- та же полоса высот, что у ударов (ноги выше пола): кто ниже пола — не боец, не цель и без награды
+	return flat <= reach and up > 0 and up <= Cfg.LEASH_UP
 end
 
 -- список целей: игроки в мире + копии «Лжи» (Hooks.decoys)

@@ -1110,7 +1110,29 @@ local function crumble()
 		h.part.AssemblyLinearVelocity = Vector3.new(math.random(-14, 14), math.random(30, 55), math.random(-14, 14))
 	end
 	snd(SND.HALO_CRACK, FB.crack, center + Vector3.new(0, 14, 0), { range = 400 })
+	-- обломки без столкновений (не толкают игроков), поэтому «кладём» их на пол сами
+	local floorY = attr("GFloor") or (center.Y - 14)
+	local rest
+	rest = RunService.Heartbeat:Connect(function()
+		local moving = false
+		for _, p in ipairs(rig.parts) do
+			if p.Parent and not p.Anchored then
+				if p.AssemblyLinearVelocity.Y < 0 and p.Position.Y - p.Size.Y * 0.5 <= floorY then
+					p.Anchored = true
+					p.Position = Vector3.new(p.Position.X, floorY + p.Size.Y * 0.5, p.Position.Z)
+				else
+					moving = true
+				end
+			end
+		end
+		if not moving then
+			rest:Disconnect()
+		end
+	end)
 	task.delay(4, function()
+		if rest.Connected then
+			rest:Disconnect()
+		end
 		for _, p in ipairs(rig.parts) do
 			if p.Parent then
 				TweenService:Create(p, TweenInfo.new(1.5), { Transparency = 1 }):Play()
