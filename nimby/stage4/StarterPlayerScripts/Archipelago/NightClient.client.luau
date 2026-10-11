@@ -276,7 +276,7 @@ end
 
 local ffFolder = FX.localFolder("Fireflies")
 local ffEmitters = {} -- [ключ] = {part, emitter}
-local bboxCache = {}
+local bboxCache = setmetatable({}, { __mode = "k" })
 
 local function makeEmitter(parent: Instance): ParticleEmitter
 	local cfg = Night.FIREFLIES
@@ -330,16 +330,20 @@ local function islandModels()
 	return list
 end
 
+-- рамка острова; при подгрузке (StreamingEnabled) остров приходит частями — пересчёт раз в 10 с,
+-- пустую рамку (ничего ещё не пришло) не запоминаем
 local function bbox(m: Model)
 	local c = bboxCache[m]
-	if c and m.Parent then
+	local now = os.clock()
+	if c and m.Parent and now - c[3] < 10 then
 		return c[1], c[2]
 	end
 	local ok, cf, size = pcall(m.GetBoundingBox, m)
-	if not ok then
+	if not ok or size.Magnitude < 1 then
+		bboxCache[m] = nil
 		return nil, nil
 	end
-	bboxCache[m] = { cf, size }
+	bboxCache[m] = { cf, size, now }
 	return cf, size
 end
 
@@ -394,21 +398,28 @@ local function refreshFireflies(nightK: number)
 			ffEmitters[key] = nil
 		end
 	end
-	-- добавить новые
+	-- добавить новые и подвинуть старые (рамка могла уточниться при подгрузке)
 	for key, info in pairs(want) do
-		if not ffEmitters[key] then
-			if info.tagged then
+		local rec = ffEmitters[key]
+		if info.tagged then
+			if not rec then
 				ffEmitters[key] = { emitter = makeEmitter(key) }
-			else
-				local top = info.cf.Position + Vector3.new(0, info.size.Y * 0.5 + 10, 0)
+			end
+		else
+			local top = info.cf.Position + Vector3.new(0, info.size.Y * 0.5 + 10, 0)
+			local size = Vector3.new(math.min(info.size.X * 0.8, 400), 18, math.min(info.size.Z * 0.8, 400))
+			if not rec then
 				local part = FX.part({
 					Name = "FF_" .. key.Name,
 					Transparency = 1,
-					Size = Vector3.new(math.min(info.size.X * 0.8, 400), 18, math.min(info.size.Z * 0.8, 400)),
+					Size = size,
 					CFrame = CFrame.new(top),
 					Parent = ffFolder,
 				})
 				ffEmitters[key] = { part = part, emitter = makeEmitter(part) }
+			elseif rec.part then
+				rec.part.Size = size
+				rec.part.CFrame = CFrame.new(top)
 			end
 		end
 	end

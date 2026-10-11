@@ -541,9 +541,9 @@ local function doSlam(target)
 		for _, f in ipairs(fighters()) do
 			local d = flatDist(f.hrp.Position, spot)
 			local h = heightOf(f)
-			if d <= def.radius and h < 14 then
+			if d <= def.radius and h > -3 and h < 14 then
 				damage(f, def.damage, outward(spot, f.hrp.Position, def.knock, def.knock * 0.55), id)
-			elseif d <= def.ring and h < 5 then
+			elseif d <= def.ring and h > -3 and h < 5 then
 				damage(f, def.ringDamage, outward(spot, f.hrp.Position, def.knock * 0.6, def.knock * 0.35), id)
 			end
 		end
@@ -564,7 +564,8 @@ local function doSweep(target)
 		for _, f in ipairs(fighters()) do
 			local v = Vector3.new(f.hrp.Position.X - ARENA.X, 0, f.hrp.Position.Z - ARENA.Z)
 			local d = v.Magnitude
-			if d <= def.radius and heightOf(f) < 14 then
+			local h = heightOf(f)
+			if d <= def.radius and h > -3 and h < 14 then
 				local ang = (d > 0.1) and math.acos(math.clamp(v.Unit:Dot(fwd), -1, 1)) or 0
 				if ang <= half then
 					local side = Vector3.new(-fwd.Z, 0, fwd.X)
@@ -588,7 +589,8 @@ local function doQuake()
 		end
 		for _, f in ipairs(fighters()) do
 			local d = flatDist(f.hrp.Position, ARENA)
-			if math.abs(d - r) <= def.width * 0.5 + 1 and heightOf(f) < def.height then
+			local h = heightOf(f)
+			if math.abs(d - r) <= def.width * 0.5 + 1 and h > -3 and h < def.height then
 				damage(f, def.damage, outward(ARENA, f.hrp.Position, def.knock, def.knock * 0.6), id)
 			end
 		end
@@ -617,7 +619,7 @@ local function doBeams()
 			local d = v.Magnitude
 			local h = heightOf(f)
 			-- тело игрока 0..5 над ногами; луч — height ± thick/2
-			if d > 5 and d <= def.length and h < def.height + def.thick * 0.5 and h + 5 > def.height - def.thick * 0.5 then
+			if d > 5 and d <= def.length and h > -3 and h < def.height + def.thick * 0.5 and h + 5 > def.height - def.thick * 0.5 then
 				local a = math.atan2(-v.X, -v.Z) -- тот же отсчёт, что у yaw (вперёд = -Z)
 				local halfW = math.atan2(def.thick * 0.5 + 1.3, d)
 				for i = 0, n - 1 do
@@ -658,7 +660,8 @@ local function doRubble()
 	at(tFall, function()
 		for _, f in ipairs(fighters()) do
 			for _, s in ipairs(spots) do
-				if flatDist(f.hrp.Position, s) <= def.radius and heightOf(f) < 10 then
+				local h = heightOf(f)
+				if flatDist(f.hrp.Position, s) <= def.radius and h > -3 and h <= Cfg.LEASH_UP then
 					damage(f, def.damage, outward(s, f.hrp.Position, 55, 40), id)
 					break
 				end
@@ -672,6 +675,16 @@ end
 local function pickTarget(list)
 	if #list == 0 then
 		return nil
+	end
+	-- кто стоит на арене — в приоритете (по летающим бьёт только камнепад)
+	local grounded = {}
+	for _, f in ipairs(list) do
+		if heightOf(f) < 14 then
+			table.insert(grounded, f)
+		end
+	end
+	if #grounded > 0 then
+		list = grounded
 	end
 	if rng:NextNumber() < 0.6 then
 		local best, bd = nil, math.huge
@@ -687,6 +700,10 @@ local function pickTarget(list)
 end
 
 local function chooseAttack(target)
+	-- цель высоко над полом — достанет только камнепад (в любой фазе)
+	if heightOf(target) > 14 then
+		return "rubble"
+	end
 	local d = flatDist(target.hrp.Position, ARENA)
 	local weights = {}
 	for name, def in pairs(A) do
@@ -1078,3 +1095,21 @@ Players.PlayerRemoving:Connect(function(plr)
 	G.fightTime[plr] = nil
 	G.inWake[plr] = nil
 end)
+
+-- «уже встречал» из сохранения → атрибут (сцена-знакомство не повторяется в следующих входах).
+-- Профиль грузится после входа — слушаем изменение атрибута набора флагов.
+local function restoreMet(plr: Player)
+	if plr:GetAttribute("ArchGuardianMet") ~= true and Prog.flag(plr, "guardian_met") then
+		plr:SetAttribute("ArchGuardianMet", true)
+	end
+end
+local function hookMet(plr: Player)
+	restoreMet(plr)
+	plr:GetAttributeChangedSignal(Prog.attrName("flags")):Connect(function()
+		restoreMet(plr)
+	end)
+end
+Players.PlayerAdded:Connect(hookMet)
+for _, p in ipairs(Players:GetPlayers()) do
+	hookMet(p)
+end

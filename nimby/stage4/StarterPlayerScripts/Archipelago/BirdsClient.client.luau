@@ -24,7 +24,8 @@ local folder = FX.localFolder("Birds")
 local rng = Random.new()
 
 local flocks = {} -- [key] = flock
-local bboxCache = {}
+local bboxCache = setmetatable({}, { __mode = "k" })
+local T_BASE = os.clock() -- для math.noise (float32): маленькие числа
 
 local function makeBird(color: Color3, withTrail: boolean, parent: Instance): Part
 	local p = Instance.new("Part")
@@ -107,12 +108,16 @@ local function islandAnchors(cam: Vector3)
 		for _, regionFolder in ipairs(islands:GetChildren()) do
 			for _, m in ipairs(regionFolder:GetChildren()) do
 				if m:IsA("Model") then
+					-- остров мог прийти частями (подгрузка): пересчёт раз в 10 с, пустую рамку не помним
 					local c = bboxCache[m]
-					if not c then
+					if not c or os.clock() - c[2] > 10 then
 						local ok, cf, size = pcall(m.GetBoundingBox, m)
-						if ok then
-							c = { cf.Position + Vector3.new(0, size.Y * 0.5, 0) }
+						if ok and size.Magnitude > 1 then
+							c = { cf.Position + Vector3.new(0, size.Y * 0.5, 0), os.clock() }
 							bboxCache[m] = c
+						else
+							c = nil
+							bboxCache[m] = nil
 						end
 					end
 					if c then
@@ -153,9 +158,12 @@ local function refresh(cam: Vector3)
 		end
 	end
 	for key, a in pairs(want) do
-		if not flocks[key] then
+		local fl = flocks[key]
+		if not fl then
 			local seed = math.floor(a.pos.X * 0.37 + a.pos.Z * 1.31) % 100000
 			flocks[key] = newFlock(key, a.pos, seed)
+		elseif (fl.anchor - a.pos).Magnitude > 2 then
+			fl.anchor = a.pos -- рамка острова уточнилась
 		end
 	end
 end
@@ -186,7 +194,7 @@ local function poseFlock(fl, t: number, hrp: BasePart?)
 	local armed = hrp ~= nil and sinceScatter >= B.SCATTER_TIME
 	local hrpPos = hrp and hrp.Position
 	-- math.noise считает во float32: время сервера (~1e9) не годится, берём локальные часы
-	local tn = os.clock()
+	local tn = os.clock() - T_BASE
 	for i, b in ipairs(fl.birds) do
 		local a = b.a0 + ang * (1 + b.lag)
 		local flutter = math.noise(tn * 0.8 + b.ph, b.ph) * 6

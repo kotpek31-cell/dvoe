@@ -57,6 +57,8 @@ local function blend(a, b, t)
 	return out
 end
 
+local snowK, lightClock = 0, os.clock() -- плавный переход гроза ↔ метель на границе Льда
+
 local function updateLight(I: number, snow: boolean, overcast: number)
 	if not Director then
 		return
@@ -69,9 +71,25 @@ local function updateLight(I: number, snow: boolean, overcast: number)
 		return
 	end
 	local L = WC.LIGHT
-	local heavy = snow and L.snow or L.storm
+	local c = os.clock()
+	local dtL = math.min(c - lightClock, 0.5)
+	lightClock = c
+	snowK += math.clamp((snow and 1 or 0) - snowK, -dtL / 3, dtL / 3)
+	local heavy = blend(L.storm, L.snow, snowK)
 	local props = blend(L.cloudy, heavy, math.clamp(I * 1.2, 0, 1))
 	local w = math.max(overcast * L.CLOUDY_WEIGHT, I)
+	-- значения погоды дневные: ночью темнее (иначе облачная ночь светлее полудня)
+	local nk = Clock.day().night
+	if nk > 0.001 then
+		local dk = 0.55 * nk
+		props["Lighting.Brightness"] = (props["Lighting.Brightness"] or 1) * (1 - 0.5 * nk)
+		for _, key in ipairs({ "Lighting.OutdoorAmbient", "Atmosphere.Color", "Atmosphere.Decay" }) do
+			local col = props[key]
+			if typeof(col) == "Color3" then
+				props[key] = col:Lerp(Color3.new(0, 0, 0), dk)
+			end
+		end
+	end
 	if flashK > 0.001 then
 		props["Lighting.Brightness"] = (props["Lighting.Brightness"] or 1) + L.FLASH_BRIGHTNESS * flashK
 		props["Grade.Brightness"] = (props["Grade.Brightness"] or 0) + 0.22 * flashK
@@ -659,6 +677,7 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 	local camPos = cam.CFrame.Position
 	local inWorld = FX.inWorld()
+	local under = camPos.Y < ORIGIN.Y + LZ.SEA_Y -- под облачным морем — укрытие
 
 	-- вспышка гаснет быстро
 	if flashK > 0 then
@@ -668,7 +687,7 @@ RunService.RenderStepped:Connect(function(dt)
 	local clockNow = os.clock()
 	if clockNow - slowAt > 0.1 or flashK > 0 then
 		slowAt = clockNow
-		if inWorld then
+		if inWorld and not under then
 			local i2, s2 = Clock.stormAt(camPos, t)
 			I, snow = i2, s2
 		else
@@ -684,7 +703,8 @@ RunService.RenderStepped:Connect(function(dt)
 		updateWall(Clock.front(t), t, camPos)
 		updatePrecip(I, snow, camPos, cam.CFrame.LookVector)
 		updateGust(I, snow, t)
-		updateRainbow(Clock.rainbow(t), camPos)
+		-- радуга — только днём и не под облаками
+		updateRainbow(under and 0 or Clock.rainbow(t) * (1 - Clock.day(t).night), camPos)
 	else
 		destroyWall()
 		updatePrecip(0, false, camPos, cam.CFrame.LookVector)

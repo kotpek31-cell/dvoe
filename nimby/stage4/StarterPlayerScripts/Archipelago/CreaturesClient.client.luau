@@ -201,7 +201,7 @@ local function standingOn(e, hrp: BasePart, hum: Humanoid): boolean
 	if not plat or not plat.Parent then
 		return false
 	end
-	rideRay.FilterDescendantsInstances = { plat }
+	rideRay.FilterDescendantsInstances = e.rig.rideParts or { plat }
 	local reach = hum.HipHeight + hrp.Size.Y * 0.5 + W.RIDE_RAY
 	local hit = workspace:Raycast(hrp.Position, Vector3.new(0, -reach, 0), rideRay)
 	return hit ~= nil
@@ -246,15 +246,21 @@ local function bounceFx(r, pos: Vector3)
 	FX.ring(pos - Vector3.new(0, 1, 0), r.size * 0.4, r.size * 1.6, 0.45, r.bell.Color, 0.8, 0.6)
 end
 
-local function tryBounce(g: number, j: number, r, top: Vector3, hrp: BasePart, hum: Humanoid)
+-- высота ног в этом и прошлом кадре: на скорости падения окно ±3 стад проскакивается за кадр,
+-- поэтому проверяем весь отрезок пути ног
+local feetNow, feetPrev = nil, nil
+local feetHrp = nil
+local jellySent = {} -- ["g:j"] = os.clock(), когда снова можно просить свет у сервера
+
+local function tryBounce(g: number, j: number, r, top: Vector3, hrp: BasePart, _hum: Humanoid)
 	local key = g .. ":" .. j
 	local now = os.clock()
-	if (jellyCd[key] or 0) > now then
+	if (jellyCd[key] or 0) > now or not feetNow then
 		return
 	end
-	local feet = hrp.Position.Y - (hum.HipHeight + hrp.Size.Y * 0.5)
-	local dy = feet - top.Y
-	if dy < -2.5 or dy > 3 then
+	local lo = math.min(feetPrev or feetNow, feetNow)
+	local hi = math.max(feetPrev or feetNow, feetNow)
+	if hi < top.Y - 2.5 or lo > top.Y + 3 then
 		return
 	end
 	local flat = Vector3.new(hrp.Position.X - top.X, 0, hrp.Position.Z - top.Z).Magnitude
@@ -268,7 +274,8 @@ local function tryBounce(g: number, j: number, r, top: Vector3, hrp: BasePart, h
 	jellyCd[key] = now + J.LOCAL_COOLDOWN
 	FX.knock(Vector3.new(0, BOUNCE - v.Y, 0))
 	bounceFx(r, top)
-	if remote then
+	if remote and (jellySent[key] or 0) <= now then
+		jellySent[key] = now + J.COOLDOWN
 		remote:FireServer("jelly", g, j)
 	end
 end
@@ -434,7 +441,19 @@ RunService.PreSimulation:Connect(function(dt)
 		end
 	end
 
-	-- медузы
+	-- медузы (ноги: этот кадр и прошлый)
+	if hrp and hum then
+		if hrp ~= feetHrp then
+			feetPrev = nil
+			feetHrp = hrp
+		end
+		feetNow = hrp.Position.Y - (hum.HipHeight + hrp.Size.Y * 0.5)
+		if feetPrev and math.abs(feetNow - feetPrev) > 40 then
+			feetPrev = nil -- телепорт
+		end
+	else
+		feetNow, feetPrev, feetHrp = nil, nil, nil
+	end
 	for g, grp in ipairs(Jellies.groups) do
 		local d = (grp.center - cam).Magnitude
 		if d < J.NEAR * 2.5 + grp.radius then
@@ -447,6 +466,7 @@ RunService.PreSimulation:Connect(function(dt)
 	if hrp then
 		checkSecret(hrp)
 	end
+	feetPrev = feetNow
 
 	if frame % 30 == 0 then
 		updateStripes(Clock.day(t).night)

@@ -182,6 +182,32 @@ function WhaleBuilder.build(w, parent: Instance)
 	platform:SetAttribute("WhaleRide", def.id)
 	add(platform, "back", CFrame.new())
 	rig.platform = platform
+	rig.rideParts = { platform }
+	platform.Size = Vector3.new(rMid * 0.9, 1, L * 0.42)
+	-- боковые скаты по изгибу спины (~32°) — тоже твёрдые, на них тоже едут
+	for _, sx in ipairs({ -1, 1 }) do
+		local side = block(Vector3.new(rMid * 0.36, 1, L * 0.42), Color3.new(1, 1, 1), nil, model)
+		side.Name = "BackSide"
+		side.Transparency = 1
+		side.CanCollide = true
+		side.CanQuery = true
+		add(side, "back", CFrame.new(sx * rMid * 0.6, -rMid * 0.135, 0) * CFrame.Angles(0, 0, -sx * 0.56))
+		table.insert(rig.rideParts, side)
+	end
+	-- невидимые бортики: не сойти с края спины (перепрыгнуть можно — 3.5 стад)
+	local rails = {
+		{ Vector3.new(0.5, 3.5, L * 0.42), CFrame.new(rMid * 0.76, -rMid * 0.25 + 1.75, 0) },
+		{ Vector3.new(0.5, 3.5, L * 0.42), CFrame.new(-rMid * 0.76, -rMid * 0.25 + 1.75, 0) },
+		{ Vector3.new(rMid * 1.5, 3.5, 0.5), CFrame.new(0, 1.75, L * 0.21) },
+		{ Vector3.new(rMid * 1.5, 3.5, 0.5), CFrame.new(0, 1.75, -L * 0.21) },
+	}
+	for _, rl in ipairs(rails) do
+		local rail = block(rl[1], Color3.new(1, 1, 1), nil, model)
+		rail.Name = "BackRail"
+		rail.Transparency = 1
+		rail.CanCollide = true
+		add(rail, "back", rl[2])
+	end
 
 	-- сад на спине «Старого кита»
 	if def.garden then

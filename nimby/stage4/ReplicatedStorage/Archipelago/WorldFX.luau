@@ -138,6 +138,7 @@ end
 
 local shakes = {}
 local shakeBound = false
+local T_BASE = os.clock() -- math.noise считает во float32: подаём маленькие числа
 -- что тряска добавила к камере в этом кадре: до обновления камеры возвращаем как было,
 -- иначе стандартная камера «запомнит» поворот и взгляд уплывёт
 local applied = CFrame.identity
@@ -168,9 +169,10 @@ local function bindShake()
 				table.remove(shakes, i)
 			else
 				local e = (1 - k) * (1 - k) * s.a
-				rx += math.noise(now * s.f, 0.5, i) * e
-				ry += math.noise(0.5, now * s.f, i) * e
-				rz += math.noise(now * s.f, i, 0.5) * e * 0.5
+				local tn = now - T_BASE
+				rx += math.noise(tn * s.f, 0.5, i) * e
+				ry += math.noise(0.5, tn * s.f, i) * e
+				rz += math.noise(tn * s.f, i, 0.5) * e * 0.5
 			end
 		end
 		local cam = workspace.CurrentCamera

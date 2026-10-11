@@ -246,6 +246,11 @@ local function pickStrike(): Vector3?
 			local a = rng:NextNumber(0, math.pi * 2)
 			local d = rng:NextNumber(LZ.NEAR_DIST[1], LZ.NEAR_DIST[2])
 			local pos = p + Vector3.new(math.cos(a) * d, rng:NextNumber(-12, 12), math.sin(a) * d)
+			-- точка ушла внутрь острова (игрок летит низко) — ставим её на поверхность
+			local hit = workspace:Raycast(p, pos - p, rayParams)
+			if hit then
+				pos = hit.Position + hit.Normal * 2
+			end
 			if strikeAllowed(pos) then
 				return pos
 			end

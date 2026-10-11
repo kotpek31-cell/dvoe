@@ -28,6 +28,7 @@ local POSES = GB.POSES
 local OK = Ambience.OK
 
 local folder = FX.localFolder("Guardian")
+local T_BASE = os.clock() -- для math.noise (float32)
 local remote = Arch:WaitForChild("Remotes"):WaitForChild("Guardian", 30)
 
 -- ===== текст (ru/en). TODO(studio): перевести на ключи модуля Text (как на этапе 3) =====
@@ -517,7 +518,7 @@ local function rubbleSpots(spots, tFall: number)
 			shadow.Size = Vector3.new(0.25, def.radius * 2 * k, def.radius * 2 * k)
 			if left > 0 and left < 0.75 then
 				local f = 1 - left / 0.75
-				local y = 90 * (1 - f * f)
+				local y = (Cfg.LEASH_UP + 10) * (1 - f * f) -- падает со «потолка» арены: бьёт весь столб
 				local cf = CFrame.new(spot + Vector3.new(0, def.radius * 0.35 + y, 0)) * spin * CFrame.Angles(t * 3, t * 2, 0)
 				rock.CFrame = cf
 				rock2.CFrame = cf * CFrame.new(1, 1.2, -0.6) * CFrame.Angles(0.6, 0.3, 0)
@@ -941,7 +942,7 @@ local function banner(lines, color: Color3, dur: number, big: boolean?)
 	return gui
 end
 
-local function playCutscene()
+local function playCutscene(dur: number)
 	local cam = workspace.CurrentCamera
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -990,7 +991,7 @@ local function playCutscene()
 	hint.Parent = gui
 
 	local t0 = os.clock()
-	local DUR = 4.4
+	local DUR = dur
 	local done = false
 	local function finish()
 		if done then
@@ -1024,7 +1025,8 @@ local function playCutscene()
 	end)
 	RunService:BindToRenderStep("ArchGuardianCut", Enum.RenderPriority.Camera.Value + 1, function()
 		local k = (os.clock() - t0) / DUR
-		if k >= 1 then
+		-- пробуждение кончилось (или Страж пропал) — камеру сразу вернуть
+		if k >= 1 or not view or attr("GState") ~= "intro" then
 			skipConn:Disconnect()
 			finish()
 			return
@@ -1056,8 +1058,9 @@ local function checkMeet()
 		return
 	end
 	metShown = true
-	if st == "intro" then
-		playCutscene()
+	local left = (attr("GIntroT0") or 0) + Cfg.INTRO - workspace:GetServerTimeNow()
+	if st == "intro" and left >= 1.5 then
+		playCutscene(math.min(4.4, left))
 	else
 		banner({ T.name, T.sub }, L.GLOW, 3, true)
 	end
@@ -1094,7 +1097,7 @@ local function crumble()
 	for _, p in ipairs(rig.parts) do
 		if p.Parent then
 			p.Anchored = false
-			p.CanCollide = true
+			p.CanCollide = false -- тяжёлые обломки не должны сбрасывать игроков с арены
 			local out = (p.Position - center)
 			out = (out.Magnitude > 0.1) and out.Unit or Vector3.yAxis
 			p.AssemblyLinearVelocity = out * math.random(12, 30) + Vector3.new(0, math.random(10, 26), 0)
@@ -1179,7 +1182,7 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 	if not view or view.server ~= m then
 		buildView(m)
-		lastN = m:GetAttribute("GActN") or 0
+		lastN = -1 -- показать атаку, которая уже идёт (если её замах ещё не кончился)
 		lastState = ""
 	end
 
@@ -1239,7 +1242,8 @@ RunService.RenderStepped:Connect(function(dt)
 	local n = attr("GActN") or 0
 	if n ~= lastN then
 		lastN = n
-		if (attr("GAct") or "") ~= "" then
+		local def = A[attr("GAct") or ""]
+		if def and t < (attr("GActT0") or t) + def.windup + (def.duration or 0) then
 			startAct(n)
 		end
 	end
@@ -1281,8 +1285,8 @@ RunService.RenderStepped:Connect(function(dt)
 			tz -= breathe
 		end
 		if tremble > 0 and (name == "waist" or name == "neck") then
-			tx += math.noise(os.clock() * 22, 1) * 0.05 * tremble
-			tz += math.noise(os.clock() * 22, 2) * 0.05 * tremble
+			tx += math.noise((os.clock() - T_BASE) * 22, 1) * 0.05 * tremble
+			tz += math.noise((os.clock() - T_BASE) * 22, 2) * 0.05 * tremble
 		end
 		ang[name] = {
 			WorldMath.spring(s[1], tx, f, z, dt),

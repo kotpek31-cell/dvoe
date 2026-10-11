@@ -624,6 +624,32 @@ function WhaleBuilder.build(w, parent: Instance)
 	platform:SetAttribute("WhaleRide", def.id)
 	add(platform, "back", CFrame.new())
 	rig.platform = platform
+	rig.rideParts = { platform }
+	platform.Size = Vector3.new(rMid * 0.9, 1, L * 0.42)
+	-- боковые скаты по изгибу спины (~32°) — тоже твёрдые, на них тоже едут
+	for _, sx in ipairs({ -1, 1 }) do
+		local side = block(Vector3.new(rMid * 0.36, 1, L * 0.42), Color3.new(1, 1, 1), nil, model)
+		side.Name = "BackSide"
+		side.Transparency = 1
+		side.CanCollide = true
+		side.CanQuery = true
+		add(side, "back", CFrame.new(sx * rMid * 0.6, -rMid * 0.135, 0) * CFrame.Angles(0, 0, -sx * 0.56))
+		table.insert(rig.rideParts, side)
+	end
+	-- невидимые бортики: не сойти с края спины (перепрыгнуть можно — 3.5 стад)
+	local rails = {
+		{ Vector3.new(0.5, 3.5, L * 0.42), CFrame.new(rMid * 0.76, -rMid * 0.25 + 1.75, 0) },
+		{ Vector3.new(0.5, 3.5, L * 0.42), CFrame.new(-rMid * 0.76, -rMid * 0.25 + 1.75, 0) },
+		{ Vector3.new(rMid * 1.5, 3.5, 0.5), CFrame.new(0, 1.75, L * 0.21) },
+		{ Vector3.new(rMid * 1.5, 3.5, 0.5), CFrame.new(0, 1.75, -L * 0.21) },
+	}
+	for _, rl in ipairs(rails) do
+		local rail = block(rl[1], Color3.new(1, 1, 1), nil, model)
+		rail.Name = "BackRail"
+		rail.Transparency = 1
+		rail.CanCollide = true
+		add(rail, "back", rl[2])
+	end
 
 	-- сад на спине «Старого кита»
 	if def.garden then
@@ -1028,7 +1054,7 @@ return {
 		NEAR = 420, -- ближе — анимация и проверка прыжка
 		LIGHT_NEAR = 160, -- ближе — PointLight
 		COOLDOWN = 8, -- с, одна медуза даёт свет одному игроку не чаще
-		LOCAL_COOLDOWN = 0.7, -- с, повторный подброс от той же медузы
+		LOCAL_COOLDOWN = 0.25, -- с, повторный подброс от той же медузы (меньше времени полёта — можно прыгать подряд)
 		CHECK_RADIUS = 24, -- сервер: игрок не дальше от медузы (с запасом на пинг)
 		RATE = 0.4, -- с, не чаще на игрока
 	},
@@ -2088,6 +2114,7 @@ end
 
 local shakes = {}
 local shakeBound = false
+local T_BASE = os.clock() -- math.noise считает во float32: подаём маленькие числа
 -- что тряска добавила к камере в этом кадре: до обновления камеры возвращаем как было,
 -- иначе стандартная камера «запомнит» поворот и взгляд уплывёт
 local applied = CFrame.identity
@@ -2118,9 +2145,10 @@ local function bindShake()
 				table.remove(shakes, i)
 			else
 				local e = (1 - k) * (1 - k) * s.a
-				rx += math.noise(now * s.f, 0.5, i) * e
-				ry += math.noise(0.5, now * s.f, i) * e
-				rz += math.noise(now * s.f, i, 0.5) * e * 0.5
+				local tn = now - T_BASE
+				rx += math.noise(tn * s.f, 0.5, i) * e
+				ry += math.noise(0.5, tn * s.f, i) * e
+				rz += math.noise(tn * s.f, i, 0.5) * e * 0.5
 			end
 		end
 		local cam = workspace.CurrentCamera
@@ -3913,9 +3941,9 @@ local function doSlam(target)
 		for _, f in ipairs(fighters()) do
 			local d = flatDist(f.hrp.Position, spot)
 			local h = heightOf(f)
-			if d <= def.radius and h < 14 then
+			if d <= def.radius and h > -3 and h < 14 then
 				damage(f, def.damage, outward(spot, f.hrp.Position, def.knock, def.knock * 0.55), id)
-			elseif d <= def.ring and h < 5 then
+			elseif d <= def.ring and h > -3 and h < 5 then
 				damage(f, def.ringDamage, outward(spot, f.hrp.Position, def.knock * 0.6, def.knock * 0.35), id)
 			end
 		end
@@ -3936,7 +3964,8 @@ local function doSweep(target)
 		for _, f in ipairs(fighters()) do
 			local v = Vector3.new(f.hrp.Position.X - ARENA.X, 0, f.hrp.Position.Z - ARENA.Z)
 			local d = v.Magnitude
-			if d <= def.radius and heightOf(f) < 14 then
+			local h = heightOf(f)
+			if d <= def.radius and h > -3 and h < 14 then
 				local ang = (d > 0.1) and math.acos(math.clamp(v.Unit:Dot(fwd), -1, 1)) or 0
 				if ang <= half then
 					local side = Vector3.new(-fwd.Z, 0, fwd.X)
@@ -3960,7 +3989,8 @@ local function doQuake()
 		end
 		for _, f in ipairs(fighters()) do
 			local d = flatDist(f.hrp.Position, ARENA)
-			if math.abs(d - r) <= def.width * 0.5 + 1 and heightOf(f) < def.height then
+			local h = heightOf(f)
+			if math.abs(d - r) <= def.width * 0.5 + 1 and h > -3 and h < def.height then
 				damage(f, def.damage, outward(ARENA, f.hrp.Position, def.knock, def.knock * 0.6), id)
 			end
 		end
@@ -3989,7 +4019,7 @@ local function doBeams()
 			local d = v.Magnitude
 			local h = heightOf(f)
 			-- тело игрока 0..5 над ногами; луч — height ± thick/2
-			if d > 5 and d <= def.length and h < def.height + def.thick * 0.5 and h + 5 > def.height - def.thick * 0.5 then
+			if d > 5 and d <= def.length and h > -3 and h < def.height + def.thick * 0.5 and h + 5 > def.height - def.thick * 0.5 then
 				local a = math.atan2(-v.X, -v.Z) -- тот же отсчёт, что у yaw (вперёд = -Z)
 				local halfW = math.atan2(def.thick * 0.5 + 1.3, d)
 				for i = 0, n - 1 do
@@ -4030,7 +4060,8 @@ local function doRubble()
 	at(tFall, function()
 		for _, f in ipairs(fighters()) do
 			for _, s in ipairs(spots) do
-				if flatDist(f.hrp.Position, s) <= def.radius and heightOf(f) < 10 then
+				local h = heightOf(f)
+				if flatDist(f.hrp.Position, s) <= def.radius and h > -3 and h <= Cfg.LEASH_UP then
 					damage(f, def.damage, outward(s, f.hrp.Position, 55, 40), id)
 					break
 				end
@@ -4044,6 +4075,16 @@ end
 local function pickTarget(list)
 	if #list == 0 then
 		return nil
+	end
+	-- кто стоит на арене — в приоритете (по летающим бьёт только камнепад)
+	local grounded = {}
+	for _, f in ipairs(list) do
+		if heightOf(f) < 14 then
+			table.insert(grounded, f)
+		end
+	end
+	if #grounded > 0 then
+		list = grounded
 	end
 	if rng:NextNumber() < 0.6 then
 		local best, bd = nil, math.huge
@@ -4059,6 +4100,10 @@ local function pickTarget(list)
 end
 
 local function chooseAttack(target)
+	-- цель высоко над полом — достанет только камнепад (в любой фазе)
+	if heightOf(target) > 14 then
+		return "rubble"
+	end
 	local d = flatDist(target.hrp.Position, ARENA)
 	local weights = {}
 	for name, def in pairs(A) do
@@ -4450,6 +4495,24 @@ Players.PlayerRemoving:Connect(function(plr)
 	G.fightTime[plr] = nil
 	G.inWake[plr] = nil
 end)
+
+-- «уже встречал» из сохранения → атрибут (сцена-знакомство не повторяется в следующих входах).
+-- Профиль грузится после входа — слушаем изменение атрибута набора флагов.
+local function restoreMet(plr: Player)
+	if plr:GetAttribute("ArchGuardianMet") ~= true and Prog.flag(plr, "guardian_met") then
+		plr:SetAttribute("ArchGuardianMet", true)
+	end
+end
+local function hookMet(plr: Player)
+	restoreMet(plr)
+	plr:GetAttributeChangedSignal(Prog.attrName("flags")):Connect(function()
+		restoreMet(plr)
+	end)
+end
+Players.PlayerAdded:Connect(hookMet)
+for _, p in ipairs(Players:GetPlayers()) do
+	hookMet(p)
+end
 ]==])
 
 put("ServerScriptService/Archipelago/Stage4Check", "Script", [==[
@@ -4950,6 +5013,11 @@ local function pickStrike(): Vector3?
 			local a = rng:NextNumber(0, math.pi * 2)
 			local d = rng:NextNumber(LZ.NEAR_DIST[1], LZ.NEAR_DIST[2])
 			local pos = p + Vector3.new(math.cos(a) * d, rng:NextNumber(-12, 12), math.sin(a) * d)
+			-- точка ушла внутрь острова (игрок летит низко) — ставим её на поверхность
+			local hit = workspace:Raycast(p, pos - p, rayParams)
+			if hit then
+				pos = hit.Position + hit.Normal * 2
+			end
 			if strikeAllowed(pos) then
 				return pos
 			end
@@ -5408,7 +5476,8 @@ local folder = FX.localFolder("Birds")
 local rng = Random.new()
 
 local flocks = {} -- [key] = flock
-local bboxCache = {}
+local bboxCache = setmetatable({}, { __mode = "k" })
+local T_BASE = os.clock() -- для math.noise (float32): маленькие числа
 
 local function makeBird(color: Color3, withTrail: boolean, parent: Instance): Part
 	local p = Instance.new("Part")
@@ -5491,12 +5560,16 @@ local function islandAnchors(cam: Vector3)
 		for _, regionFolder in ipairs(islands:GetChildren()) do
 			for _, m in ipairs(regionFolder:GetChildren()) do
 				if m:IsA("Model") then
+					-- остров мог прийти частями (подгрузка): пересчёт раз в 10 с, пустую рамку не помним
 					local c = bboxCache[m]
-					if not c then
+					if not c or os.clock() - c[2] > 10 then
 						local ok, cf, size = pcall(m.GetBoundingBox, m)
-						if ok then
-							c = { cf.Position + Vector3.new(0, size.Y * 0.5, 0) }
+						if ok and size.Magnitude > 1 then
+							c = { cf.Position + Vector3.new(0, size.Y * 0.5, 0), os.clock() }
 							bboxCache[m] = c
+						else
+							c = nil
+							bboxCache[m] = nil
 						end
 					end
 					if c then
@@ -5537,9 +5610,12 @@ local function refresh(cam: Vector3)
 		end
 	end
 	for key, a in pairs(want) do
-		if not flocks[key] then
+		local fl = flocks[key]
+		if not fl then
 			local seed = math.floor(a.pos.X * 0.37 + a.pos.Z * 1.31) % 100000
 			flocks[key] = newFlock(key, a.pos, seed)
+		elseif (fl.anchor - a.pos).Magnitude > 2 then
+			fl.anchor = a.pos -- рамка острова уточнилась
 		end
 	end
 end
@@ -5570,7 +5646,7 @@ local function poseFlock(fl, t: number, hrp: BasePart?)
 	local armed = hrp ~= nil and sinceScatter >= B.SCATTER_TIME
 	local hrpPos = hrp and hrp.Position
 	-- math.noise считает во float32: время сервера (~1e9) не годится, берём локальные часы
-	local tn = os.clock()
+	local tn = os.clock() - T_BASE
 	for i, b in ipairs(fl.birds) do
 		local a = b.a0 + ang * (1 + b.lag)
 		local flutter = math.noise(tn * 0.8 + b.ph, b.ph) * 6
@@ -5852,7 +5928,7 @@ local function standingOn(e, hrp: BasePart, hum: Humanoid): boolean
 	if not plat or not plat.Parent then
 		return false
 	end
-	rideRay.FilterDescendantsInstances = { plat }
+	rideRay.FilterDescendantsInstances = e.rig.rideParts or { plat }
 	local reach = hum.HipHeight + hrp.Size.Y * 0.5 + W.RIDE_RAY
 	local hit = workspace:Raycast(hrp.Position, Vector3.new(0, -reach, 0), rideRay)
 	return hit ~= nil
@@ -5897,15 +5973,21 @@ local function bounceFx(r, pos: Vector3)
 	FX.ring(pos - Vector3.new(0, 1, 0), r.size * 0.4, r.size * 1.6, 0.45, r.bell.Color, 0.8, 0.6)
 end
 
-local function tryBounce(g: number, j: number, r, top: Vector3, hrp: BasePart, hum: Humanoid)
+-- высота ног в этом и прошлом кадре: на скорости падения окно ±3 стад проскакивается за кадр,
+-- поэтому проверяем весь отрезок пути ног
+local feetNow, feetPrev = nil, nil
+local feetHrp = nil
+local jellySent = {} -- ["g:j"] = os.clock(), когда снова можно просить свет у сервера
+
+local function tryBounce(g: number, j: number, r, top: Vector3, hrp: BasePart, _hum: Humanoid)
 	local key = g .. ":" .. j
 	local now = os.clock()
-	if (jellyCd[key] or 0) > now then
+	if (jellyCd[key] or 0) > now or not feetNow then
 		return
 	end
-	local feet = hrp.Position.Y - (hum.HipHeight + hrp.Size.Y * 0.5)
-	local dy = feet - top.Y
-	if dy < -2.5 or dy > 3 then
+	local lo = math.min(feetPrev or feetNow, feetNow)
+	local hi = math.max(feetPrev or feetNow, feetNow)
+	if hi < top.Y - 2.5 or lo > top.Y + 3 then
 		return
 	end
 	local flat = Vector3.new(hrp.Position.X - top.X, 0, hrp.Position.Z - top.Z).Magnitude
@@ -5919,7 +6001,8 @@ local function tryBounce(g: number, j: number, r, top: Vector3, hrp: BasePart, h
 	jellyCd[key] = now + J.LOCAL_COOLDOWN
 	FX.knock(Vector3.new(0, BOUNCE - v.Y, 0))
 	bounceFx(r, top)
-	if remote then
+	if remote and (jellySent[key] or 0) <= now then
+		jellySent[key] = now + J.COOLDOWN
 		remote:FireServer("jelly", g, j)
 	end
 end
@@ -6085,7 +6168,19 @@ RunService.PreSimulation:Connect(function(dt)
 		end
 	end
 
-	-- медузы
+	-- медузы (ноги: этот кадр и прошлый)
+	if hrp and hum then
+		if hrp ~= feetHrp then
+			feetPrev = nil
+			feetHrp = hrp
+		end
+		feetNow = hrp.Position.Y - (hum.HipHeight + hrp.Size.Y * 0.5)
+		if feetPrev and math.abs(feetNow - feetPrev) > 40 then
+			feetPrev = nil -- телепорт
+		end
+	else
+		feetNow, feetPrev, feetHrp = nil, nil, nil
+	end
 	for g, grp in ipairs(Jellies.groups) do
 		local d = (grp.center - cam).Magnitude
 		if d < J.NEAR * 2.5 + grp.radius then
@@ -6098,6 +6193,7 @@ RunService.PreSimulation:Connect(function(dt)
 	if hrp then
 		checkSecret(hrp)
 	end
+	feetPrev = feetNow
 
 	if frame % 30 == 0 then
 		updateStripes(Clock.day(t).night)
@@ -6137,6 +6233,7 @@ local POSES = GB.POSES
 local OK = Ambience.OK
 
 local folder = FX.localFolder("Guardian")
+local T_BASE = os.clock() -- для math.noise (float32)
 local remote = Arch:WaitForChild("Remotes"):WaitForChild("Guardian", 30)
 
 -- ===== текст (ru/en). TODO(studio): перевести на ключи модуля Text (как на этапе 3) =====
@@ -6626,7 +6723,7 @@ local function rubbleSpots(spots, tFall: number)
 			shadow.Size = Vector3.new(0.25, def.radius * 2 * k, def.radius * 2 * k)
 			if left > 0 and left < 0.75 then
 				local f = 1 - left / 0.75
-				local y = 90 * (1 - f * f)
+				local y = (Cfg.LEASH_UP + 10) * (1 - f * f) -- падает со «потолка» арены: бьёт весь столб
 				local cf = CFrame.new(spot + Vector3.new(0, def.radius * 0.35 + y, 0)) * spin * CFrame.Angles(t * 3, t * 2, 0)
 				rock.CFrame = cf
 				rock2.CFrame = cf * CFrame.new(1, 1.2, -0.6) * CFrame.Angles(0.6, 0.3, 0)
@@ -7050,7 +7147,7 @@ local function banner(lines, color: Color3, dur: number, big: boolean?)
 	return gui
 end
 
-local function playCutscene()
+local function playCutscene(dur: number)
 	local cam = workspace.CurrentCamera
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
@@ -7099,7 +7196,7 @@ local function playCutscene()
 	hint.Parent = gui
 
 	local t0 = os.clock()
-	local DUR = 4.4
+	local DUR = dur
 	local done = false
 	local function finish()
 		if done then
@@ -7133,7 +7230,8 @@ local function playCutscene()
 	end)
 	RunService:BindToRenderStep("ArchGuardianCut", Enum.RenderPriority.Camera.Value + 1, function()
 		local k = (os.clock() - t0) / DUR
-		if k >= 1 then
+		-- пробуждение кончилось (или Страж пропал) — камеру сразу вернуть
+		if k >= 1 or not view or attr("GState") ~= "intro" then
 			skipConn:Disconnect()
 			finish()
 			return
@@ -7165,8 +7263,9 @@ local function checkMeet()
 		return
 	end
 	metShown = true
-	if st == "intro" then
-		playCutscene()
+	local left = (attr("GIntroT0") or 0) + Cfg.INTRO - workspace:GetServerTimeNow()
+	if st == "intro" and left >= 1.5 then
+		playCutscene(math.min(4.4, left))
 	else
 		banner({ T.name, T.sub }, L.GLOW, 3, true)
 	end
@@ -7203,7 +7302,7 @@ local function crumble()
 	for _, p in ipairs(rig.parts) do
 		if p.Parent then
 			p.Anchored = false
-			p.CanCollide = true
+			p.CanCollide = false -- тяжёлые обломки не должны сбрасывать игроков с арены
 			local out = (p.Position - center)
 			out = (out.Magnitude > 0.1) and out.Unit or Vector3.yAxis
 			p.AssemblyLinearVelocity = out * math.random(12, 30) + Vector3.new(0, math.random(10, 26), 0)
@@ -7288,7 +7387,7 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 	if not view or view.server ~= m then
 		buildView(m)
-		lastN = m:GetAttribute("GActN") or 0
+		lastN = -1 -- показать атаку, которая уже идёт (если её замах ещё не кончился)
 		lastState = ""
 	end
 
@@ -7348,7 +7447,8 @@ RunService.RenderStepped:Connect(function(dt)
 	local n = attr("GActN") or 0
 	if n ~= lastN then
 		lastN = n
-		if (attr("GAct") or "") ~= "" then
+		local def = A[attr("GAct") or ""]
+		if def and t < (attr("GActT0") or t) + def.windup + (def.duration or 0) then
 			startAct(n)
 		end
 	end
@@ -7390,8 +7490,8 @@ RunService.RenderStepped:Connect(function(dt)
 			tz -= breathe
 		end
 		if tremble > 0 and (name == "waist" or name == "neck") then
-			tx += math.noise(os.clock() * 22, 1) * 0.05 * tremble
-			tz += math.noise(os.clock() * 22, 2) * 0.05 * tremble
+			tx += math.noise((os.clock() - T_BASE) * 22, 1) * 0.05 * tremble
+			tz += math.noise((os.clock() - T_BASE) * 22, 2) * 0.05 * tremble
 		end
 		ang[name] = {
 			WorldMath.spring(s[1], tx, f, z, dt),
@@ -7725,7 +7825,7 @@ end
 
 local ffFolder = FX.localFolder("Fireflies")
 local ffEmitters = {} -- [ключ] = {part, emitter}
-local bboxCache = {}
+local bboxCache = setmetatable({}, { __mode = "k" })
 
 local function makeEmitter(parent: Instance): ParticleEmitter
 	local cfg = Night.FIREFLIES
@@ -7779,16 +7879,20 @@ local function islandModels()
 	return list
 end
 
+-- рамка острова; при подгрузке (StreamingEnabled) остров приходит частями — пересчёт раз в 10 с,
+-- пустую рамку (ничего ещё не пришло) не запоминаем
 local function bbox(m: Model)
 	local c = bboxCache[m]
-	if c and m.Parent then
+	local now = os.clock()
+	if c and m.Parent and now - c[3] < 10 then
 		return c[1], c[2]
 	end
 	local ok, cf, size = pcall(m.GetBoundingBox, m)
-	if not ok then
+	if not ok or size.Magnitude < 1 then
+		bboxCache[m] = nil
 		return nil, nil
 	end
-	bboxCache[m] = { cf, size }
+	bboxCache[m] = { cf, size, now }
 	return cf, size
 end
 
@@ -7843,21 +7947,28 @@ local function refreshFireflies(nightK: number)
 			ffEmitters[key] = nil
 		end
 	end
-	-- добавить новые
+	-- добавить новые и подвинуть старые (рамка могла уточниться при подгрузке)
 	for key, info in pairs(want) do
-		if not ffEmitters[key] then
-			if info.tagged then
+		local rec = ffEmitters[key]
+		if info.tagged then
+			if not rec then
 				ffEmitters[key] = { emitter = makeEmitter(key) }
-			else
-				local top = info.cf.Position + Vector3.new(0, info.size.Y * 0.5 + 10, 0)
+			end
+		else
+			local top = info.cf.Position + Vector3.new(0, info.size.Y * 0.5 + 10, 0)
+			local size = Vector3.new(math.min(info.size.X * 0.8, 400), 18, math.min(info.size.Z * 0.8, 400))
+			if not rec then
 				local part = FX.part({
 					Name = "FF_" .. key.Name,
 					Transparency = 1,
-					Size = Vector3.new(math.min(info.size.X * 0.8, 400), 18, math.min(info.size.Z * 0.8, 400)),
+					Size = size,
 					CFrame = CFrame.new(top),
 					Parent = ffFolder,
 				})
 				ffEmitters[key] = { part = part, emitter = makeEmitter(part) }
+			elseif rec.part then
+				rec.part.Size = size
+				rec.part.CFrame = CFrame.new(top)
 			end
 		end
 	end
@@ -8084,6 +8195,8 @@ local function blend(a, b, t)
 	return out
 end
 
+local snowK, lightClock = 0, os.clock() -- плавный переход гроза ↔ метель на границе Льда
+
 local function updateLight(I: number, snow: boolean, overcast: number)
 	if not Director then
 		return
@@ -8096,9 +8209,25 @@ local function updateLight(I: number, snow: boolean, overcast: number)
 		return
 	end
 	local L = WC.LIGHT
-	local heavy = snow and L.snow or L.storm
+	local c = os.clock()
+	local dtL = math.min(c - lightClock, 0.5)
+	lightClock = c
+	snowK += math.clamp((snow and 1 or 0) - snowK, -dtL / 3, dtL / 3)
+	local heavy = blend(L.storm, L.snow, snowK)
 	local props = blend(L.cloudy, heavy, math.clamp(I * 1.2, 0, 1))
 	local w = math.max(overcast * L.CLOUDY_WEIGHT, I)
+	-- значения погоды дневные: ночью темнее (иначе облачная ночь светлее полудня)
+	local nk = Clock.day().night
+	if nk > 0.001 then
+		local dk = 0.55 * nk
+		props["Lighting.Brightness"] = (props["Lighting.Brightness"] or 1) * (1 - 0.5 * nk)
+		for _, key in ipairs({ "Lighting.OutdoorAmbient", "Atmosphere.Color", "Atmosphere.Decay" }) do
+			local col = props[key]
+			if typeof(col) == "Color3" then
+				props[key] = col:Lerp(Color3.new(0, 0, 0), dk)
+			end
+		end
+	end
 	if flashK > 0.001 then
 		props["Lighting.Brightness"] = (props["Lighting.Brightness"] or 1) + L.FLASH_BRIGHTNESS * flashK
 		props["Grade.Brightness"] = (props["Grade.Brightness"] or 0) + 0.22 * flashK
@@ -8686,6 +8815,7 @@ RunService.RenderStepped:Connect(function(dt)
 	end
 	local camPos = cam.CFrame.Position
 	local inWorld = FX.inWorld()
+	local under = camPos.Y < ORIGIN.Y + LZ.SEA_Y -- под облачным морем — укрытие
 
 	-- вспышка гаснет быстро
 	if flashK > 0 then
@@ -8695,7 +8825,7 @@ RunService.RenderStepped:Connect(function(dt)
 	local clockNow = os.clock()
 	if clockNow - slowAt > 0.1 or flashK > 0 then
 		slowAt = clockNow
-		if inWorld then
+		if inWorld and not under then
 			local i2, s2 = Clock.stormAt(camPos, t)
 			I, snow = i2, s2
 		else
@@ -8711,7 +8841,8 @@ RunService.RenderStepped:Connect(function(dt)
 		updateWall(Clock.front(t), t, camPos)
 		updatePrecip(I, snow, camPos, cam.CFrame.LookVector)
 		updateGust(I, snow, t)
-		updateRainbow(Clock.rainbow(t), camPos)
+		-- радуга — только днём и не под облаками
+		updateRainbow(under and 0 or Clock.rainbow(t) * (1 - Clock.day(t).night), camPos)
 	else
 		destroyWall()
 		updatePrecip(0, false, camPos, cam.CFrame.LookVector)
