@@ -94,7 +94,7 @@ local function buildWall(f)
 	local W = WC.WALL
 	local model = Instance.new("Model")
 	model.Name = "StormWall"
-	local parts, rel, sizes = {}, {}, {}
+	local parts, rel, sizes, colors = {}, {}, {}, {}
 	local r = Random.new(f.seed)
 	for layer = 1, 2 do
 		local uBase = (layer == 1) and 0.42 or -0.05 -- передняя кромка плотнее
@@ -114,6 +114,7 @@ local function buildWall(f)
 					Parent = model,
 				})
 				table.insert(parts, p)
+				table.insert(colors, p.Color)
 				table.insert(rel, { u = u, v = v, y = y + r:NextNumber(-60, 60), ph = r:NextNumber(0, 6.28) })
 				table.insert(sizes, size)
 			end
@@ -128,7 +129,7 @@ local function buildWall(f)
 		Parent = model,
 	})
 	model.Parent = folder
-	return { model = model, parts = parts, rel = rel, sizes = sizes, sea = sea, seed = f.seed, base = W.COLOR, flash = {}, cfs = table.create(#parts) }
+	return { model = model, parts = parts, rel = rel, sizes = sizes, colors = colors, sea = sea, seed = f.seed, cfs = table.create(#parts) }
 end
 
 local function destroyWall()
@@ -147,7 +148,7 @@ local function cloudFlash(n: number)
 	for _ = 1, n do
 		local i = rng:NextInteger(1, #wall.parts)
 		local p = wall.parts[i]
-		local orig = p.Color
+		local orig = wall.colors[i] -- настоящий цвет (не текущий: вспышки могут перекрываться)
 		local seq = { 0.07, 0.05, 0.11 }
 		task.spawn(function()
 			for k, d in ipairs(seq) do
@@ -619,13 +620,15 @@ local function updateRainbow(k: number, cam: Vector3)
 	local right = anti:Cross(Vector3.yAxis).Unit
 	local center = cam + anti * R.DIST - Vector3.new(0, R.RADIUS * 0.22, 0)
 	rainbow.base.CFrame = CFrame.new(center)
+	-- сравниваем с ПРИМЕНЁННОЙ видимостью: радуга проявляется медленно
+	local upd = math.abs(k - rainbow.vis) > 0.01
 	for b, band in ipairs(rainbow.bands) do
 		local rad = R.RADIUS - (b - 1) * R.BAND
 		for i = 0, rainbow.seg do
 			local a = math.pi * i / rainbow.seg
 			band.atts[i].Position = right * math.cos(a) * rad + Vector3.yAxis * math.sin(a) * rad
 		end
-		if math.abs(k - rainbow.vis) > 0.01 then
+		if upd then
 			local tr = 1 - k * (1 - R.ALPHA)
 			for i, bm in ipairs(band.beams) do
 				local e0 = (i == 1) and 1 or tr
@@ -638,7 +641,9 @@ local function updateRainbow(k: number, cam: Vector3)
 			end
 		end
 	end
-	rainbow.vis = k
+	if upd then
+		rainbow.vis = k
+	end
 end
 
 -- ===== главный цикл =====

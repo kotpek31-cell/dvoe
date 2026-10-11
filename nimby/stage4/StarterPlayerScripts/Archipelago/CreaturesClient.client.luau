@@ -378,6 +378,9 @@ RunService.PreSimulation:Connect(function(dt)
 	if hum and hum.Health <= 0 then
 		hrp, hum = nil, nil
 	end
+	if not (hrp and hum) then
+		riding = nil -- умер / перерождается: старая езда не тянет новое тело
+	end
 
 	if not inWorld then
 		for _, e in ipairs(whales) do
@@ -413,7 +416,10 @@ RunService.PreSimulation:Connect(function(dt)
 				e.lastAt = t
 				e.lastBack = back
 				-- перенос: игрок стоял на площадке — сдвигаем его вместе с ней
-				if riding == e and oldBack and hrp then
+				if riding == e and charDist >= 400 then
+					riding = nil -- телепорт/возрождение далеко от кита
+				end
+				if riding == e and oldBack and hrp and charDist < 400 then
 					hrp.CFrame = back * oldBack:Inverse() * hrp.CFrame
 				end
 				if hrp and hum and charDist < 400 then

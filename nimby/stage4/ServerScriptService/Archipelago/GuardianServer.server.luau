@@ -550,7 +550,11 @@ local function doSlam(target)
 	end)
 end
 
-local function doSweep()
+local function doSweep(target)
+	-- взмах — в того, кто рядом (ради него и выбран)
+	local v = target.hrp.Position - ARENA
+	yaw = math.atan2(-v.X, -v.Z)
+	placeModel()
 	local def = A.sweep
 	local t0, id = beginAction("sweep", nil)
 	local face = yaw
@@ -575,6 +579,8 @@ local function doQuake()
 	local def = A.quake
 	local t0, id = beginAction("quake", nil)
 	local tS = t0 + def.windup
+	-- атака длится, пока кольцо не дойдёт до края (иначе очистка снимет его шаги раньше)
+	G.action.tEnd = math.max(G.action.tEnd, tS + (def.maxR + def.width) / def.speed + def.recover)
 	local function step()
 		local r = def.speed * (now() - tS)
 		if r > def.maxR + def.width then
@@ -592,6 +598,7 @@ local function doQuake()
 end
 
 local function doBeams()
+	tickHit = {}
 	local def = A.beams
 	local n = def.count[G.phase] or 3
 	local sign = (rng:NextNumber() < 0.5) and -1 or 1
@@ -623,7 +630,8 @@ local function doBeams()
 				end
 			end
 		end
-		at(t + def.tick, step)
+		-- проверяем часто (луч крутится), урон всё равно не чаще def.tick на игрока
+		at(t + 0.05, step)
 	end
 	at(tS, step)
 end
@@ -703,7 +711,7 @@ local function startAttack(list)
 	if name == "slam" then
 		doSlam(target)
 	elseif name == "sweep" then
-		doSweep()
+		doSweep(target)
 	elseif name == "quake" then
 		doQuake()
 	elseif name == "beams" then
@@ -759,7 +767,13 @@ wake = function()
 		restoring = false
 		lastHp = G.maxHp
 		setAttr("GMaxHp", G.maxHp)
-		scaleHealth(#fighters())
+		local nPlayers = 0
+		for _, f in ipairs(fighters()) do
+			if f.kind == "player" then
+				nPlayers += 1
+			end
+		end
+		scaleHealth(nPlayers)
 		G.phase = 1
 		setAttr("GPhase", 1)
 		setState("fight")

@@ -138,12 +138,23 @@ end
 
 local shakes = {}
 local shakeBound = false
+-- что тряска добавила к камере в этом кадре: до обновления камеры возвращаем как было,
+-- иначе стандартная камера «запомнит» поворот и взгляд уплывёт
+local applied = CFrame.identity
+local written: CFrame? = nil
 
 local function bindShake()
 	if shakeBound then
 		return
 	end
 	shakeBound = true
+	RunService:BindToRenderStep("ArchWorldShakeUndo", Enum.RenderPriority.Camera.Value - 1, function()
+		local cam = workspace.CurrentCamera
+		if cam and written and cam.CFrame == written then
+			cam.CFrame = cam.CFrame * applied:Inverse()
+		end
+		applied, written = CFrame.identity, nil
+	end)
 	RunService:BindToRenderStep("ArchWorldShake", Enum.RenderPriority.Camera.Value + 2, function()
 		if #shakes == 0 then
 			return
@@ -164,7 +175,9 @@ local function bindShake()
 		end
 		local cam = workspace.CurrentCamera
 		if cam then
-			cam.CFrame = cam.CFrame * CFrame.Angles(math.rad(rx), math.rad(ry), math.rad(rz))
+			applied = CFrame.Angles(math.rad(rx), math.rad(ry), math.rad(rz))
+			cam.CFrame = cam.CFrame * applied
+			written = cam.CFrame
 		end
 	end)
 end

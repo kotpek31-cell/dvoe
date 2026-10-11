@@ -23,6 +23,7 @@ local startAt = WorldMath.phaseStart(Night.START_PHASE or "day", Clock.PHASES)
 State:SetAttribute("DayLength", L)
 State:SetAttribute("DayOffset", 0)
 State:SetAttribute("DayEpoch", now - startAt)
+Clock.invalidate()
 
 -- ===== закатный остров =====
 
@@ -115,6 +116,7 @@ local function setCycle(target: number)
 	local epoch = State:GetAttribute("DayEpoch") or 0
 	local raw = (t - epoch) % L
 	State:SetAttribute("DayOffset", (target - raw) % L)
+	Clock.invalidate()
 	tick()
 end
 

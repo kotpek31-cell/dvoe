@@ -164,6 +164,8 @@ local skyVis = -1
 local function updateSky(vis: number, t: number)
 	skyAnchor.CFrame = CFrame.new(FX.camPos())
 	local on = vis > 0.02
+	-- линии обновляем, когда видимость ушла от ПРИМЕНЁННОЙ больше чем на 0.01 (ночь наступает медленно)
+	local applyLines = on and math.abs(vis - skyVis) > 0.01
 	for ci, c in ipairs(constellations) do
 		c.gui.Enabled = on
 		if on then
@@ -173,14 +175,16 @@ local function updateSky(vis: number, t: number)
 				s.BackgroundTransparency = 1 - vis * tw
 				f.glows[i].BackgroundTransparency = 1 - vis * 0.28 * tw
 			end
-			if math.abs(vis - skyVis) > 0.01 then
+			if applyLines then
 				for _, l in ipairs(f.lines) do
 					l.BackgroundTransparency = 1 - vis * 0.42
 				end
 			end
 		end
 	end
-	skyVis = vis
+	if applyLines then
+		skyVis = vis
+	end
 end
 
 -- ===== северное сияние (Beams над Ледяным венцом) =====
@@ -234,6 +238,7 @@ end
 local auroraVis = -1
 local function updateAurora(vis: number, t: number)
 	local on = vis > 0.02
+	local apply = on and math.abs(vis - auroraVis) > 0.01
 	for c, cur in ipairs(aurora.curtains) do
 		for i, b in ipairs(cur.beams) do
 			b.Enabled = on
@@ -241,7 +246,7 @@ local function updateAurora(vis: number, t: number)
 				-- края всего занавеса растворяются
 				local e0 = (i == 1) and 1 or 0.35
 				local e1 = (i == #cur.beams) and 1 or 0.35
-				if math.abs(vis - auroraVis) > 0.01 then
+				if apply then
 					local m = 1 - vis * 0.75
 					b.Transparency = NumberSequence.new({
 						NumberSequenceKeypoint.new(0, math.max(e0, m)),
@@ -262,7 +267,9 @@ local function updateAurora(vis: number, t: number)
 			end
 		end
 	end
-	auroraVis = vis
+	if apply then
+		auroraVis = vis
+	end
 end
 
 -- ===== светлячки =====
@@ -505,10 +512,22 @@ end)
 
 local State = Clock.State
 State:GetAttributeChangedSignal("SunsetIsland"):Connect(function()
-	if State:GetAttribute("SunsetIsland") == false then
-		for _, inst in ipairs(CollectionService:GetTagged("ArchSunsetOnly")) do
-			if inst:IsDescendantOf(workspace) then
+	local v = State:GetAttribute("SunsetIsland")
+	for _, inst in ipairs(CollectionService:GetTagged("ArchSunsetOnly")) do
+		if inst:IsDescendantOf(workspace) then
+			if v == false then
 				fadeSunset(inst, false)
+			elseif v == true then
+				-- закат вернули, пока остров ещё не спрятан: проявить от текущей прозрачности
+				for _, p in ipairs(sunsetParts(inst)) do
+					if p.LocalTransparencyModifier > 0 then
+						TweenService:Create(
+							p,
+							TweenInfo.new(Night.SUNSET.FADE, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+							{ LocalTransparencyModifier = 0 }
+						):Play()
+					end
+				end
 			end
 		end
 	end

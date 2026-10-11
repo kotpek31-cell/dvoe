@@ -165,6 +165,10 @@ report("Whale", safe(function()
 end))
 
 -- ===== Страж =====
+-- (через функцию: анализатор не «сужает» тип состояния между вызовами)
+local function ginfo(): any
+	return Bus.call("Guardian", 5, "info")
+end
 report("Guardian", safe(function()
 	local okHooks, Hooks = pcall(function()
 		return require(ServerStorage:WaitForChild("HaloHooks", 5))
@@ -172,7 +176,7 @@ report("Guardian", safe(function()
 	if not okHooks or type(Hooks) ~= "table" or type(Hooks.damage) ~= "function" then
 		return false, "нет HaloHooks.damage"
 	end
-	local info = Bus.call("Guardian", 5, "info")
+	local info = ginfo()
 	if type(info) ~= "table" then
 		return false, "нет шины Guardian"
 	end
@@ -183,8 +187,8 @@ report("Guardian", safe(function()
 	task.wait(0.3)
 	Bus.call("Guardian", 5, "wake")
 	task.wait(GCfg.INTRO + 0.6)
-	info = Bus.call("Guardian", 5, "info")
-	if info.state ~= "fight" then
+	info = ginfo()
+	if tostring(info.state) ~= "fight" then
 		return false, "после пробуждения состояние " .. tostring(info.state)
 	end
 	local model = workspace.Archipelago.Guardian:FindFirstChild("TempleGuardian")
@@ -199,33 +203,33 @@ report("Guardian", safe(function()
 	local hooksHit = hum.Health < before
 	hum.Health = hum.MaxHealth * 0.5
 	task.wait(0.4)
-	info = Bus.call("Guardian", 5, "info")
-	if info.state ~= "transition" then
+	info = ginfo()
+	if tostring(info.state) ~= "transition" then
 		return false, "на 50% нет перехода (" .. tostring(info.state) .. ")"
 	end
 	task.wait(GCfg.TRANSITION + 0.5)
-	info = Bus.call("Guardian", 5, "info")
+	info = ginfo()
 	if info.phase ~= 2 then
 		return false, "фаза после перехода " .. tostring(info.phase)
 	end
 	hum = model:FindFirstChildOfClass("Humanoid")
 	hum.Health = hum.MaxHealth * 0.1
 	task.wait(GCfg.TRANSITION + 0.9)
-	info = Bus.call("Guardian", 5, "info")
+	info = ginfo()
 	if info.phase ~= 3 then
 		return false, "третья фаза не началась (" .. tostring(info.phase) .. ")"
 	end
 	hum = model:FindFirstChildOfClass("Humanoid")
 	hum.Health = 0
 	task.wait(0.5)
-	info = Bus.call("Guardian", 5, "info")
-	if info.state ~= "dead" then
+	info = ginfo()
+	if tostring(info.state) ~= "dead" then
 		return false, "не умер (" .. tostring(info.state) .. ")"
 	end
 	Bus.call("Guardian", 5, "spawn")
 	task.wait(0.5)
-	info = Bus.call("Guardian", 5, "info")
-	if info.state ~= "dormant" or info.health ~= info.maxHealth then
+	info = ginfo()
+	if tostring(info.state) ~= "dormant" or info.health ~= info.maxHealth then
 		return false, "не возродился (" .. tostring(info.state) .. ")"
 	end
 	return true, "пробуждение → бой, фазы 1→2→3, смерть, возрождение; HaloHooks.damage по Стражу: " .. (hooksHit and "проходит" or "НЕ проходит (проверить зоны Hooks)")

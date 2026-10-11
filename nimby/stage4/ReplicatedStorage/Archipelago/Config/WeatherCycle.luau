@@ -103,8 +103,10 @@ return {
 			["Atmosphere.Haze"] = 2.2,
 			["Atmosphere.Glare"] = 0,
 			["Atmosphere.Color"] = C3(170, 178, 196),
+			["Atmosphere.Decay"] = C3(110, 118, 150),
 			["Grade.Saturation"] = -0.12,
 			["Grade.Contrast"] = 0.02,
+			["Grade.Brightness"] = 0,
 			["SunRays.Intensity"] = 0.02,
 		},
 		storm = {

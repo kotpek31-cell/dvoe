@@ -182,16 +182,21 @@ local function poseFlock(fl, t: number, hrp: BasePart?)
 		sc = math.sin(math.min(k * 3, 1) * math.pi * 0.5) * (1 - k) ^ 1.5 -- быстро разлетелись, медленно вернулись
 	end
 	local hit = false
+	-- снова пугаться можно только когда стайка собралась (иначе разлёт перезапускается каждый кадр)
+	local armed = hrp ~= nil and sinceScatter >= B.SCATTER_TIME
+	local hrpPos = hrp and hrp.Position
+	-- math.noise считает во float32: время сервера (~1e9) не годится, берём локальные часы
+	local tn = os.clock()
 	for i, b in ipairs(fl.birds) do
 		local a = b.a0 + ang * (1 + b.lag)
-		local flutter = math.noise(t * 0.8 + b.ph, b.ph) * 6
+		local flutter = math.noise(tn * 0.8 + b.ph, b.ph) * 6
 		local pos = fl.anchor
 			+ Vector3.new(math.cos(a) * (b.rr + flutter), b.h + math.sin(t * b.bob + b.ph) * 4, math.sin(a) * (b.rr + flutter))
 		if sc > 0 then
 			pos += b.scatter * sc
 		end
 		fl.cfs[i] = CFrame.new(pos)
-		if hrp and sc < 0.05 and (pos - hrp.Position).Magnitude < B.SCATTER_RADIUS * 0.4 then
+		if armed and not hit and (pos - hrpPos).Magnitude < B.SCATTER_RADIUS * 0.4 then
 			hit = true
 		end
 	end

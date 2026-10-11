@@ -128,6 +128,7 @@ local function writeFront(f)
 	State:SetAttribute("StormWidth", f.width)
 	State:SetAttribute("StormDepth", f.depth)
 	State:SetAttribute("StormSeed", f.seed)
+	Clock.invalidate()
 end
 
 -- ===== смена погоды =====
@@ -141,6 +142,7 @@ local function setWeather(name: string, seconds: number)
 	State:SetAttribute("WeatherT1", t + seconds)
 	ver += 1
 	State:SetAttribute("WeatherVer", ver)
+	Clock.invalidate()
 end
 
 local function startStorm(target: Vector3?, arrive: number?)
@@ -214,6 +216,10 @@ end
 
 -- молния не бьёт в Кузницу, метель (лёд), зоны других режимов
 local function strikeAllowed(pos: Vector3): boolean
+	-- под облачным морем гроза не бьёт (там «укрытие», осадков тоже нет)
+	if pos.Y < ORIGIN.Y + LZ.SEA_Y then
+		return false
+	end
 	local I, snow = Clock.stormAt(pos)
 	return I >= LZ.MIN_STORM and not snow
 end
@@ -303,8 +309,9 @@ end
 
 -- расстояние до вертикального столба молнии (от земли до тучи)
 local function boltDist(p: Vector3, s): number
-	local top = s.pos.Y + LZ.BOLT_HEIGHT
-	local y = math.clamp(p.Y, s.groundY, top)
+	local lo = s.groundY
+	local hi = math.max(lo, s.pos.Y + LZ.BOLT_HEIGHT)
+	local y = math.clamp(p.Y, lo, hi)
 	local dx, dz = p.X - s.pos.X, p.Z - s.pos.Z
 	local dy = p.Y - y
 	return math.sqrt(dx * dx + dy * dy + dz * dz)
@@ -346,12 +353,14 @@ Bus.serve("Weather", function(cmd, a, b)
 				return false, "дождь бывает только после грозы: weather storm"
 			end
 			State:SetAttribute("StormT1", now())
+			Clock.invalidate()
 			advance()
 		elseif DUR[name] then
 			-- ясно / облачно / радуга по команде: фронт (если был) сразу уходит
 			if Clock.front() then
 				State:SetAttribute("StormT1", now())
 				State:SetAttribute("StormEnd", now())
+				Clock.invalidate()
 			end
 			setWeather(name, WorldMath.duration(DUR[name], rng:NextNumber()))
 		else

@@ -75,7 +75,8 @@ function Whales.frameAt(w, t: number, back: number?): CFrame
 	if look.Magnitude < 1e-4 then
 		look = Vector3.new(0, 0, -1)
 	end
-	local roll = math.clamp(-w.route:yawRate(s) * W.BANK_GAIN, -W.BANK, W.BANK)
+	-- yawRate > 0 — поворот налево; крен внутрь поворота (левый бок ниже) — roll > 0
+	local roll = math.clamp(w.route:yawRate(s) * W.BANK_GAIN, -W.BANK, W.BANK)
 	return CFrame.lookAt(pos, pos + look.Unit) * CFrame.Angles(0, 0, roll)
 end
 

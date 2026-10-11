@@ -40,6 +40,11 @@ State.AttributeChanged:Connect(function()
 	dirty = true
 end)
 
+-- сервер пишет атрибуты и тут же читает Clock в том же потоке (сигналы отложены) — сбросить кэш вручную
+function Clock.invalidate()
+	dirty = true
+end
+
 local function refresh()
 	if not dirty then
 		return cache

@@ -637,7 +637,7 @@ local function updateAct(t: number)
 			for _, o in ipairs(act.holder:GetChildren()) do
 				o:Destroy()
 			end
-			quakeWave(arena, act.t0 + def.windup, def, folder)
+			quakeWave(arena, act.t0 + def.windup, def, act.holder)
 			impact(arena, 26, 1.2)
 			snd(SND.QUAKE, FB.quake, arena, { range = 500, min = 40 })
 		end
@@ -1129,7 +1129,8 @@ if remote then
 			FX.flash(L.DANGER, 0.7, 0.4)
 			FX.shake(2, 0.35)
 		elseif kind == "rubble" and type(a) == "table" and type(b) == "number" then
-			if FX.inWorld() then
+			-- далеко от арены не строим (камнепад видят только рядом)
+			if FX.inWorld() and typeof(a[1]) == "Vector3" and (a[1] - FX.camPos()).Magnitude < 450 then
 				rubbleSpots(a, b)
 			end
 		elseif kind == "reward" and type(a) == "table" then
@@ -1280,8 +1281,8 @@ RunService.RenderStepped:Connect(function(dt)
 			tz -= breathe
 		end
 		if tremble > 0 and (name == "waist" or name == "neck") then
-			tx += math.noise(t * 22, 1) * 0.05 * tremble
-			tz += math.noise(t * 22, 2) * 0.05 * tremble
+			tx += math.noise(os.clock() * 22, 1) * 0.05 * tremble
+			tz += math.noise(os.clock() * 22, 2) * 0.05 * tremble
 		end
 		ang[name] = {
 			WorldMath.spring(s[1], tx, f, z, dt),

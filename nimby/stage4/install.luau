@@ -845,6 +845,7 @@ return {
 			recover = 0.9,
 			speed = 46, -- стад/с
 			maxR = 92,
+			duration = 2.11, -- (maxR + width) / speed: кольцо успевает дойти до края, атака не кончается раньше
 			width = 5,
 			height = 4.5, -- выше над полом — волна не задевает
 			damage = 22,
@@ -1330,8 +1331,10 @@ return {
 			["Atmosphere.Haze"] = 2.2,
 			["Atmosphere.Glare"] = 0,
 			["Atmosphere.Color"] = C3(170, 178, 196),
+			["Atmosphere.Decay"] = C3(110, 118, 150),
 			["Grade.Saturation"] = -0.12,
 			["Grade.Contrast"] = 0.02,
+			["Grade.Brightness"] = 0,
 			["SunRays.Intensity"] = 0.02,
 		},
 		storm = {
@@ -1649,7 +1652,8 @@ function Whales.frameAt(w, t: number, back: number?): CFrame
 	if look.Magnitude < 1e-4 then
 		look = Vector3.new(0, 0, -1)
 	end
-	local roll = math.clamp(-w.route:yawRate(s) * W.BANK_GAIN, -W.BANK, W.BANK)
+	-- yawRate > 0 — поворот налево; крен внутрь поворота (левый бок ниже) — roll > 0
+	local roll = math.clamp(w.route:yawRate(s) * W.BANK_GAIN, -W.BANK, W.BANK)
 	return CFrame.lookAt(pos, pos + look.Unit) * CFrame.Angles(0, 0, roll)
 end
 
@@ -1737,6 +1741,11 @@ local cache = {}
 State.AttributeChanged:Connect(function()
 	dirty = true
 end)
+
+-- сервер пишет атрибуты и тут же читает Clock в том же потоке (сигналы отложены) — сбросить кэш вручную
+function Clock.invalidate()
+	dirty = true
+end
 
 local function refresh()
 	if not dirty then
@@ -2079,12 +2088,23 @@ end
 
 local shakes = {}
 local shakeBound = false
+-- что тряска добавила к камере в этом кадре: до обновления камеры возвращаем как было,
+-- иначе стандартная камера «запомнит» поворот и взгляд уплывёт
+local applied = CFrame.identity
+local written: CFrame? = nil
 
 local function bindShake()
 	if shakeBound then
 		return
 	end
 	shakeBound = true
+	RunService:BindToRenderStep("ArchWorldShakeUndo", Enum.RenderPriority.Camera.Value - 1, function()
+		local cam = workspace.CurrentCamera
+		if cam and written and cam.CFrame == written then
+			cam.CFrame = cam.CFrame * applied:Inverse()
+		end
+		applied, written = CFrame.identity, nil
+	end)
 	RunService:BindToRenderStep("ArchWorldShake", Enum.RenderPriority.Camera.Value + 2, function()
 		if #shakes == 0 then
 			return
@@ -2105,7 +2125,9 @@ local function bindShake()
 		end
 		local cam = workspace.CurrentCamera
 		if cam then
-			cam.CFrame = cam.CFrame * CFrame.Angles(math.rad(rx), math.rad(ry), math.rad(rz))
+			applied = CFrame.Angles(math.rad(rx), math.rad(ry), math.rad(rz))
+			cam.CFrame = cam.CFrame * applied
+			written = cam.CFrame
 		end
 	end)
 end
@@ -3209,6 +3231,7 @@ local startAt = WorldMath.phaseStart(Night.START_PHASE or "day", Clock.PHASES)
 State:SetAttribute("DayLength", L)
 State:SetAttribute("DayOffset", 0)
 State:SetAttribute("DayEpoch", now - startAt)
+Clock.invalidate()
 
 -- ===== закатный остров =====
 
@@ -3301,6 +3324,7 @@ local function setCycle(target: number)
 	local epoch = State:GetAttribute("DayEpoch") or 0
 	local raw = (t - epoch) % L
 	State:SetAttribute("DayOffset", (target - raw) % L)
+	Clock.invalidate()
 	tick()
 end
 
@@ -3898,7 +3922,11 @@ local function doSlam(target)
 	end)
 end
 
-local function doSweep()
+local function doSweep(target)
+	-- взмах — в того, кто рядом (ради него и выбран)
+	local v = target.hrp.Position - ARENA
+	yaw = math.atan2(-v.X, -v.Z)
+	placeModel()
 	local def = A.sweep
 	local t0, id = beginAction("sweep", nil)
 	local face = yaw
@@ -3923,6 +3951,8 @@ local function doQuake()
 	local def = A.quake
 	local t0, id = beginAction("quake", nil)
 	local tS = t0 + def.windup
+	-- атака длится, пока кольцо не дойдёт до края (иначе очистка снимет его шаги раньше)
+	G.action.tEnd = math.max(G.action.tEnd, tS + (def.maxR + def.width) / def.speed + def.recover)
 	local function step()
 		local r = def.speed * (now() - tS)
 		if r > def.maxR + def.width then
@@ -3940,6 +3970,7 @@ local function doQuake()
 end
 
 local function doBeams()
+	tickHit = {}
 	local def = A.beams
 	local n = def.count[G.phase] or 3
 	local sign = (rng:NextNumber() < 0.5) and -1 or 1
@@ -3971,7 +4002,8 @@ local function doBeams()
 				end
 			end
 		end
-		at(t + def.tick, step)
+		-- проверяем часто (луч крутится), урон всё равно не чаще def.tick на игрока
+		at(t + 0.05, step)
 	end
 	at(tS, step)
 end
@@ -4051,7 +4083,7 @@ local function startAttack(list)
 	if name == "slam" then
 		doSlam(target)
 	elseif name == "sweep" then
-		doSweep()
+		doSweep(target)
 	elseif name == "quake" then
 		doQuake()
 	elseif name == "beams" then
@@ -4107,7 +4139,13 @@ wake = function()
 		restoring = false
 		lastHp = G.maxHp
 		setAttr("GMaxHp", G.maxHp)
-		scaleHealth(#fighters())
+		local nPlayers = 0
+		for _, f in ipairs(fighters()) do
+			if f.kind == "player" then
+				nPlayers += 1
+			end
+		end
+		scaleHealth(nPlayers)
 		G.phase = 1
 		setAttr("GPhase", 1)
 		setState("fight")
@@ -4582,6 +4620,10 @@ report("Whale", safe(function()
 end))
 
 -- ===== Страж =====
+-- (через функцию: анализатор не «сужает» тип состояния между вызовами)
+local function ginfo(): any
+	return Bus.call("Guardian", 5, "info")
+end
 report("Guardian", safe(function()
 	local okHooks, Hooks = pcall(function()
 		return require(ServerStorage:WaitForChild("HaloHooks", 5))
@@ -4589,7 +4631,7 @@ report("Guardian", safe(function()
 	if not okHooks or type(Hooks) ~= "table" or type(Hooks.damage) ~= "function" then
 		return false, "нет HaloHooks.damage"
 	end
-	local info = Bus.call("Guardian", 5, "info")
+	local info = ginfo()
 	if type(info) ~= "table" then
 		return false, "нет шины Guardian"
 	end
@@ -4600,8 +4642,8 @@ report("Guardian", safe(function()
 	task.wait(0.3)
 	Bus.call("Guardian", 5, "wake")
 	task.wait(GCfg.INTRO + 0.6)
-	info = Bus.call("Guardian", 5, "info")
-	if info.state ~= "fight" then
+	info = ginfo()
+	if tostring(info.state) ~= "fight" then
 		return false, "после пробуждения состояние " .. tostring(info.state)
 	end
 	local model = workspace.Archipelago.Guardian:FindFirstChild("TempleGuardian")
@@ -4616,33 +4658,33 @@ report("Guardian", safe(function()
 	local hooksHit = hum.Health < before
 	hum.Health = hum.MaxHealth * 0.5
 	task.wait(0.4)
-	info = Bus.call("Guardian", 5, "info")
-	if info.state ~= "transition" then
+	info = ginfo()
+	if tostring(info.state) ~= "transition" then
 		return false, "на 50% нет перехода (" .. tostring(info.state) .. ")"
 	end
 	task.wait(GCfg.TRANSITION + 0.5)
-	info = Bus.call("Guardian", 5, "info")
+	info = ginfo()
 	if info.phase ~= 2 then
 		return false, "фаза после перехода " .. tostring(info.phase)
 	end
 	hum = model:FindFirstChildOfClass("Humanoid")
 	hum.Health = hum.MaxHealth * 0.1
 	task.wait(GCfg.TRANSITION + 0.9)
-	info = Bus.call("Guardian", 5, "info")
+	info = ginfo()
 	if info.phase ~= 3 then
 		return false, "третья фаза не началась (" .. tostring(info.phase) .. ")"
 	end
 	hum = model:FindFirstChildOfClass("Humanoid")
 	hum.Health = 0
 	task.wait(0.5)
-	info = Bus.call("Guardian", 5, "info")
-	if info.state ~= "dead" then
+	info = ginfo()
+	if tostring(info.state) ~= "dead" then
 		return false, "не умер (" .. tostring(info.state) .. ")"
 	end
 	Bus.call("Guardian", 5, "spawn")
 	task.wait(0.5)
-	info = Bus.call("Guardian", 5, "info")
-	if info.state ~= "dormant" or info.health ~= info.maxHealth then
+	info = ginfo()
+	if tostring(info.state) ~= "dormant" or info.health ~= info.maxHealth then
 		return false, "не возродился (" .. tostring(info.state) .. ")"
 	end
 	return true, "пробуждение → бой, фазы 1→2→3, смерть, возрождение; HaloHooks.damage по Стражу: " .. (hooksHit and "проходит" or "НЕ проходит (проверить зоны Hooks)")
@@ -4790,6 +4832,7 @@ local function writeFront(f)
 	State:SetAttribute("StormWidth", f.width)
 	State:SetAttribute("StormDepth", f.depth)
 	State:SetAttribute("StormSeed", f.seed)
+	Clock.invalidate()
 end
 
 -- ===== смена погоды =====
@@ -4803,6 +4846,7 @@ local function setWeather(name: string, seconds: number)
 	State:SetAttribute("WeatherT1", t + seconds)
 	ver += 1
 	State:SetAttribute("WeatherVer", ver)
+	Clock.invalidate()
 end
 
 local function startStorm(target: Vector3?, arrive: number?)
@@ -4876,6 +4920,10 @@ end
 
 -- молния не бьёт в Кузницу, метель (лёд), зоны других режимов
 local function strikeAllowed(pos: Vector3): boolean
+	-- под облачным морем гроза не бьёт (там «укрытие», осадков тоже нет)
+	if pos.Y < ORIGIN.Y + LZ.SEA_Y then
+		return false
+	end
 	local I, snow = Clock.stormAt(pos)
 	return I >= LZ.MIN_STORM and not snow
 end
@@ -4965,8 +5013,9 @@ end
 
 -- расстояние до вертикального столба молнии (от земли до тучи)
 local function boltDist(p: Vector3, s): number
-	local top = s.pos.Y + LZ.BOLT_HEIGHT
-	local y = math.clamp(p.Y, s.groundY, top)
+	local lo = s.groundY
+	local hi = math.max(lo, s.pos.Y + LZ.BOLT_HEIGHT)
+	local y = math.clamp(p.Y, lo, hi)
 	local dx, dz = p.X - s.pos.X, p.Z - s.pos.Z
 	local dy = p.Y - y
 	return math.sqrt(dx * dx + dy * dy + dz * dz)
@@ -5008,12 +5057,14 @@ Bus.serve("Weather", function(cmd, a, b)
 				return false, "дождь бывает только после грозы: weather storm"
 			end
 			State:SetAttribute("StormT1", now())
+			Clock.invalidate()
 			advance()
 		elseif DUR[name] then
 			-- ясно / облачно / радуга по команде: фронт (если был) сразу уходит
 			if Clock.front() then
 				State:SetAttribute("StormT1", now())
 				State:SetAttribute("StormEnd", now())
+				Clock.invalidate()
 			end
 			setWeather(name, WorldMath.duration(DUR[name], rng:NextNumber()))
 		else
@@ -5515,16 +5566,21 @@ local function poseFlock(fl, t: number, hrp: BasePart?)
 		sc = math.sin(math.min(k * 3, 1) * math.pi * 0.5) * (1 - k) ^ 1.5 -- быстро разлетелись, медленно вернулись
 	end
 	local hit = false
+	-- снова пугаться можно только когда стайка собралась (иначе разлёт перезапускается каждый кадр)
+	local armed = hrp ~= nil and sinceScatter >= B.SCATTER_TIME
+	local hrpPos = hrp and hrp.Position
+	-- math.noise считает во float32: время сервера (~1e9) не годится, берём локальные часы
+	local tn = os.clock()
 	for i, b in ipairs(fl.birds) do
 		local a = b.a0 + ang * (1 + b.lag)
-		local flutter = math.noise(t * 0.8 + b.ph, b.ph) * 6
+		local flutter = math.noise(tn * 0.8 + b.ph, b.ph) * 6
 		local pos = fl.anchor
 			+ Vector3.new(math.cos(a) * (b.rr + flutter), b.h + math.sin(t * b.bob + b.ph) * 4, math.sin(a) * (b.rr + flutter))
 		if sc > 0 then
 			pos += b.scatter * sc
 		end
 		fl.cfs[i] = CFrame.new(pos)
-		if hrp and sc < 0.05 and (pos - hrp.Position).Magnitude < B.SCATTER_RADIUS * 0.4 then
+		if armed and not hit and (pos - hrpPos).Magnitude < B.SCATTER_RADIUS * 0.4 then
 			hit = true
 		end
 	end
@@ -5973,6 +6029,9 @@ RunService.PreSimulation:Connect(function(dt)
 	if hum and hum.Health <= 0 then
 		hrp, hum = nil, nil
 	end
+	if not (hrp and hum) then
+		riding = nil -- умер / перерождается: старая езда не тянет новое тело
+	end
 
 	if not inWorld then
 		for _, e in ipairs(whales) do
@@ -6008,7 +6067,10 @@ RunService.PreSimulation:Connect(function(dt)
 				e.lastAt = t
 				e.lastBack = back
 				-- перенос: игрок стоял на площадке — сдвигаем его вместе с ней
-				if riding == e and oldBack and hrp then
+				if riding == e and charDist >= 400 then
+					riding = nil -- телепорт/возрождение далеко от кита
+				end
+				if riding == e and oldBack and hrp and charDist < 400 then
 					hrp.CFrame = back * oldBack:Inverse() * hrp.CFrame
 				end
 				if hrp and hum and charDist < 400 then
@@ -6684,7 +6746,7 @@ local function updateAct(t: number)
 			for _, o in ipairs(act.holder:GetChildren()) do
 				o:Destroy()
 			end
-			quakeWave(arena, act.t0 + def.windup, def, folder)
+			quakeWave(arena, act.t0 + def.windup, def, act.holder)
 			impact(arena, 26, 1.2)
 			snd(SND.QUAKE, FB.quake, arena, { range = 500, min = 40 })
 		end
@@ -7176,7 +7238,8 @@ if remote then
 			FX.flash(L.DANGER, 0.7, 0.4)
 			FX.shake(2, 0.35)
 		elseif kind == "rubble" and type(a) == "table" and type(b) == "number" then
-			if FX.inWorld() then
+			-- далеко от арены не строим (камнепад видят только рядом)
+			if FX.inWorld() and typeof(a[1]) == "Vector3" and (a[1] - FX.camPos()).Magnitude < 450 then
 				rubbleSpots(a, b)
 			end
 		elseif kind == "reward" and type(a) == "table" then
@@ -7327,8 +7390,8 @@ RunService.RenderStepped:Connect(function(dt)
 			tz -= breathe
 		end
 		if tremble > 0 and (name == "waist" or name == "neck") then
-			tx += math.noise(t * 22, 1) * 0.05 * tremble
-			tz += math.noise(t * 22, 2) * 0.05 * tremble
+			tx += math.noise(os.clock() * 22, 1) * 0.05 * tremble
+			tz += math.noise(os.clock() * 22, 2) * 0.05 * tremble
 		end
 		ang[name] = {
 			WorldMath.spring(s[1], tx, f, z, dt),
@@ -7550,6 +7613,8 @@ local skyVis = -1
 local function updateSky(vis: number, t: number)
 	skyAnchor.CFrame = CFrame.new(FX.camPos())
 	local on = vis > 0.02
+	-- линии обновляем, когда видимость ушла от ПРИМЕНЁННОЙ больше чем на 0.01 (ночь наступает медленно)
+	local applyLines = on and math.abs(vis - skyVis) > 0.01
 	for ci, c in ipairs(constellations) do
 		c.gui.Enabled = on
 		if on then
@@ -7559,14 +7624,16 @@ local function updateSky(vis: number, t: number)
 				s.BackgroundTransparency = 1 - vis * tw
 				f.glows[i].BackgroundTransparency = 1 - vis * 0.28 * tw
 			end
-			if math.abs(vis - skyVis) > 0.01 then
+			if applyLines then
 				for _, l in ipairs(f.lines) do
 					l.BackgroundTransparency = 1 - vis * 0.42
 				end
 			end
 		end
 	end
-	skyVis = vis
+	if applyLines then
+		skyVis = vis
+	end
 end
 
 -- ===== северное сияние (Beams над Ледяным венцом) =====
@@ -7620,6 +7687,7 @@ end
 local auroraVis = -1
 local function updateAurora(vis: number, t: number)
 	local on = vis > 0.02
+	local apply = on and math.abs(vis - auroraVis) > 0.01
 	for c, cur in ipairs(aurora.curtains) do
 		for i, b in ipairs(cur.beams) do
 			b.Enabled = on
@@ -7627,7 +7695,7 @@ local function updateAurora(vis: number, t: number)
 				-- края всего занавеса растворяются
 				local e0 = (i == 1) and 1 or 0.35
 				local e1 = (i == #cur.beams) and 1 or 0.35
-				if math.abs(vis - auroraVis) > 0.01 then
+				if apply then
 					local m = 1 - vis * 0.75
 					b.Transparency = NumberSequence.new({
 						NumberSequenceKeypoint.new(0, math.max(e0, m)),
@@ -7648,7 +7716,9 @@ local function updateAurora(vis: number, t: number)
 			end
 		end
 	end
-	auroraVis = vis
+	if apply then
+		auroraVis = vis
+	end
 end
 
 -- ===== светлячки =====
@@ -7891,10 +7961,22 @@ end)
 
 local State = Clock.State
 State:GetAttributeChangedSignal("SunsetIsland"):Connect(function()
-	if State:GetAttribute("SunsetIsland") == false then
-		for _, inst in ipairs(CollectionService:GetTagged("ArchSunsetOnly")) do
-			if inst:IsDescendantOf(workspace) then
+	local v = State:GetAttribute("SunsetIsland")
+	for _, inst in ipairs(CollectionService:GetTagged("ArchSunsetOnly")) do
+		if inst:IsDescendantOf(workspace) then
+			if v == false then
 				fadeSunset(inst, false)
+			elseif v == true then
+				-- закат вернули, пока остров ещё не спрятан: проявить от текущей прозрачности
+				for _, p in ipairs(sunsetParts(inst)) do
+					if p.LocalTransparencyModifier > 0 then
+						TweenService:Create(
+							p,
+							TweenInfo.new(Night.SUNSET.FADE, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+							{ LocalTransparencyModifier = 0 }
+						):Play()
+					end
+				end
 			end
 		end
 	end
@@ -8039,7 +8121,7 @@ local function buildWall(f)
 	local W = WC.WALL
 	local model = Instance.new("Model")
 	model.Name = "StormWall"
-	local parts, rel, sizes = {}, {}, {}
+	local parts, rel, sizes, colors = {}, {}, {}, {}
 	local r = Random.new(f.seed)
 	for layer = 1, 2 do
 		local uBase = (layer == 1) and 0.42 or -0.05 -- передняя кромка плотнее
@@ -8059,6 +8141,7 @@ local function buildWall(f)
 					Parent = model,
 				})
 				table.insert(parts, p)
+				table.insert(colors, p.Color)
 				table.insert(rel, { u = u, v = v, y = y + r:NextNumber(-60, 60), ph = r:NextNumber(0, 6.28) })
 				table.insert(sizes, size)
 			end
@@ -8073,7 +8156,7 @@ local function buildWall(f)
 		Parent = model,
 	})
 	model.Parent = folder
-	return { model = model, parts = parts, rel = rel, sizes = sizes, sea = sea, seed = f.seed, base = W.COLOR, flash = {}, cfs = table.create(#parts) }
+	return { model = model, parts = parts, rel = rel, sizes = sizes, colors = colors, sea = sea, seed = f.seed, cfs = table.create(#parts) }
 end
 
 local function destroyWall()
@@ -8092,7 +8175,7 @@ local function cloudFlash(n: number)
 	for _ = 1, n do
 		local i = rng:NextInteger(1, #wall.parts)
 		local p = wall.parts[i]
-		local orig = p.Color
+		local orig = wall.colors[i] -- настоящий цвет (не текущий: вспышки могут перекрываться)
 		local seq = { 0.07, 0.05, 0.11 }
 		task.spawn(function()
 			for k, d in ipairs(seq) do
@@ -8564,13 +8647,15 @@ local function updateRainbow(k: number, cam: Vector3)
 	local right = anti:Cross(Vector3.yAxis).Unit
 	local center = cam + anti * R.DIST - Vector3.new(0, R.RADIUS * 0.22, 0)
 	rainbow.base.CFrame = CFrame.new(center)
+	-- сравниваем с ПРИМЕНЁННОЙ видимостью: радуга проявляется медленно
+	local upd = math.abs(k - rainbow.vis) > 0.01
 	for b, band in ipairs(rainbow.bands) do
 		local rad = R.RADIUS - (b - 1) * R.BAND
 		for i = 0, rainbow.seg do
 			local a = math.pi * i / rainbow.seg
 			band.atts[i].Position = right * math.cos(a) * rad + Vector3.yAxis * math.sin(a) * rad
 		end
-		if math.abs(k - rainbow.vis) > 0.01 then
+		if upd then
 			local tr = 1 - k * (1 - R.ALPHA)
 			for i, bm in ipairs(band.beams) do
 				local e0 = (i == 1) and 1 or tr
@@ -8583,7 +8668,9 @@ local function updateRainbow(k: number, cam: Vector3)
 			end
 		end
 	end
-	rainbow.vis = k
+	if upd then
+		rainbow.vis = k
+	end
 end
 
 -- ===== главный цикл =====

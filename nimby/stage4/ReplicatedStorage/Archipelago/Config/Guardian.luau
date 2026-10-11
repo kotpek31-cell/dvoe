@@ -63,6 +63,7 @@ return {
 			recover = 0.9,
 			speed = 46, -- стад/с
 			maxR = 92,
+			duration = 2.11, -- (maxR + width) / speed: кольцо успевает дойти до края, атака не кончается раньше
 			width = 5,
 			height = 4.5, -- выше над полом — волна не задевает
 			damage = 22,
